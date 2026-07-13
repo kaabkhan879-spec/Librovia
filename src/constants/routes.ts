@@ -1,0 +1,14 @@
+export const ROUTES = {
+  LANDING: '/',
+  LOGIN: '/login',
+  REGISTER: '/register',
+  DASHBOARD: '/dashboard',
+  LIBRARY: '/library',
+  UPLOAD: '/upload',
+  BOOK_DETAILS: '/books/:id',
+  READER: '/reader/:id',
+  FAVORITES: '/favorites',
+  CATEGORIES: '/categories',
+  PROFILE: '/profile',
+  SETTINGS: '/settings',
+} as const
