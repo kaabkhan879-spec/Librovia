@@ -20,15 +20,29 @@ export const Footer: React.FC = () => {
           </Link>
 
           <nav className="flex flex-wrap justify-center gap-x-8 gap-y-3">
+            <a href="#about" className="hover:text-brand-600 text-sm text-slate-500">
+              About
+            </a>
             <a href="#features" className="hover:text-brand-600 text-sm text-slate-500">
               Features
             </a>
-            <a href="#pricing" className="hover:text-brand-600 text-sm text-slate-500">
-              Pricing
+            <a href="#privacy" className="hover:text-brand-600 text-sm text-slate-500">
+              Privacy Policy
             </a>
-            <Link to={ROUTES.LOGIN} className="hover:text-brand-600 text-sm text-slate-500">
-              Sign In
-            </Link>
+            <a href="#terms" className="hover:text-brand-600 text-sm text-slate-500">
+              Terms
+            </a>
+            <a href="#contact" className="hover:text-brand-600 text-sm text-slate-500">
+              Contact
+            </a>
+            <a
+              href="https://github.com"
+              target="_blank"
+              rel="noreferrer"
+              className="hover:text-brand-600 text-sm text-slate-500"
+            >
+              GitHub
+            </a>
           </nav>
 
           <p className="text-sm text-slate-400">

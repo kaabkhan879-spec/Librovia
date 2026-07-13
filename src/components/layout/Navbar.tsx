@@ -23,11 +23,17 @@ export const MarketingNavbar: React.FC = () => {
 
         {/* Desktop Nav */}
         <nav className="hidden items-center gap-6 md:flex">
+          <a href="#home" className="hover:text-brand-600 text-sm font-medium text-slate-600">
+            Home
+          </a>
           <a href="#features" className="hover:text-brand-600 text-sm font-medium text-slate-600">
             Features
           </a>
-          <a href="#pricing" className="hover:text-brand-600 text-sm font-medium text-slate-600">
-            Pricing
+          <a href="#about" className="hover:text-brand-600 text-sm font-medium text-slate-600">
+            About
+          </a>
+          <a href="#faq" className="hover:text-brand-600 text-sm font-medium text-slate-600">
+            FAQ
           </a>
           <Link
             to={ROUTES.DESIGN_SYSTEM}
