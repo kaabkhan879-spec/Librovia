@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ROUTES } from '../../constants/routes'
@@ -14,7 +14,15 @@ import {
   Sliders,
   Clock,
   Trash2,
+  Maximize,
+  Minimize,
+  RotateCw,
 } from 'lucide-react'
+import { booksService, type Book } from '../../services/books'
+import { Document, Page, pdfjs } from 'react-pdf'
+
+// Set react-pdf worker source to CDN worker
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
 
 interface Annotation {
   id: string
@@ -30,29 +38,42 @@ interface Chapter {
 
 export const ReaderPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
-  const bookTitle = useMemo(() => {
-    if (id) {
-      return id.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-    }
-    return 'Atomic Habits'
-  }, [id])
+  const containerRef = useRef<HTMLDivElement>(null)
 
-  // Reading settings states
-  const [page, setPage] = useState(15)
-  const [totalPages] = useState(320)
-  const [zoom, setZoom] = useState(100)
-  const [theme, setTheme] = useState<'light' | 'dark' | 'sepia'>('sepia')
+  // Database book models
+  const [rawBook, setRawBook] = useState<Book | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
+  // Reader states
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [scale, setScale] = useState(1.0)
+  const [fitMode, setFitMode] = useState<'custom' | 'width' | 'page'>('custom')
+  const [rotation, setRotation] = useState<number>(0)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+
+  // Dimensions of single page
+  const [originalPageWidth, setOriginalPageWidth] = useState(600)
+  const [originalPageHeight, setOriginalPageHeight] = useState(800)
+
+  // Theme configuration (Persist selection locally)
+  const [theme, setTheme] = useState<'light' | 'dark' | 'sepia'>(() => {
+    const saved = localStorage.getItem('librovia-reader-theme')
+    return saved === 'light' || saved === 'dark' || saved === 'sepia' ? saved : 'sepia'
+  })
+
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [activeTab, setActiveTab] = useState<'toc' | 'thumbs' | 'bookmarks' | 'notes'>('toc')
   const [showSettings, setShowSettings] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Text options
+  // Text options (UI mockup elements)
   const [fontSize, setFontSize] = useState<'sm' | 'base' | 'lg' | 'xl'>('base')
   const [lineHeight, setLineHeight] = useState<'normal' | 'relaxed' | 'loose'>('relaxed')
   const [pageWidth, setPageWidth] = useState<'narrow' | 'medium' | 'wide'>('medium')
 
-  // Interactive bookmark and highlights records
+  // Local interactive bookmarks & notes (not saved to Supabase yet as requested)
   const [bookmarks, setBookmarks] = useState<number[]>([5, 12, 15])
   const [highlights, setHighlights] = useState<Annotation[]>([
     {
@@ -70,7 +91,7 @@ export const ReaderPage: React.FC = () => {
   ])
   const [noteInput, setNoteInput] = useState('')
 
-  // Simulated chapters
+  // Chapters Mockup list
   const chapters: Chapter[] = [
     { title: 'Introduction: My Story', page: 1 },
     { title: 'Chapter 1: The Surprising Power of Atomic Habits', page: 12 },
@@ -79,13 +100,164 @@ export const ReaderPage: React.FC = () => {
     { title: 'Chapter 4: The Man Who Didnt Look Right', page: 55 },
   ]
 
-  const handleNextPage = () => {
-    setPage((prev) => Math.min(prev + 1, totalPages))
-  }
+  // Query Supabase for book path on mount
+  useEffect(() => {
+    if (!id) return
+    Promise.resolve().then(() => {
+      setLoading(true)
+      setErrorMsg(null)
+    })
 
-  const handlePrevPage = () => {
+    booksService
+      .getBookById(id)
+      .then((data) => {
+        if (!data) {
+          setErrorMsg('Book not found or access denied.')
+          setLoading(false)
+          return
+        }
+
+        const isPdf = data.filePath.toLowerCase().split('?')[0].endsWith('.pdf')
+        if (!isPdf) {
+          setErrorMsg('Only PDF files are supported in this reader mode.')
+          setLoading(false)
+          return
+        }
+
+        setRawBook(data)
+        const resumePage = data.currentPage && data.currentPage > 0 ? data.currentPage : 1
+        setPage(resumePage)
+        setLoading(false)
+      })
+      .catch((err) => {
+        console.error(err)
+        setErrorMsg('Failed to load secure PDF from Supabase storage.')
+        setLoading(false)
+      })
+  }, [id])
+
+  // Local storage theme synchronization
+  useEffect(() => {
+    localStorage.setItem('librovia-reader-theme', theme)
+  }, [theme])
+
+  // Fullscreen event listener sync
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement)
+    }
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }, [])
+
+  // Auto layout fitting scale calculation logic
+  const adjustScale = useCallback(() => {
+    if (!containerRef.current || !originalPageWidth || !originalPageHeight) return
+    // Padding offsets
+    const containerWidth = containerRef.current.clientWidth - 48
+    const containerHeight = containerRef.current.clientHeight - 48
+
+    if (fitMode === 'width') {
+      setScale(containerWidth / originalPageWidth)
+    } else if (fitMode === 'page') {
+      setScale(Math.min(containerWidth / originalPageWidth, containerHeight / originalPageHeight))
+    }
+  }, [originalPageWidth, originalPageHeight, fitMode])
+
+  useEffect(() => {
+    adjustScale()
+    window.addEventListener('resize', adjustScale)
+    return () => window.removeEventListener('resize', adjustScale)
+  }, [adjustScale])
+
+  const handleNextPage = useCallback(() => {
+    setPage((prev) => Math.min(prev + 1, totalPages))
+  }, [totalPages])
+
+  const handlePrevPage = useCallback(() => {
     setPage((prev) => Math.max(prev - 1, 1))
-  }
+  }, [])
+
+  const handleZoomIn = useCallback(() => {
+    setFitMode('custom')
+    setScale((prev) => Math.min(prev + 0.1, 3.0))
+  }, [])
+
+  const handleZoomOut = useCallback(() => {
+    setFitMode('custom')
+    setScale((prev) => Math.max(prev - 0.1, 0.4))
+  }, [])
+
+  const handleRotate = useCallback(() => {
+    setRotation((prev) => (prev + 90) % 360)
+  }, [])
+
+  const handleFullscreenToggle = useCallback(() => {
+    if (!document.fullscreenElement) {
+      containerRef.current?.requestFullscreen().catch((err) => {
+        console.error('Error enabling fullscreen mode:', err)
+      })
+    } else {
+      document.exitFullscreen()
+    }
+  }, [])
+
+  // Keyboard shortcut keys
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        document.activeElement?.tagName === 'INPUT' ||
+        document.activeElement?.tagName === 'TEXTAREA'
+      ) {
+        return
+      }
+
+      switch (e.key) {
+        case 'ArrowRight':
+        case ' ':
+          e.preventDefault()
+          handleNextPage()
+          break
+        case 'ArrowLeft':
+        case 'Backspace':
+          e.preventDefault()
+          handlePrevPage()
+          break
+        case '+':
+        case '=':
+          e.preventDefault()
+          handleZoomIn()
+          break
+        case '-':
+        case '_':
+          e.preventDefault()
+          handleZoomOut()
+          break
+        case 'r':
+        case 'R':
+          e.preventDefault()
+          handleRotate()
+          break
+        case 'f':
+        case 'F':
+          e.preventDefault()
+          handleFullscreenToggle()
+          break
+        default:
+          break
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [
+    handleNextPage,
+    handlePrevPage,
+    handleZoomIn,
+    handleZoomOut,
+    handleRotate,
+    handleFullscreenToggle,
+  ])
 
   const toggleBookmark = () => {
     if (bookmarks.includes(page)) {
@@ -136,24 +308,32 @@ export const ReaderPage: React.FC = () => {
     setNoteInput('')
   }
 
+  // Ctrl + Mouse Wheel Zoom helper
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (e.ctrlKey) {
+      e.preventDefault()
+      if (e.deltaY < 0) {
+        handleZoomIn()
+      } else {
+        handleZoomOut()
+      }
+    }
+  }
+
+  const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
+    setTotalPages(numPages)
+  }
+
+  const onPageLoadSuccess = (p: { width: number; height: number }) => {
+    setOriginalPageWidth(p.width)
+    setOriginalPageHeight(p.height)
+  }
+
   // Theme styling definitions
   const themeClasses = {
-    light: 'bg-white text-slate-900 border-slate-200',
-    dark: 'bg-neutral-900 text-neutral-100 border-neutral-800',
-    sepia: 'bg-[#f4ecd8] text-[#5b4636] border-[#e4dcc4]',
-  }
-
-  const fontClasses = {
-    sm: 'text-xs',
-    base: 'text-sm',
-    lg: 'text-base',
-    xl: 'text-lg',
-  }
-
-  const leadingClasses = {
-    normal: 'leading-normal',
-    relaxed: 'leading-relaxed',
-    loose: 'leading-loose',
+    light: 'bg-white text-slate-900 border-slate-200 shadow-xl',
+    dark: 'bg-neutral-900 text-neutral-100 border-neutral-800 shadow-2xl',
+    sepia: 'bg-[#f4ecd8] text-[#5b4636] border-[#e4dcc4] shadow-xl',
   }
 
   const widthClasses = {
@@ -162,13 +342,48 @@ export const ReaderPage: React.FC = () => {
     wide: 'max-w-3xl',
   }
 
+  if (loading) {
+    return (
+      <div className="flex h-screen w-screen flex-col items-center justify-center bg-neutral-950 text-neutral-400">
+        <div className="border-primary-600 h-10 w-10 animate-spin rounded-full border-4 border-t-transparent" />
+        <p className="mt-4 text-xs font-bold tracking-wider uppercase">
+          Loading secure PDF documents...
+        </p>
+      </div>
+    )
+  }
+
+  if (errorMsg || !rawBook) {
+    return (
+      <div className="flex h-screen w-screen flex-col items-center justify-center bg-neutral-950 p-6 text-center text-neutral-400">
+        <div className="max-w-md rounded-2xl border border-red-500/20 bg-red-500/10 p-8">
+          <h2 className="text-sm font-bold tracking-widest text-red-400 uppercase">
+            Error Loading Book
+          </h2>
+          <p className="mt-2 text-xs text-neutral-300">{errorMsg || 'Failed to open reader.'}</p>
+          <Link to={ROUTES.LIBRARY} className="mt-6 inline-block">
+            <button className="bg-primary-600 hover:bg-primary-700 rounded-lg px-4 py-2 text-xs font-bold tracking-wider text-white uppercase transition-colors">
+              Return to Library
+            </button>
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div
-      className={`flex h-screen w-screen flex-col overflow-hidden font-sans transition-colors duration-300 select-none ${theme === 'dark' ? 'bg-neutral-950 text-neutral-200' : 'bg-neutral-100 text-slate-800'}`}
+      className={`flex h-screen w-screen flex-col overflow-hidden font-sans transition-colors duration-300 select-none ${
+        theme === 'dark' ? 'bg-neutral-950 text-neutral-200' : 'bg-neutral-100 text-slate-800'
+      }`}
     >
       {/* Top Toolbar */}
       <header
-        className={`z-20 flex h-16 shrink-0 items-center justify-between border-b px-4 ${theme === 'dark' ? 'border-neutral-800 bg-neutral-900' : 'border-slate-200 bg-white shadow-sm'}`}
+        className={`z-20 flex h-16 shrink-0 items-center justify-between border-b px-4 ${
+          theme === 'dark'
+            ? 'border-neutral-800 bg-neutral-900'
+            : 'border-slate-200 bg-white shadow-sm'
+        }`}
       >
         {/* Left side actions */}
         <div className="flex items-center gap-3">
@@ -180,11 +395,11 @@ export const ReaderPage: React.FC = () => {
             <ArrowLeft className="h-4.5 w-4.5" />
           </Link>
           <div className="text-left">
-            <h1 className="text-text-main text-xs font-bold tracking-wider uppercase">
-              {bookTitle}
+            <h1 className="text-text-main max-w-[200px] truncate text-xs font-bold tracking-wider uppercase">
+              {rawBook.title}
             </h1>
             <p className="text-text-muted text-[10px]">
-              By James Clear • Page {page} of {totalPages}
+              By {rawBook.author} • Page {page} of {totalPages}
             </p>
           </div>
         </div>
@@ -208,15 +423,17 @@ export const ReaderPage: React.FC = () => {
           {/* Zoom controls */}
           <div className="border-border-base bg-bg-surface hidden items-center gap-1 rounded-lg border p-0.5 sm:flex">
             <button
-              onClick={() => setZoom((z) => Math.max(z - 10, 50))}
+              onClick={handleZoomOut}
               className="text-text-sub hover:text-text-main cursor-pointer p-1"
               title="Zoom Out"
             >
               <ZoomOut className="h-4 w-4" />
             </button>
-            <span className="w-10 text-center text-[10px] font-bold">{zoom}%</span>
+            <span className="w-12 text-center text-[10px] font-bold">
+              {Math.round(scale * 100)}%
+            </span>
             <button
-              onClick={() => setZoom((z) => Math.min(z + 10, 150))}
+              onClick={handleZoomIn}
               className="text-text-sub hover:text-text-main cursor-pointer p-1"
               title="Zoom In"
             >
@@ -224,13 +441,53 @@ export const ReaderPage: React.FC = () => {
             </button>
           </div>
 
+          {/* Scale Fit Selects */}
+          <div className="border-border-base bg-bg-surface hidden items-center rounded-lg border p-0.5 sm:flex">
+            <button
+              onClick={() => setFitMode(fitMode === 'width' ? 'custom' : 'width')}
+              className={`cursor-pointer rounded px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase ${
+                fitMode === 'width' ? 'bg-primary-600 text-white' : 'text-text-sub hover:bg-bg-app'
+              }`}
+            >
+              Fit Width
+            </button>
+            <button
+              onClick={() => setFitMode(fitMode === 'page' ? 'custom' : 'page')}
+              className={`cursor-pointer rounded px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase ml-1${
+                fitMode === 'page' ? 'bg-primary-600 text-white' : 'text-text-sub hover:bg-bg-app'
+              }`}
+            >
+              Fit Page
+            </button>
+          </div>
+
+          {/* Rotation Toggle */}
+          <button
+            onClick={handleRotate}
+            className="text-text-sub hover:bg-bg-app hover:text-text-main cursor-pointer rounded-lg p-2"
+            title="Rotate Page"
+          >
+            <RotateCw className="h-4 w-4" />
+          </button>
+
+          {/* Fullscreen Toggle */}
+          <button
+            onClick={handleFullscreenToggle}
+            className="text-text-sub hover:bg-bg-app hover:text-text-main cursor-pointer rounded-lg p-2"
+            title="Fullscreen Toggle"
+          >
+            {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+          </button>
+
           {/* Theme select switch */}
           <div className="border-border-base bg-bg-surface flex rounded-lg border p-0.5">
             {(['light', 'dark', 'sepia'] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setTheme(t)}
-                className={`cursor-pointer rounded px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase ${theme === t ? 'bg-primary-600 text-white' : 'text-text-sub hover:bg-bg-app'} `}
+                className={`cursor-pointer rounded px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase ${
+                  theme === t ? 'bg-primary-600 text-white' : 'text-text-sub hover:bg-bg-app'
+                } `}
               >
                 {t}
               </button>
@@ -260,7 +517,11 @@ export const ReaderPage: React.FC = () => {
           {/* Bookmark page */}
           <button
             onClick={toggleBookmark}
-            className={`cursor-pointer rounded-lg p-2 ${bookmarks.includes(page) ? 'bg-amber-500/10 text-amber-500' : 'text-text-sub hover:bg-bg-app'}`}
+            className={`cursor-pointer rounded-lg p-2 ${
+              bookmarks.includes(page)
+                ? 'bg-amber-500/10 text-amber-500'
+                : 'text-text-sub hover:bg-bg-app'
+            }`}
             title="Bookmark Page"
           >
             <Bookmark
@@ -272,7 +533,11 @@ export const ReaderPage: React.FC = () => {
           {/* Text options settings dropdown */}
           <button
             onClick={() => setShowSettings(!showSettings)}
-            className={`cursor-pointer rounded-lg p-2 ${showSettings ? 'text-primary-600 bg-primary-50 dark:bg-primary-500/10' : 'text-text-sub hover:bg-bg-app'}`}
+            className={`cursor-pointer rounded-lg p-2 ${
+              showSettings
+                ? 'text-primary-600 bg-primary-50 dark:bg-primary-500/10'
+                : 'text-text-sub hover:bg-bg-app'
+            }`}
             title="Reading Settings"
           >
             <Sliders className="h-4.5 w-4.5" />
@@ -281,7 +546,11 @@ export const ReaderPage: React.FC = () => {
           {/* Collapse sidebar */}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className={`cursor-pointer rounded-lg p-2 ${sidebarOpen ? 'text-primary-600 bg-primary-50 dark:bg-primary-500/10' : 'text-text-sub hover:bg-bg-app'}`}
+            className={`cursor-pointer rounded-lg p-2 ${
+              sidebarOpen
+                ? 'text-primary-600 bg-primary-50 dark:bg-primary-500/10'
+                : 'text-text-sub hover:bg-bg-app'
+            }`}
             title="Toggle Navigation drawer"
           >
             <List className="h-4.5 w-4.5" />
@@ -293,7 +562,9 @@ export const ReaderPage: React.FC = () => {
       <div className="relative flex flex-1 overflow-hidden">
         {/* Left Side Drawer */}
         <div
-          className={`bg-bg-surface border-border-base relative z-10 flex flex-col border-r text-left transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-0 overflow-hidden'}`}
+          className={`bg-bg-surface border-border-base relative z-10 flex flex-col border-r text-left transition-all duration-300 ${
+            sidebarOpen ? 'w-64' : 'w-0 overflow-hidden'
+          }`}
         >
           {/* Tab selectors */}
           <div className="border-border-base bg-bg-app flex border-b">
@@ -327,7 +598,11 @@ export const ReaderPage: React.FC = () => {
                   <button
                     key={idx}
                     onClick={() => setPage(ch.page)}
-                    className={`flex w-full cursor-pointer items-center justify-between rounded-lg p-2 text-left text-xs transition-colors ${page === ch.page ? 'bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400 font-bold' : 'text-text-sub hover:bg-bg-app'} `}
+                    className={`flex w-full cursor-pointer items-center justify-between rounded-lg p-2 text-left text-xs transition-colors ${
+                      page === ch.page
+                        ? 'bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400 font-bold'
+                        : 'text-text-sub hover:bg-bg-app'
+                    } `}
                   >
                     <span className="truncate pr-2">{ch.title}</span>
                     <span className="text-text-muted shrink-0 font-mono text-[10px]">
@@ -340,13 +615,17 @@ export const ReaderPage: React.FC = () => {
 
             {activeTab === 'thumbs' && (
               <div className="grid grid-cols-2 gap-3">
-                {Array.from({ length: 10 }).map((_, idx) => {
-                  const pNum = idx * 5 + 1
+                {Array.from({ length: Math.min(10, totalPages) }).map((_, idx) => {
+                  const pNum = idx * 2 + 1
                   return (
                     <button
                       key={idx}
                       onClick={() => setPage(pNum)}
-                      className={`flex aspect-[0.7/1] cursor-pointer flex-col justify-between rounded-lg border p-2 text-center transition-all ${page === pNum ? 'border-primary-500 bg-primary-50/10' : 'border-border-base hover:bg-bg-app'} `}
+                      className={`flex aspect-[0.7/1] cursor-pointer flex-col justify-between rounded-lg border p-2 text-center transition-all ${
+                        page === pNum
+                          ? 'border-primary-500 bg-primary-50/10'
+                          : 'border-border-base hover:bg-bg-app'
+                      } `}
                     >
                       <div className="bg-border-light/40 text-text-muted flex w-full flex-1 items-center justify-center rounded text-[10px]">
                         📄
@@ -371,7 +650,11 @@ export const ReaderPage: React.FC = () => {
                     <button
                       key={p}
                       onClick={() => setPage(p)}
-                      className={`flex w-full cursor-pointer items-center gap-2 rounded-lg p-2 text-left text-xs ${p === page ? 'bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400 font-bold' : 'text-text-sub hover:bg-bg-app'} `}
+                      className={`flex w-full cursor-pointer items-center gap-2 rounded-lg p-2 text-left text-xs ${
+                        p === page
+                          ? 'bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400 font-bold'
+                          : 'text-text-sub hover:bg-bg-app'
+                      } `}
                     >
                       <Bookmark className="h-3.5 w-3.5" fill="currentColor" />
                       <span>Page {p} Bookmarked</span>
@@ -450,9 +733,9 @@ export const ReaderPage: React.FC = () => {
                 </span>
                 <button
                   onClick={() => setShowSettings(false)}
-                  className="text-text-muted hover:text-text-main"
+                  className="text-text-muted hover:text-text-main cursor-pointer"
                 >
-                  <X className="h-4 w-4" />
+                  ✕
                 </button>
               </div>
 
@@ -466,7 +749,11 @@ export const ReaderPage: React.FC = () => {
                     <button
                       key={sz}
                       onClick={() => setFontSize(sz)}
-                      className={`flex-1 cursor-pointer rounded py-1 text-[10px] font-bold tracking-wider uppercase ${fontSize === sz ? 'bg-primary-600 text-white' : 'text-text-sub hover:bg-bg-surface'}`}
+                      className={`flex-1 cursor-pointer rounded py-1 text-[10px] font-bold tracking-wider uppercase ${
+                        fontSize === sz
+                          ? 'bg-primary-600 text-white'
+                          : 'text-text-sub hover:bg-bg-surface'
+                      }`}
                     >
                       {sz}
                     </button>
@@ -484,7 +771,11 @@ export const ReaderPage: React.FC = () => {
                     <button
                       key={lh}
                       onClick={() => setLineHeight(lh)}
-                      className={`flex-1 cursor-pointer rounded py-1 text-[10px] font-bold tracking-wider uppercase ${lineHeight === lh ? 'bg-primary-600 text-white' : 'text-text-sub hover:bg-bg-surface'}`}
+                      className={`flex-1 cursor-pointer rounded py-1 text-[10px] font-bold tracking-wider uppercase ${
+                        lineHeight === lh
+                          ? 'bg-primary-600 text-white'
+                          : 'text-text-sub hover:bg-bg-surface'
+                      }`}
                     >
                       {lh}
                     </button>
@@ -502,7 +793,11 @@ export const ReaderPage: React.FC = () => {
                     <button
                       key={wd}
                       onClick={() => setPageWidth(wd)}
-                      className={`flex-1 cursor-pointer rounded py-1 text-[10px] font-bold tracking-wider uppercase ${pageWidth === wd ? 'bg-primary-600 text-white' : 'text-text-sub hover:bg-bg-surface'}`}
+                      className={`flex-1 cursor-pointer rounded py-1 text-[10px] font-bold tracking-wider uppercase ${
+                        pageWidth === wd
+                          ? 'bg-primary-600 text-white'
+                          : 'text-text-sub hover:bg-bg-surface'
+                      }`}
                     >
                       {wd}
                     </button>
@@ -514,58 +809,55 @@ export const ReaderPage: React.FC = () => {
         </AnimatePresence>
 
         {/* Main centered reading zone */}
-        <div className="relative flex flex-1 items-start justify-center overflow-auto p-6 sm:p-12">
+        <div
+          ref={containerRef}
+          onWheel={handleWheel}
+          className={`relative flex flex-1 items-start justify-center overflow-auto p-6 sm:p-12 ${
+            theme === 'sepia'
+              ? 'bg-[#eae3cb]'
+              : theme === 'dark'
+                ? 'bg-neutral-950'
+                : 'bg-neutral-100'
+          }`}
+        >
           <div className="bg-radial-gradient(circle_at_center,rgba(99,102,241,0.02),transparent) pointer-events-none absolute inset-0" />
 
-          {/* Simulated PDF Paper Canvas */}
-          <motion.div
-            layout
-            className={`flex min-h-[700px] w-full origin-top flex-col justify-between rounded-2xl border p-8 shadow-2xl transition-all duration-300 sm:p-12 ${themeClasses[theme]} ${widthClasses[pageWidth]} `}
-            style={{ transform: `scale(${zoom / 100})` }}
+          {/* PDF Page Canvas Frame wrapper */}
+          <div
+            className={`origin-top transition-all duration-300 ${
+              themeClasses[theme]
+            } ${widthClasses[pageWidth]}`}
+            style={{ transform: `scale(${scale})` }}
           >
-            {/* Header info */}
-            <div className="flex justify-between border-b pb-4 text-[10px] font-bold tracking-wider uppercase opacity-60">
-              <span>Chapter I: Atomic Compounding</span>
-              <span>
-                Page {page} of {totalPages}
-              </span>
-            </div>
-
-            {/* Paragraph body texts */}
-            <div className="my-8 flex-1 space-y-5 text-left">
-              <h2 className="font-sans text-xl font-extrabold tracking-tight sm:text-2xl">
-                The Surprising Power of Habits
-              </h2>
-              <p
-                className={`font-serif text-sm leading-relaxed ${fontClasses[fontSize]} ${leadingClasses[lineHeight]}`}
-              >
-                In the beginning, there is no difference between a good habit and a bad one. It
-                compounds slowly over months or years. If you get 1 percent better each day for one
-                year, you’ll end up thirty-seven times better by the time you’re done. Conversely,
-                if you get 1 percent worse each day, you’ll decline nearly down to zero.
-              </p>
-              <p
-                className={`font-serif text-sm leading-relaxed ${fontClasses[fontSize]} ${leadingClasses[lineHeight]}`}
-              >
-                This is a high-fidelity visual rendering of your personal PDF document. Inside this
-                distraction-free reading mode, Librovia loads the PDF.js renderer component. The web
-                worker processes pages to render vector elements directly inside HTML5 canvases,
-                maintaining perfect clarity.
-              </p>
-              <p
-                className={`font-serif text-sm leading-relaxed ${fontClasses[fontSize]} ${leadingClasses[lineHeight]}`}
-              >
-                You do not rise to the level of your goals. You fall to the level of your systems.
-                Focus on building compounding habits, and the results will naturally follow.
-              </p>
-            </div>
-
-            {/* Footer info */}
-            <div className="flex justify-between border-t pt-4 text-[10px] font-bold tracking-wider uppercase opacity-60">
-              <span>Librovia Cloud Shelf</span>
-              <span>{bookTitle}</span>
-            </div>
-          </motion.div>
+            <Document
+              file={rawBook.filePath}
+              onLoadSuccess={onDocumentLoadSuccess}
+              loading={
+                <div className="text-text-sub flex h-[600px] w-[500px] flex-col items-center justify-center text-[10px] font-bold uppercase">
+                  Loading PDF pages...
+                </div>
+              }
+              error={
+                <div className="flex h-[300px] w-[500px] flex-col items-center justify-center p-6 text-center text-[10px] font-bold text-red-500 uppercase">
+                  Failed to render PDF document pages.
+                </div>
+              }
+            >
+              <Page
+                pageNumber={page}
+                rotate={rotation}
+                onLoadSuccess={onPageLoadSuccess}
+                renderTextLayer={false}
+                renderAnnotationLayer={false}
+                className="overflow-hidden rounded-2xl"
+                loading={
+                  <div className="text-text-sub flex h-[600px] w-[500px] items-center justify-center text-[10px] font-bold uppercase">
+                    Loading Page {page}...
+                  </div>
+                }
+              />
+            </Document>
+          </div>
 
           {/* Quick float pagination buttons */}
           <button
@@ -587,13 +879,17 @@ export const ReaderPage: React.FC = () => {
 
       {/* Bottom Bar Controls */}
       <footer
-        className={`flex h-14 shrink-0 items-center justify-between border-t px-6 ${theme === 'dark' ? 'border-neutral-800 bg-neutral-900' : 'border-slate-200 bg-white shadow-inner'}`}
+        className={`flex h-14 shrink-0 items-center justify-between border-t px-6 ${
+          theme === 'dark'
+            ? 'border-neutral-800 bg-neutral-900'
+            : 'border-slate-200 bg-white shadow-inner'
+        }`}
       >
         {/* Left progress indicators */}
         <div className="flex items-center gap-3 text-left">
           <Clock className="text-primary-600 h-4 w-4 shrink-0" />
           <span className="text-text-sub text-[10px] font-bold tracking-wider uppercase">
-            1h 45m remaining in book
+            {(totalPages - page) * 2} minutes remaining
           </span>
         </div>
 
@@ -619,22 +915,3 @@ export const ReaderPage: React.FC = () => {
     </div>
   )
 }
-
-interface XProps {
-  className?: string
-}
-
-const X: React.FC<XProps> = ({ className = 'h-4 w-4' }) => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M18 6 6 18" />
-    <path d="m6 6 12 12" />
-  </svg>
-)
