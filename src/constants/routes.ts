@@ -12,4 +12,5 @@ export const ROUTES = {
   PROFILE: '/profile',
   SETTINGS: '/settings',
   DESIGN_SYSTEM: '/design-system',
+  FORGOT_PASSWORD: '/forgot-password',
 } as const

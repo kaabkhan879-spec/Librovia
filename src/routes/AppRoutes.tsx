@@ -14,6 +14,7 @@ import { PublicRoute } from './PublicRoute'
 import { LandingPage } from '../pages/landing/LandingPage'
 import { LoginPage } from '../pages/login/LoginPage'
 import { RegisterPage } from '../pages/register/RegisterPage'
+import { ForgotPasswordPage } from '../pages/forgot-password/ForgotPasswordPage'
 import { DashboardPage } from '../pages/dashboard/DashboardPage'
 import { LibraryPage } from '../pages/library/LibraryPage'
 import { UploadBookPage } from '../pages/upload/UploadBookPage'
@@ -36,6 +37,7 @@ export const AppRoutes: React.FC = () => {
         <Route element={<PublicRoute />}>
           <Route path={ROUTES.LOGIN} element={<LoginPage />} />
           <Route path={ROUTES.REGISTER} element={<RegisterPage />} />
+          <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPasswordPage />} />
         </Route>
       </Route>
 
