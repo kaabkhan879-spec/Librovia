@@ -23,35 +23,8 @@ import {
 import { Button } from '../../components/common/Button'
 import { formatBytes } from '../../utils/helpers'
 
-const collectionsData = [
-  {
-    name: 'Programming',
-    count: 1,
-    color: 'from-blue-500 to-indigo-600',
-    covers: [
-      'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=60&q=80',
-    ],
-  },
-  {
-    name: 'Business & Finance',
-    count: 0,
-    color: 'from-purple-500 to-pink-600',
-    covers: [
-      'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&w=60&q=80',
-    ],
-  },
-  {
-    name: 'Self-Help',
-    count: 2,
-    color: 'from-violet-500 to-fuchsia-600',
-    covers: [
-      'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=60&q=80',
-    ],
-  },
-]
-
-type FilterType = 'all' | 'reading' | 'completed' | 'favorites'
-type SortType = 'newest' | 'oldest' | 'a-z'
+type FilterType = 'all' | 'reading' | 'completed' | 'favorites' | 'pdf' | 'epub' | 'recent'
+type SortType = 'newest' | 'oldest' | 'a-z' | 'recently-opened'
 
 export const LibraryPage: React.FC = () => {
   const [books, setBooks] = useState<Book[]>([])
@@ -63,12 +36,25 @@ export const LibraryPage: React.FC = () => {
   const [activeFilter, setActiveFilter] = useState<FilterType>('all')
   const [sortBy, setSortBy] = useState<SortType>('newest')
   const [selectedBook, setSelectedBook] = useState<Book | null>(null)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [recentThreshold] = useState(() => Date.now() - 7 * 24 * 60 * 60 * 1000)
+
+  // Pagination states
+  const [page, setPage] = useState(1)
+  const pageSize = 12
 
   const fetchBooks = () => {
-    booksService.getBooks().then((data) => {
-      setBooks(data)
-      setLoading(false)
-    })
+    booksService
+      .getBooks()
+      .then((data) => {
+        setBooks(data)
+        setLoading(false)
+      })
+      .catch((err) => {
+        console.error('Failed to fetch books:', err)
+        setErrorMsg('Failed to load library collection. Please check your network connection.')
+        setLoading(false)
+      })
   }
 
   useEffect(() => {
@@ -99,18 +85,54 @@ export const LibraryPage: React.FC = () => {
     }
   }
 
+  // Collections data computed dynamically from books
+  const collectionsData = useMemo(() => {
+    return [
+      {
+        name: 'Programming',
+        count: books.filter((b) => b.categoryId === 'cat-2').length,
+        color: 'from-blue-500 to-indigo-600',
+      },
+      {
+        name: 'Classics',
+        count: books.filter((b) => b.categoryId === 'cat-1').length,
+        color: 'from-purple-500 to-pink-600',
+      },
+      {
+        name: 'Self-Help',
+        count: books.filter((b) => b.categoryId === 'cat-3').length,
+        color: 'from-violet-500 to-fuchsia-600',
+      },
+    ]
+  }, [books])
+
   // Filter & Sort Logic
   const filteredBooks = useMemo(() => {
     const result = books.filter((book) => {
+      const categoryName =
+        book.categoryId === 'cat-2'
+          ? 'Programming'
+          : book.categoryId === 'cat-3'
+            ? 'Self-Help'
+            : 'Classics'
+
       const matchesSearch =
         book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        book.author.toLowerCase().includes(searchQuery.toLowerCase())
+        book.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        categoryName.toLowerCase().includes(searchQuery.toLowerCase())
 
       if (!matchesSearch) return false
 
       if (activeFilter === 'reading') return book.progress > 0 && book.progress < 100
       if (activeFilter === 'completed') return book.progress === 100
       if (activeFilter === 'favorites') return book.isFavorite
+      if (activeFilter === 'pdf') return book.filePath.toLowerCase().split('?')[0].endsWith('.pdf')
+      if (activeFilter === 'epub')
+        return book.filePath.toLowerCase().split('?')[0].endsWith('.epub')
+      if (activeFilter === 'recent') {
+        const addedTime = new Date(book.createdAt).getTime()
+        return addedTime > recentThreshold
+      }
 
       return true
     })
@@ -122,9 +144,16 @@ export const LibraryPage: React.FC = () => {
         return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
       if (sortBy === 'newest')
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      if (sortBy === 'recently-opened')
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
       return 0
     })
-  }, [books, searchQuery, activeFilter, sortBy])
+  }, [books, searchQuery, activeFilter, sortBy, recentThreshold])
+
+  // Paginated books for display
+  const paginatedBooks = useMemo(() => {
+    return filteredBooks.slice(0, page * pageSize)
+  }, [filteredBooks, page, pageSize])
 
   const handleSimulateLoader = () => {
     setIsSkeletonLoading(true)
@@ -135,9 +164,12 @@ export const LibraryPage: React.FC = () => {
 
   const filterPills: { id: FilterType; label: string }[] = [
     { id: 'all', label: 'All Books' },
+    { id: 'favorites', label: 'Favorites' },
     { id: 'reading', label: 'Reading' },
     { id: 'completed', label: 'Completed' },
-    { id: 'favorites', label: 'Favorites' },
+    { id: 'pdf', label: 'PDF' },
+    { id: 'epub', label: 'EPUB' },
+    { id: 'recent', label: 'Recently Added' },
   ]
 
   // Stats calculation
@@ -169,8 +201,20 @@ export const LibraryPage: React.FC = () => {
       .slice(0, 3)
   }, [books])
 
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    e.currentTarget.src =
+      'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=300&q=80'
+  }
+
   return (
     <div className="relative min-h-screen space-y-8 pb-20 text-left select-none">
+      {/* Error Alert Display */}
+      {errorMsg && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs font-semibold text-red-600 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400">
+          Error: {errorMsg}
+        </div>
+      )}
+
       {/* Simulation Tools Row */}
       <div className="bg-bg-surface border-border-base flex flex-wrap items-center justify-between gap-4 rounded-2xl border p-4 shadow-sm">
         <div className="text-text-sub flex items-center gap-2 text-xs font-semibold">
@@ -226,13 +270,13 @@ export const LibraryPage: React.FC = () => {
               <BookOpen className="h-7 w-7" />
             </div>
             <div className="space-y-2">
-              <h3 className="text-text-main text-lg font-bold">Your Library is Empty</h3>
+              <h3 className="text-text-main text-lg font-bold">No books found</h3>
               <p className="text-text-sub mx-auto max-w-xs text-xs leading-relaxed">
-                Upload your first book and start building your digital library.
+                Upload your first book to start building your library.
               </p>
             </div>
             <Link to={ROUTES.UPLOAD} className="inline-block">
-              <Button leftIcon={<Plus className="h-4 w-4" />}>Upload First Book</Button>
+              <Button leftIcon={<Plus className="h-4 w-4" />}>Upload Book</Button>
             </Link>
           </motion.div>
         ) : (
@@ -298,8 +342,12 @@ export const LibraryPage: React.FC = () => {
                       className="bg-bg-surface border-border-base hover:border-primary-500/20 flex w-64 flex-shrink-0 cursor-pointer gap-4 rounded-2xl border p-3 text-left shadow-sm transition-all"
                     >
                       <img
-                        src={book.coverPath}
+                        src={
+                          book.coverPath ||
+                          'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=300&q=80'
+                        }
                         alt={book.title}
+                        onError={handleImageError}
                         className="border-border-light aspect-[0.7/1] w-12 shrink-0 rounded border object-cover shadow-sm"
                       />
                       <div className="flex min-w-0 flex-col justify-between">
@@ -333,7 +381,10 @@ export const LibraryPage: React.FC = () => {
                 {filterPills.map((pill) => (
                   <button
                     key={pill.id}
-                    onClick={() => setActiveFilter(pill.id)}
+                    onClick={() => {
+                      setActiveFilter(pill.id)
+                      setPage(1)
+                    }}
                     className={`cursor-pointer rounded-lg border px-3.5 py-1.5 text-xs font-bold tracking-wider uppercase transition-all ${
                       activeFilter === pill.id
                         ? 'bg-primary-600 border-primary-600 shadow-primary-500/10 text-white shadow-sm'
@@ -354,7 +405,10 @@ export const LibraryPage: React.FC = () => {
                   <input
                     type="text"
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value)
+                      setPage(1)
+                    }}
                     placeholder="Search books..."
                     className="border-border-base bg-bg-surface text-text-main placeholder:text-text-muted focus:border-primary-500 focus:ring-primary-500/10 block w-full rounded-lg border py-1.5 pr-3 pl-8 text-xs transition-all focus:ring-2 focus:outline-none"
                   />
@@ -364,12 +418,16 @@ export const LibraryPage: React.FC = () => {
                   <ArrowUpDown className="text-text-muted mr-1.5 h-3.5 w-3.5" />
                   <select
                     value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as SortType)}
+                    onChange={(e) => {
+                      setSortBy(e.target.value as SortType)
+                      setPage(1)
+                    }}
                     className="text-text-sub cursor-pointer border-none bg-transparent pr-4 text-xs font-bold focus:outline-none"
                   >
                     <option value="newest">Newest</option>
                     <option value="oldest">Oldest</option>
                     <option value="a-z">A - Z</option>
+                    <option value="recently-opened">Recently Opened</option>
                   </select>
                 </div>
 
@@ -411,7 +469,7 @@ export const LibraryPage: React.FC = () => {
                   exit={{ opacity: 0 }}
                   className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
                 >
-                  {filteredBooks.map((book) => {
+                  {paginatedBooks.map((book) => {
                     return (
                       <motion.div
                         key={book.id}
@@ -421,8 +479,12 @@ export const LibraryPage: React.FC = () => {
                       >
                         <div className="flex gap-4">
                           <img
-                            src={book.coverPath}
+                            src={
+                              book.coverPath ||
+                              'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=300&q=80'
+                            }
                             alt={book.title}
+                            onError={handleImageError}
                             className="border-border-light aspect-[0.7/1] w-16 shrink-0 rounded border object-cover shadow"
                           />
                           <div className="min-w-0 flex-1 space-y-1.5">
@@ -490,7 +552,7 @@ export const LibraryPage: React.FC = () => {
                   exit={{ opacity: 0 }}
                   className="bg-bg-surface border-border-base divide-border-light divide-y overflow-hidden rounded-2xl border shadow-sm"
                 >
-                  {filteredBooks.map((book) => {
+                  {paginatedBooks.map((book) => {
                     return (
                       <div
                         key={book.id}
@@ -499,8 +561,12 @@ export const LibraryPage: React.FC = () => {
                       >
                         <div className="flex min-w-0 flex-1 items-center gap-4">
                           <img
-                            src={book.coverPath}
+                            src={
+                              book.coverPath ||
+                              'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=300&q=80'
+                            }
                             alt={book.title}
+                            onError={handleImageError}
                             className="border-border-light aspect-[0.7/1] w-9 shrink-0 rounded border object-cover shadow-sm"
                           />
                           <div className="min-w-0 flex-1 items-center gap-4 sm:grid sm:grid-cols-2 md:grid-cols-3">
@@ -556,6 +622,20 @@ export const LibraryPage: React.FC = () => {
               )}
             </AnimatePresence>
 
+            {/* Pagination Load More control */}
+            {filteredBooks.length > paginatedBooks.length && (
+              <div className="flex justify-center pt-4">
+                <Button
+                  onClick={() => setPage((p) => p + 1)}
+                  variant="outline"
+                  size="sm"
+                  className="animate-fade-in font-bold tracking-wider uppercase"
+                >
+                  Load More Books
+                </Button>
+              </div>
+            )}
+
             {/* Collections Section */}
             <div>
               <h3 className="text-text-muted mb-4 text-sm font-bold tracking-wider uppercase">
@@ -577,10 +657,13 @@ export const LibraryPage: React.FC = () => {
                         Shelf Category
                       </span>
                     </div>
-                    <div className="mt-4">
+                    <div className="mt-4 flex items-end justify-between">
                       <h4 className="text-text-main truncate text-xs font-bold tracking-wider uppercase">
                         {col.name}
                       </h4>
+                      <span className="text-text-muted font-mono text-[10px] font-bold">
+                        {col.count} {col.count === 1 ? 'Book' : 'Books'}
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -618,8 +701,12 @@ export const LibraryPage: React.FC = () => {
 
                 <div className="flex items-start gap-5">
                   <img
-                    src={selectedBook.coverPath}
+                    src={
+                      selectedBook.coverPath ||
+                      'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=300&q=80'
+                    }
                     alt={selectedBook.title}
+                    onError={handleImageError}
                     className="border-border-light aspect-[0.7/1] w-24 shrink-0 rounded-lg border object-cover shadow-md"
                   />
                   <div className="min-w-0 flex-1 space-y-1.5">
