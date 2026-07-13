@@ -127,6 +127,7 @@ export const ReaderPage: React.FC = () => {
         setRawBook(data)
         const resumePage = data.currentPage && data.currentPage > 0 ? data.currentPage : 1
         setPage(resumePage)
+        lastSavedPageRef.current = resumePage
         setLoading(false)
       })
       .catch((err) => {
@@ -134,6 +135,64 @@ export const ReaderPage: React.FC = () => {
         setErrorMsg('Failed to load secure PDF from Supabase storage.')
         setLoading(false)
       })
+  }, [id])
+
+  // Synchronize reading progress with Supabase
+  const lastSavedPageRef = useRef<number>(1)
+  const currentPageRef = useRef<number>(page)
+  const totalPagesRef = useRef<number>(totalPages)
+
+  useEffect(() => {
+    currentPageRef.current = page
+    totalPagesRef.current = totalPages
+  }, [page, totalPages])
+
+  // Debounced autosave on page changes
+  useEffect(() => {
+    if (loading || !rawBook || !page || !totalPages) return
+    if (page === lastSavedPageRef.current) return
+
+    const timer = setTimeout(() => {
+      lastSavedPageRef.current = page
+      if (id) {
+        booksService.updateReadingProgress(id, page, totalPages).catch((err) => {
+          console.error('Failed to sync progress to Supabase:', err)
+        })
+      }
+    }, 2000)
+
+    return () => clearTimeout(timer)
+  }, [page, totalPages, loading, rawBook, id])
+
+  // Save immediately on unmount/unload
+  useEffect(() => {
+    return () => {
+      if (id) {
+        const lastPage = currentPageRef.current
+        const total = totalPagesRef.current
+        if (lastPage !== lastSavedPageRef.current) {
+          booksService.updateReadingProgress(id, lastPage, total).catch((err) => {
+            console.error('Failed to save progress on unmount:', err)
+          })
+        }
+      }
+    }
+  }, [id])
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (id) {
+        const lastPage = currentPageRef.current
+        const total = totalPagesRef.current
+        if (lastPage !== lastSavedPageRef.current) {
+          booksService.updateReadingProgress(id, lastPage, total).catch((err) => {
+            console.error('Failed to save progress on unload:', err)
+          })
+        }
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
   }, [id])
 
   // Local storage theme synchronization

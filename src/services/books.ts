@@ -17,6 +17,7 @@ export interface Book {
   progress: number
   currentPage: number
   totalPages: number
+  lastReadAt?: string
 }
 
 export interface ReadingProgress {
@@ -45,7 +46,7 @@ export const booksService = {
 
     const { data, error } = await supabase
       .from('books')
-      .select('*')
+      .select('*, reading_progress(current_page, total_pages, last_read_at, is_completed)')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
 
@@ -91,6 +92,13 @@ export const booksService = {
     return rows.map((row) => {
       const bookPath = getPathFromUrl(row.file_url, 'books')
       const coverPath = getPathFromUrl(row.cover_url, 'covers')
+
+      const rpArray = row.reading_progress
+      const rp = Array.isArray(rpArray) ? rpArray[0] : rpArray
+      const currentPage = rp?.current_page || 1
+      const totalPages = rp?.total_pages || row.pages || 320
+      const progressPct = totalPages > 0 ? Math.round((currentPage / totalPages) * 100) : 0
+
       return {
         id: row.id,
         title: row.title,
@@ -104,15 +112,20 @@ export const booksService = {
         fileSize: row.file_size || 0,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
-        progress: row.progress || 0,
-        currentPage: row.current_page || 1,
-        totalPages: row.pages || 320,
+        progress: progressPct,
+        currentPage: currentPage,
+        totalPages: totalPages,
+        lastReadAt: rp?.last_read_at,
       }
     })
   },
 
   async getBookById(id: string): Promise<Book | null> {
-    const { data, error } = await supabase.from('books').select('*').eq('id', id).single()
+    const { data, error } = await supabase
+      .from('books')
+      .select('*, reading_progress(current_page, total_pages, last_read_at, is_completed)')
+      .eq('id', id)
+      .single()
 
     if (error || !data) {
       console.error('Error fetching book by id:', error)
@@ -139,6 +152,12 @@ export const booksService = {
       if (signedCover?.signedUrl) coverUrl = signedCover.signedUrl
     }
 
+    const rpArray = data.reading_progress
+    const rp = Array.isArray(rpArray) ? rpArray[0] : rpArray
+    const currentPage = rp?.current_page || 1
+    const totalPages = rp?.total_pages || data.pages || 320
+    const progressPct = totalPages > 0 ? Math.round((currentPage / totalPages) * 100) : 0
+
     return {
       id: data.id,
       title: data.title,
@@ -152,9 +171,10 @@ export const booksService = {
       fileSize: data.file_size || 0,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
-      progress: data.progress || 0,
-      currentPage: data.current_page || 1,
-      totalPages: data.pages || 320,
+      progress: progressPct,
+      currentPage: currentPage,
+      totalPages: totalPages,
+      lastReadAt: rp?.last_read_at,
     }
   },
 
@@ -284,46 +304,71 @@ export const booksService = {
     page: number,
     totalPages: number
   ): Promise<ReadingProgress> {
-    const progressPct = Math.round((page / totalPages) * 100)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
 
-    const { error } = await supabase
+    const isCompleted = page === totalPages
+
+    const { data, error } = await supabase
+      .from('reading_progress')
+      .upsert(
+        {
+          user_id: user.id,
+          book_id: bookId,
+          current_page: page,
+          total_pages: totalPages,
+          is_completed: isCompleted,
+          last_read_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,book_id' }
+      )
+      .select()
+      .single()
+
+    if (error) throw error
+
+    // Update book timestamp to record activity update
+    await supabase
       .from('books')
       .update({
-        current_page: page,
-        pages: totalPages,
-        progress: progressPct,
         updated_at: new Date().toISOString(),
       })
       .eq('id', bookId)
 
-    if (error) throw error
-
     return {
-      id: `progress-${bookId}`,
-      bookId,
-      currentPage: page,
-      totalPages,
-      lastReadAt: new Date().toISOString(),
-      isCompleted: page === totalPages,
+      id: data.id,
+      bookId: data.book_id,
+      currentPage: data.current_page,
+      totalPages: data.total_pages || totalPages,
+      lastReadAt: data.last_read_at,
+      isCompleted: data.is_completed,
     }
   },
 
   async getReadingProgress(bookId: string): Promise<ReadingProgress | null> {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return null
+
     const { data, error } = await supabase
-      .from('books')
-      .select('current_page, pages')
-      .eq('id', bookId)
+      .from('reading_progress')
+      .select('*')
+      .eq('book_id', bookId)
+      .eq('user_id', user.id)
       .single()
 
     if (error || !data) return null
 
     return {
-      id: `progress-${bookId}`,
-      bookId,
+      id: data.id,
+      bookId: data.book_id,
       currentPage: data.current_page || 1,
-      totalPages: data.pages || 320,
-      lastReadAt: new Date().toISOString(),
-      isCompleted: data.current_page === data.pages,
+      totalPages: data.total_pages || 320,
+      lastReadAt: data.last_read_at,
+      isCompleted: data.is_completed,
     }
   },
 }

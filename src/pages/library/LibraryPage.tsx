@@ -488,17 +488,29 @@ export const LibraryPage: React.FC = () => {
                             className="border-border-light aspect-[0.7/1] w-16 shrink-0 rounded border object-cover shadow"
                           />
                           <div className="min-w-0 flex-1 space-y-1.5">
-                            <span className="bg-primary-50 dark:bg-primary-500/10 text-primary-600 inline-block rounded px-1.5 py-0.5 text-[8.5px] font-bold tracking-wider uppercase">
-                              {book.categoryId === 'cat-2'
-                                ? 'Programming'
-                                : book.categoryId === 'cat-3'
-                                  ? 'Self-Help'
-                                  : 'Classics'}
-                            </span>
+                            <div className="flex flex-wrap gap-1.5">
+                              <span className="bg-primary-50 dark:bg-primary-500/10 text-primary-600 inline-block rounded px-1.5 py-0.5 text-[8.5px] font-bold tracking-wider uppercase">
+                                {book.categoryId === 'cat-2'
+                                  ? 'Programming'
+                                  : book.categoryId === 'cat-3'
+                                    ? 'Self-Help'
+                                    : 'Classics'}
+                              </span>
+                              {book.progress === 100 && (
+                                <span className="inline-block rounded bg-emerald-50 px-1.5 py-0.5 text-[8.5px] font-bold tracking-wider text-emerald-600 uppercase dark:bg-emerald-500/10">
+                                  Completed
+                                </span>
+                              )}
+                            </div>
                             <h4 className="text-text-main truncate text-xs font-bold">
                               {book.title}
                             </h4>
                             <p className="text-text-sub truncate text-[10px]">By {book.author}</p>
+                            {book.lastReadAt && (
+                              <p className="text-text-muted mt-0.5 font-mono text-[8px] leading-none">
+                                Opened {new Date(book.lastReadAt).toLocaleDateString()}
+                              </p>
+                            )}
                           </div>
                         </div>
 
@@ -577,14 +589,26 @@ export const LibraryPage: React.FC = () => {
                               <p className="text-text-muted mt-0.5 truncate text-[10px]">
                                 By {book.author}
                               </p>
+                              {book.lastReadAt && (
+                                <p className="text-text-muted mt-0.5 font-mono text-[8px] leading-none">
+                                  Opened {new Date(book.lastReadAt).toLocaleDateString()}
+                                </p>
+                              )}
                             </div>
-                            <span className="text-text-sub hidden text-[10px] font-semibold sm:inline-block">
-                              {book.categoryId === 'cat-2'
-                                ? 'Programming'
-                                : book.categoryId === 'cat-3'
-                                  ? 'Self-Help'
-                                  : 'Classics'}
-                            </span>
+                            <div className="hidden sm:flex sm:items-center sm:gap-2">
+                              <span className="text-text-sub text-[10px] font-semibold">
+                                {book.categoryId === 'cat-2'
+                                  ? 'Programming'
+                                  : book.categoryId === 'cat-3'
+                                    ? 'Self-Help'
+                                    : 'Classics'}
+                              </span>
+                              {book.progress === 100 && (
+                                <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[8px] leading-none font-bold tracking-wider text-emerald-600 uppercase dark:bg-emerald-500/10">
+                                  Completed
+                                </span>
+                              )}
+                            </div>
                             <span className="text-text-muted hidden font-mono text-[9px] md:inline-block">
                               {formatBytes(book.fileSize)}
                             </span>

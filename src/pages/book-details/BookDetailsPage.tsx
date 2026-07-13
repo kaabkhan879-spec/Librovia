@@ -77,6 +77,15 @@ const mapBookToDetails = (b: Book): BookDetails => {
   const categoryName =
     b.categoryId === 'cat-2' ? 'Programming' : b.categoryId === 'cat-3' ? 'Self-Help' : 'Classics'
 
+  const lastOpenedStr = b.lastReadAt
+    ? new Date(b.lastReadAt).toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : 'Not started'
+
   return {
     id: b.id,
     title: b.title,
@@ -91,7 +100,7 @@ const mapBookToDetails = (b: Book): BookDetails => {
     progress: b.progress,
     currentPage: b.currentPage,
     totalPages: b.totalPages,
-    lastOpened: 'Recently',
+    lastOpened: lastOpenedStr,
     estTimeRemaining: estTimeRemaining || '30m',
     streak: 1,
     description: b.description || 'No description provided.',
