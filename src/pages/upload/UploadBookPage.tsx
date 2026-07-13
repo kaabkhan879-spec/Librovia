@@ -101,7 +101,36 @@ export const UploadBookPage: React.FC = () => {
 
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!file) return
+
+    // Explicit field validations
+    if (!file) {
+      setGeneralError('Book file is required.')
+      return
+    }
+    if (!title.trim()) {
+      setGeneralError('Book title is required.')
+      return
+    }
+    if (!author.trim()) {
+      setGeneralError('Author name is required.')
+      return
+    }
+
+    // Format validation
+    const fileExt = file.name.split('.').pop()?.toLowerCase() || ''
+    if (fileExt !== 'pdf' && fileExt !== 'epub') {
+      setGeneralError('Only PDF and EPUB formats are supported.')
+      return
+    }
+
+    if (coverFile) {
+      const coverExt = coverFile.name.split('.').pop()?.toLowerCase() || ''
+      const allowedCovers = ['jpg', 'jpeg', 'png', 'webp']
+      if (!allowedCovers.includes(coverExt)) {
+        setGeneralError('Only JPG, JPEG, PNG, and WEBP cover image formats are allowed.')
+        return
+      }
+    }
 
     setStatus('uploading')
     setUploadProgress(10)
@@ -115,8 +144,8 @@ export const UploadBookPage: React.FC = () => {
       await booksService.uploadBook(
         file,
         {
-          title: title || file.name.replace(/\.[^/.]+$/, ''),
-          author: author || 'Unknown',
+          title: title.trim(),
+          author: author.trim(),
           description,
           categoryId:
             category === 'Programming' ? 'cat-2' : category === 'Self-Help' ? 'cat-3' : 'cat-1',

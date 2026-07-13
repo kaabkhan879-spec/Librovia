@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { storageService } from './storage'
 
 export interface Book {
   id: string
@@ -27,6 +28,14 @@ export interface ReadingProgress {
   isCompleted: boolean
 }
 
+// Local helper to extract relative storage paths from public or authenticated URLs
+function getPathFromUrl(url: string | undefined | null, bucket: string): string {
+  if (!url) return ''
+  if (!url.startsWith('http')) return url
+  const parts = url.split(`/${bucket}/`)
+  return parts.length > 1 ? parts[1] : ''
+}
+
 export const booksService = {
   async getBooks(): Promise<Book[]> {
     const {
@@ -45,23 +54,61 @@ export const booksService = {
       return []
     }
 
-    return (data || []).map((row) => ({
-      id: row.id,
-      title: row.title,
-      author: row.author,
-      description: row.description,
-      filePath: row.file_url,
-      coverPath: row.cover_url,
-      categoryId: row.category,
-      isFavorite: row.is_favorite,
-      tags: row.tags || [],
-      fileSize: row.file_size || 0,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      progress: row.progress || 0,
-      currentPage: row.current_page || 1,
-      totalPages: row.pages || 320,
-    }))
+    const rows = data || []
+    if (rows.length === 0) return []
+
+    // Extract paths for bulk signed URL generation
+    const bookPaths = rows.map((r) => getPathFromUrl(r.file_url, 'books')).filter(Boolean)
+    const coverPaths = rows.map((r) => getPathFromUrl(r.cover_url, 'covers')).filter(Boolean)
+
+    const signedBookUrls: Record<string, string> = {}
+    const signedCoverUrls: Record<string, string> = {}
+
+    // Bulk sign book URLs (1 hour expiration)
+    if (bookPaths.length > 0) {
+      const { data: signedBooks, error: err1 } = await supabase.storage
+        .from('books')
+        .createSignedUrls(bookPaths, 3600)
+      if (!err1 && signedBooks) {
+        signedBooks.forEach((s) => {
+          if (s.signedUrl && s.path) signedBookUrls[s.path] = s.signedUrl
+        })
+      }
+    }
+
+    // Bulk sign cover URLs (1 hour expiration)
+    if (coverPaths.length > 0) {
+      const { data: signedCovers, error: err2 } = await supabase.storage
+        .from('covers')
+        .createSignedUrls(coverPaths, 3600)
+      if (!err2 && signedCovers) {
+        signedCovers.forEach((s) => {
+          if (s.signedUrl && s.path) signedCoverUrls[s.path] = s.signedUrl
+        })
+      }
+    }
+
+    return rows.map((row) => {
+      const bookPath = getPathFromUrl(row.file_url, 'books')
+      const coverPath = getPathFromUrl(row.cover_url, 'covers')
+      return {
+        id: row.id,
+        title: row.title,
+        author: row.author,
+        description: row.description,
+        filePath: signedBookUrls[bookPath] || row.file_url,
+        coverPath: signedCoverUrls[coverPath] || row.cover_url,
+        categoryId: row.category,
+        isFavorite: row.is_favorite,
+        tags: row.tags || [],
+        fileSize: row.file_size || 0,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        progress: row.progress || 0,
+        currentPage: row.current_page || 1,
+        totalPages: row.pages || 320,
+      }
+    })
   },
 
   async getBookById(id: string): Promise<Book | null> {
@@ -72,13 +119,33 @@ export const booksService = {
       return null
     }
 
+    let fileUrl = data.file_url
+    let coverUrl = data.cover_url
+
+    const bookPath = getPathFromUrl(data.file_url, 'books')
+    const coverPath = getPathFromUrl(data.cover_url, 'covers')
+
+    if (bookPath) {
+      const { data: signedBook } = await supabase.storage
+        .from('books')
+        .createSignedUrl(bookPath, 3600)
+      if (signedBook?.signedUrl) fileUrl = signedBook.signedUrl
+    }
+
+    if (coverPath) {
+      const { data: signedCover } = await supabase.storage
+        .from('covers')
+        .createSignedUrl(coverPath, 3600)
+      if (signedCover?.signedUrl) coverUrl = signedCover.signedUrl
+    }
+
     return {
       id: data.id,
       title: data.title,
       author: data.author,
       description: data.description,
-      filePath: data.file_url,
-      coverPath: data.cover_url,
+      filePath: fileUrl,
+      coverPath: coverUrl,
       categoryId: data.category,
       isFavorite: data.is_favorite,
       tags: data.tags || [],
@@ -112,35 +179,21 @@ export const booksService = {
     } = await supabase.auth.getUser()
     if (!user) throw new Error('User not authenticated')
 
-    const fileExt = file.name.split('.').pop()
-    const filePath = `${user.id}/${Date.now()}.${fileExt}`
+    // 1. Upload Book file to storage using storageService helper
+    const bookPath = await storageService.uploadBook(file)
 
-    // 1. Upload Book File to Supabase Storage private bucket
-    const { error: uploadError } = await supabase.storage.from('books').upload(filePath, file)
-
-    if (uploadError) throw uploadError
-
-    // Retrieve signed link or public url (since books is a private shelf, we will retrieve public link or custom link)
-    const { data: fileData } = supabase.storage.from('books').getPublicUrl(filePath)
-    const fileUrl = fileData.publicUrl
-
-    // 2. Upload Cover file to covers public bucket
-    let coverUrl = ''
+    // 2. Upload Cover file to storage using storageService helper
+    let coverPath = ''
     if (coverFile) {
-      const coverExt = coverFile.name.split('.').pop()
-      const coverPath = `${user.id}/${Date.now()}.${coverExt}`
-      const { error: coverUploadError } = await supabase.storage
-        .from('covers')
-        .upload(coverPath, coverFile)
-      if (!coverUploadError) {
-        const { data: coverData } = supabase.storage.from('covers').getPublicUrl(coverPath)
-        coverUrl = coverData.publicUrl
-      }
-    } else {
-      // Fallback default cover placeholder
-      coverUrl =
-        'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=300&q=80'
+      coverPath = await storageService.uploadCover(coverFile)
     }
+
+    // Resolve storage public/authenticated URLs for insert reference
+    const fileUrl = supabase.storage.from('books').getPublicUrl(bookPath).data.publicUrl
+
+    const coverUrl = coverPath
+      ? supabase.storage.from('covers').getPublicUrl(coverPath).data.publicUrl
+      : 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=300&q=80'
 
     // 3. Save Book record in database table
     const { data, error } = await supabase
@@ -186,8 +239,32 @@ export const booksService = {
   },
 
   async deleteBook(id: string): Promise<void> {
-    const { error } = await supabase.from('books').delete().eq('id', id)
+    // 1. Fetch book first to extract exact bucket file paths
+    const { data: book } = await supabase
+      .from('books')
+      .select('file_url, cover_url')
+      .eq('id', id)
+      .single()
 
+    if (book) {
+      const bookPath = getPathFromUrl(book.file_url, 'books')
+      const coverPath = getPathFromUrl(book.cover_url, 'covers')
+
+      if (bookPath) {
+        await storageService.deleteBook(bookPath).catch((err) => {
+          console.error('Failed to delete book file from storage:', err)
+        })
+      }
+
+      if (coverPath && !book.cover_url.includes('unsplash.com')) {
+        await storageService.deleteCover(coverPath).catch((err) => {
+          console.error('Failed to delete cover file from storage:', err)
+        })
+      }
+    }
+
+    // 2. Delete database record
+    const { error } = await supabase.from('books').delete().eq('id', id)
     if (error) throw error
   },
 
