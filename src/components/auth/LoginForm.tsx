@@ -44,17 +44,16 @@ export const LoginForm: React.FC = () => {
     setErrors({})
     setIsLoading(true)
 
-    // Simulate login timeout (1.5s)
-    setTimeout(() => {
-      login(email, password)
-        .then(() => {
-          setIsLoading(false)
-          navigate(ROUTES.DASHBOARD)
-        })
-        .catch(() => {
-          setIsLoading(false)
-        })
-    }, 1500)
+    login(email, password)
+      .then(() => {
+        setIsLoading(false)
+        navigate(ROUTES.DASHBOARD)
+      })
+      .catch((err: unknown) => {
+        setIsLoading(false)
+        const message = err instanceof Error ? err.message : String(err)
+        setErrors({ email: message || 'Invalid login details.' })
+      })
   }
 
   return (

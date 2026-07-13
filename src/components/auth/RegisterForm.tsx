@@ -8,9 +8,8 @@ import { Input } from '../common/Input'
 import { Button } from '../common/Button'
 import { Mail, User, ShieldAlert, ArrowRight } from 'lucide-react'
 import { AuthCard } from './AuthCard'
-
 export const RegisterForm: React.FC = () => {
-  const { login } = useAuth()
+  const { register, login } = useAuth()
   const navigate = useNavigate()
 
   const [fullName, setFullName] = useState('')
@@ -66,15 +65,16 @@ export const RegisterForm: React.FC = () => {
     setErrors({})
     setIsLoading(true)
 
-    // Simulate registration timeout (1.5s)
-    setTimeout(() => {
-      login(email, password)
-        .then(() => {
-          setIsLoading(false)
-          navigate(ROUTES.DASHBOARD)
-        })
-        .catch(() => setIsLoading(false))
-    }, 1500)
+    register(email, password, fullName)
+      .then(() => {
+        setIsLoading(false)
+        navigate(ROUTES.DASHBOARD)
+      })
+      .catch((err: unknown) => {
+        setIsLoading(false)
+        const message = err instanceof Error ? err.message : String(err)
+        setErrors({ email: message || 'Failed to create account.' })
+      })
   }
 
   return (
