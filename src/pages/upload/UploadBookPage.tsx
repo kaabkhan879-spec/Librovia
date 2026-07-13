@@ -1,9 +1,11 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ROUTES } from '../../constants/routes'
-import { UploadCloud, FileText, X, Plus, Star, CheckCircle, Lock, Globe, Tag } from 'lucide-react'
+import { booksService } from '../../services/books'
+import { UploadCloud, FileText, X, Plus, Star, CheckCircle, Lock, Tag } from 'lucide-react'
 import { Button } from '../../components/common/Button'
+import { formatBytes } from '../../utils/helpers'
 
 interface TagItem {
   id: string
@@ -12,15 +14,17 @@ interface TagItem {
 
 export const UploadBookPage: React.FC = () => {
   const navigate = useNavigate()
+  const coverInputRef = useRef<HTMLInputElement>(null)
 
   // Form states
-  const [file, setFile] = useState<{ name: string; size: string; type: string } | null>(null)
+  const [file, setFile] = useState<File | null>(null)
+  const [coverFile, setCoverFile] = useState<File | null>(null)
   const [coverUrl, setCoverUrl] = useState<string | null>(null)
 
   const [title, setTitle] = useState('')
   const [author, setAuthor] = useState('')
   const [publisher, setPublisher] = useState('')
-  const [category, setCategory] = useState('Personal Development')
+  const [category, setCategory] = useState('Programming')
   const [language, setLanguage] = useState('English')
   const [isbn, setIsbn] = useState('')
   const [pubYear, setPubYear] = useState('')
@@ -45,10 +49,11 @@ export const UploadBookPage: React.FC = () => {
 
   const [visibility, setVisibility] = useState<'private' | 'public'>('private')
 
-  // Upload Simulation states
+  // Upload Simulation/Real states
   const [status, setStatus] = useState<'idle' | 'uploading' | 'success'>('idle')
   const [uploadProgress, setUploadProgress] = useState(0)
   const [progressLabel, setProgressLabel] = useState('Uploading Cover...')
+  const [generalError, setGeneralError] = useState<string | null>(null)
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -56,34 +61,31 @@ export const UploadBookPage: React.FC = () => {
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
-    // Simulate drop book file
-    setFile({
-      name: 'Atomic_Habits_James_Clear.pdf',
-      size: '12.4 MB',
-      type: 'PDF',
-    })
-    setTitle('Atomic Habits')
-    setAuthor('James Clear')
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const selectedFile = e.dataTransfer.files[0]
+      setFile(selectedFile)
+      setTitle(selectedFile.name.replace(/\.[^/.]+$/, ''))
+    }
   }
 
   const handleBrowseFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0]
-      const ext = selectedFile.name.split('.').pop()?.toUpperCase() || 'PDF'
-      setFile({
-        name: selectedFile.name,
-        size: (selectedFile.size / (1024 * 1024)).toFixed(1) + ' MB',
-        type: ext,
-      })
+      setFile(selectedFile)
       setTitle(selectedFile.name.replace(/\.[^/.]+$/, ''))
     }
   }
 
-  const handleCoverSelect = () => {
-    // Simulate cover image preview select
-    setCoverUrl(
-      'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=150&q=80'
-    )
+  const handleCoverSelectTrigger = () => {
+    coverInputRef.current?.click()
+  }
+
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const selectedFile = e.target.files[0]
+      setCoverFile(selectedFile)
+      setCoverUrl(URL.createObjectURL(selectedFile))
+    }
   }
 
   const addTag = (e: React.FormEvent) => {
@@ -97,31 +99,47 @@ export const UploadBookPage: React.FC = () => {
     setTags((prev) => prev.filter((tag) => tag.id !== id))
   }
 
-  const handleUploadSubmit = (e: React.FormEvent) => {
+  const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!file) return
 
     setStatus('uploading')
-    setUploadProgress(0)
-    setProgressLabel('Uploading Cover Image...')
+    setUploadProgress(10)
+    setGeneralError(null)
+    setProgressLabel('Uploading Cover image...')
 
-    // Simulated progress transitions
-    let currentProgress = 0
-    const interval = setInterval(() => {
-      currentProgress += 5
-      setUploadProgress(currentProgress)
+    try {
+      setUploadProgress(40)
+      setProgressLabel('Uploading PDF file to storage...')
 
-      if (currentProgress < 30) {
-        setProgressLabel('Uploading Cover Image...')
-      } else if (currentProgress < 75) {
-        setProgressLabel('Uploading PDF Book File...')
-      } else if (currentProgress < 95) {
-        setProgressLabel('Indexing text elements & generating thumbnails...')
-      } else if (currentProgress >= 100) {
-        clearInterval(interval)
-        setStatus('success')
-      }
-    }, 150)
+      await booksService.uploadBook(
+        file,
+        {
+          title: title || file.name.replace(/\.[^/.]+$/, ''),
+          author: author || 'Unknown',
+          description,
+          categoryId:
+            category === 'Programming' ? 'cat-2' : category === 'Self-Help' ? 'cat-3' : 'cat-1',
+          tags: tags.map((t) => t.label),
+          pages: parseInt(pages) || 320,
+          publisher,
+          language,
+          isbn,
+          edition,
+        },
+        coverFile || undefined
+      )
+
+      setUploadProgress(80)
+      setProgressLabel('Indexing text elements & generating shelf reference...')
+      setUploadProgress(100)
+      setStatus('success')
+    } catch (err: unknown) {
+      console.error(err)
+      setStatus('idle')
+      const message = err instanceof Error ? err.message : String(err)
+      setGeneralError(message || 'Failed to complete book upload.')
+    }
   }
 
   return (
@@ -145,13 +163,6 @@ export const UploadBookPage: React.FC = () => {
           >
             Cancel
           </button>
-          <button
-            type="button"
-            onClick={() => navigate(ROUTES.LIBRARY)}
-            className="border-border-base bg-bg-surface text-text-sub hover:bg-bg-app cursor-pointer rounded-lg border px-4 py-2 text-xs font-bold tracking-wider uppercase"
-          >
-            Save as Draft
-          </button>
           <Button
             onClick={handleUploadSubmit}
             disabled={!file || status === 'uploading'}
@@ -163,6 +174,12 @@ export const UploadBookPage: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      {generalError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs font-semibold text-red-600 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400">
+          Error: {generalError}
+        </div>
+      )}
 
       <AnimatePresence mode="wait">
         {status === 'success' ? (
@@ -192,6 +209,7 @@ export const UploadBookPage: React.FC = () => {
               <button
                 onClick={() => {
                   setFile(null)
+                  setCoverFile(null)
                   setCoverUrl(null)
                   setTitle('')
                   setAuthor('')
@@ -400,7 +418,7 @@ export const UploadBookPage: React.FC = () => {
                 {/* Interactive tag input */}
                 <div className="space-y-2 text-left">
                   <label className="text-text-sub flex items-center gap-1.5 font-sans text-xs font-bold tracking-wider uppercase">
-                    <Tag className="h-4 w-4" />
+                    <Tag className="h-4.5 w-4.5" />
                     <span>Tags</span>
                   </label>
 
@@ -461,7 +479,7 @@ export const UploadBookPage: React.FC = () => {
                           {file.name}
                         </p>
                         <p className="text-text-muted mt-1 text-[10px] leading-none">
-                          {file.size} • {file.type}
+                          {formatBytes(file.size)}
                         </p>
                       </div>
                     </div>
@@ -514,7 +532,10 @@ export const UploadBookPage: React.FC = () => {
                         className="border-border-light aspect-[0.7/1] w-16 rounded-lg border object-cover"
                       />
                       <button
-                        onClick={() => setCoverUrl(null)}
+                        onClick={() => {
+                          setCoverFile(null)
+                          setCoverUrl(null)
+                        }}
                         className="absolute -top-1.5 -right-1.5 cursor-pointer rounded-full bg-red-500 p-0.5 text-white shadow hover:bg-red-600"
                       >
                         <X className="h-3 w-3" />
@@ -528,10 +549,18 @@ export const UploadBookPage: React.FC = () => {
 
                   <div className="space-y-2 text-left">
                     <p className="text-text-muted font-sans text-[10px] leading-normal">
-                      PNG, JPG, or WEBP. Upload a custom cover or let us generate one.
+                      PNG, JPG, or WEBP. Upload a custom cover image.
                     </p>
+                    <input
+                      type="file"
+                      ref={coverInputRef}
+                      accept="image/*"
+                      onChange={handleCoverChange}
+                      className="hidden"
+                    />
                     <button
-                      onClick={handleCoverSelect}
+                      type="button"
+                      onClick={handleCoverSelectTrigger}
                       className="bg-bg-app border-border-base text-text-sub hover:bg-bg-surface hover:text-text-main flex h-8 cursor-pointer items-center rounded-lg border px-4 text-[10px] font-bold tracking-wider uppercase"
                     >
                       {coverUrl ? 'Change Cover' : 'Upload Cover'}
@@ -557,42 +586,6 @@ export const UploadBookPage: React.FC = () => {
                       className="border-border-base text-primary-600 focus:ring-primary-500/10 h-4.5 w-4.5 cursor-pointer rounded"
                     />
                     <span>Mark as Favorite</span>
-                  </label>
-
-                  <label className="text-text-sub flex cursor-pointer items-center gap-2.5 text-xs font-bold select-none">
-                    <input
-                      type="checkbox"
-                      checked={options.currentlyReading}
-                      onChange={(e) =>
-                        setOptions((prev) => ({ ...prev, currentlyReading: e.target.checked }))
-                      }
-                      className="border-border-base text-primary-600 focus:ring-primary-500/10 h-4.5 w-4.5 cursor-pointer rounded"
-                    />
-                    <span>Currently Reading</span>
-                  </label>
-
-                  <label className="text-text-sub flex cursor-pointer items-center gap-2.5 text-xs font-bold select-none">
-                    <input
-                      type="checkbox"
-                      checked={options.completed}
-                      onChange={(e) =>
-                        setOptions((prev) => ({ ...prev, completed: e.target.checked }))
-                      }
-                      className="border-border-base text-primary-600 focus:ring-primary-500/10 h-4.5 w-4.5 cursor-pointer rounded"
-                    />
-                    <span>Completed</span>
-                  </label>
-
-                  <label className="text-text-sub flex cursor-pointer items-center gap-2.5 text-xs font-bold select-none">
-                    <input
-                      type="checkbox"
-                      checked={options.wishlist}
-                      onChange={(e) =>
-                        setOptions((prev) => ({ ...prev, wishlist: e.target.checked }))
-                      }
-                      className="border-border-base text-primary-600 focus:ring-primary-500/10 h-4.5 w-4.5 cursor-pointer rounded"
-                    />
-                    <span>Add to Wishlist</span>
                   </label>
                 </div>
               </div>
@@ -621,18 +614,6 @@ export const UploadBookPage: React.FC = () => {
                       </span>
                       <span className="text-text-muted mt-1 block text-[9px] leading-normal">
                         Only you can see and access this book in your cloud shelf.
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="border-border-base bg-bg-app/20 flex cursor-not-allowed items-start gap-3 rounded-2xl border p-4 opacity-60 select-none">
-                    <Globe className="text-text-muted mt-0.5 h-5 w-5 shrink-0" />
-                    <div>
-                      <span className="text-text-muted block text-xs font-bold">
-                        Public Library (Coming Soon)
-                      </span>
-                      <span className="text-text-muted mt-1 block text-[9px] leading-normal">
-                        Share link or host your public reader portal profile.
                       </span>
                     </div>
                   </div>

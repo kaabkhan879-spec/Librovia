@@ -1,11 +1,12 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ROUTES } from '../../constants/routes'
+import { booksService, type Book } from '../../services/books'
+import { useAuth } from '../../context/AuthContext'
 import {
   BookOpen,
   Flame,
-  Clock,
   HardDrive,
   CheckCircle2,
   FolderOpen,
@@ -21,142 +22,116 @@ import {
   UploadCloud,
 } from 'lucide-react'
 import { Button } from '../../components/common/Button'
+import { formatBytes } from '../../utils/helpers'
 
 export const DashboardPage: React.FC = () => {
+  const { user } = useAuth()
+  const [books, setBooks] = useState<Book[]>([])
+  const [loading, setLoading] = useState(true)
   const [isEmptyState, setIsEmptyState] = useState(false)
   const [isSkeletonLoading, setIsSkeletonLoading] = useState(false)
-  const [starredBooks, setStarredBooks] = useState<Record<string, boolean>>({
-    '1': true,
-    '3': false,
-  })
-  interface Book {
-    id: string
-    title: string
-    author: string
-    category: string
-    progress: number
-    timeLeft: string
-    cover: string
-    description: string
-  }
-
   const [previewBook, setPreviewBook] = useState<Book | null>(null)
 
-  const toggleStar = (id: string) => {
-    setStarredBooks((prev) => ({ ...prev, [id]: !prev[id] }))
+  const fetchBooks = () => {
+    booksService.getBooks().then((data) => {
+      setBooks(data)
+      setLoading(false)
+    })
   }
 
-  // Realistic mock data
+  useEffect(() => {
+    fetchBooks()
+  }, [])
+
+  const toggleStar = async (id: string) => {
+    try {
+      const isFav = await booksService.toggleFavorite(id)
+      setBooks((prev) => prev.map((b) => (b.id === id ? { ...b, isFavorite: isFav } : b)))
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  // Dynamic calculations
+  const totalBooks = books.length
+  const currentlyReading = books.filter((b) => b.progress > 0 && b.progress < 100).length
+  const completedBooks = books.filter((b) => b.progress === 100).length
+  const favoritesCount = books.filter((b) => b.isFavorite).length
+  const totalStorage = useMemo(() => {
+    const bytes = books.reduce((acc, b) => acc + b.fileSize, 0)
+    return formatBytes(bytes)
+  }, [books])
+
   const stats = [
     {
       title: 'Total Books',
-      value: '4',
-      sub: '+1 this week',
+      value: String(totalBooks),
+      sub: 'In cloud shelf',
       icon: BookOpen,
       color: 'text-indigo-500',
     },
     {
       title: 'Currently Reading',
-      value: '2',
+      value: String(currentlyReading),
       sub: 'Active now',
       icon: BookMarked,
       color: 'text-cyan-500',
     },
     {
       title: 'Completed Books',
-      value: '12',
-      sub: 'Lifetime count',
+      value: String(completedBooks),
+      sub: 'Read finished',
       icon: CheckCircle2,
       color: 'text-emerald-500',
     },
     {
-      title: 'Reading Hours',
-      value: '24.5h',
-      sub: 'This month',
-      icon: Clock,
+      title: 'Favorites',
+      value: String(favoritesCount),
+      sub: 'Starred books',
+      icon: Star,
       color: 'text-amber-500',
     },
     {
       title: 'Storage Used',
-      value: '15.8 MB',
-      sub: '1.5% of 1 GB',
+      value: totalStorage,
+      sub: '1 GB limit',
       icon: HardDrive,
       color: 'text-purple-500',
     },
     {
       title: 'Reading Streak',
-      value: '7 days',
+      value: '2 days',
       sub: 'Active streak',
       icon: Flame,
       color: 'text-red-500',
     },
   ]
 
-  const recentBooks = [
-    {
-      id: '1',
-      title: 'Atomic Habits',
-      author: 'James Clear',
-      category: 'Self-Help',
-      progress: 42,
-      timeLeft: '1h 45m',
-      cover:
-        'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=150&q=80',
-      description:
-        'Tiny Changes, Remarkable Results. An easy & proven way to build good habits & break bad ones.',
-    },
-    {
-      id: '2',
-      title: 'Clean Code',
-      author: 'Robert C. Martin',
-      category: 'Engineering',
-      progress: 85,
-      timeLeft: '30m',
-      cover:
-        'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=150&q=80',
-      description:
-        'A Handbook of Agile Software Craftsmanship. Learn to write code that reads like well-written prose.',
-    },
-    {
-      id: '3',
-      title: 'Deep Work',
-      author: 'Cal Newport',
-      category: 'Productivity',
-      progress: 15,
-      timeLeft: '4h 10m',
-      cover:
-        'https://images.unsplash.com/photo-1506880018603-83d5b814b5a6?auto=format&fit=crop&w=150&q=80',
-      description:
-        'Rules for Focused Success in a Distracted World. Put aside emails and meetings to produce massive outcomes.',
-    },
-    {
-      id: '4',
-      title: 'Rich Dad Poor Dad',
-      author: 'Robert Kiyosaki',
-      category: 'Finance',
-      progress: 0,
-      timeLeft: '6h 0m',
-      cover:
-        'https://images.unsplash.com/photo-1553729459-efe14ef6055d?auto=format&fit=crop&w=150&q=80',
-      description:
-        'What the Rich Teach Their Kids About Money - That the Poor and Middle Class Do Not!',
-    },
-  ]
+  const recentBooks = useMemo(() => {
+    return [...books].slice(0, 4)
+  }, [books])
+
+  const continueReadingBook = useMemo(() => {
+    const inProgress = books.find((b) => b.progress > 0 && b.progress < 100)
+    return inProgress || books[0] || null
+  }, [books])
 
   const collections = [
-    { name: 'Programming', count: 5, color: 'from-blue-500 to-indigo-600' },
-    { name: 'Islamic Books', count: 3, color: 'from-emerald-500 to-teal-600' },
-    { name: 'History', count: 2, color: 'from-amber-500 to-orange-600' },
-    { name: 'Business', count: 4, color: 'from-purple-500 to-pink-600' },
-    { name: 'Novels', count: 6, color: 'from-red-500 to-rose-600' },
-    { name: 'Science', count: 3, color: 'from-cyan-500 to-blue-600' },
-  ]
-
-  const activities = [
-    { action: 'Uploaded "Atomic Habits"', time: '2 hours ago' },
-    { action: 'Finished "Deep Work"', time: '1 day ago' },
-    { action: 'Added "Clean Code" to Favorites', time: '2 days ago' },
-    { action: 'Created Collection "Business"', time: '3 days ago' },
+    {
+      name: 'Programming',
+      count: books.filter((b) => b.categoryId === 'cat-2').length,
+      color: 'from-blue-500 to-indigo-600',
+    },
+    {
+      name: 'Self-Help',
+      count: books.filter((b) => b.categoryId === 'cat-3').length,
+      color: 'from-amber-500 to-orange-600',
+    },
+    {
+      name: 'Classics',
+      count: books.filter((b) => b.categoryId === 'cat-1').length,
+      color: 'from-purple-500 to-pink-600',
+    },
   ]
 
   const handleSimulateLoader = () => {
@@ -166,7 +141,7 @@ export const DashboardPage: React.FC = () => {
     }, 1500)
   }
 
-  // Animation variants for container staggering
+  // Animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
     show: {
@@ -192,7 +167,7 @@ export const DashboardPage: React.FC = () => {
       <div className="bg-bg-surface border-border-base flex flex-wrap items-center justify-between gap-4 rounded-2xl border p-4 shadow-sm">
         <div className="text-text-sub flex items-center gap-2 text-xs font-semibold">
           <Info className="text-primary-500 h-4.5 w-4.5 shrink-0" />
-          <span>Interactive UI Demos: Toggle empty states or skeleton layouts below.</span>
+          <span>Interactive UI Demos: Toggle empty states or skeleton layouts.</span>
         </div>
         <div className="flex gap-2">
           <button
@@ -211,8 +186,7 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       <AnimatePresence mode="wait">
-        {/* Loading Skeletons State */}
-        {isSkeletonLoading ? (
+        {isSkeletonLoading || loading ? (
           <motion.div
             key="skeleton"
             initial={{ opacity: 0 }}
@@ -230,7 +204,7 @@ export const DashboardPage: React.FC = () => {
               </div>
             ))}
           </motion.div>
-        ) : isEmptyState ? (
+        ) : isEmptyState || books.length === 0 ? (
           /* Empty States Layout */
           <motion.div
             key="empty"
@@ -269,7 +243,7 @@ export const DashboardPage: React.FC = () => {
             >
               <div className="space-y-1.5">
                 <h1 className="text-text-main font-sans text-2xl font-extrabold tracking-tight sm:text-3xl">
-                  Welcome back, Kaab 👋
+                  Welcome back, {user?.displayName || 'Reader'} 👋
                 </h1>
                 <p className="text-text-muted flex items-center gap-1.5 text-xs font-bold tracking-wider uppercase">
                   <Sparkles className="text-primary-500 h-3.5 w-3.5 animate-pulse" />
@@ -284,7 +258,7 @@ export const DashboardPage: React.FC = () => {
                   <span className="block text-[8px] leading-none tracking-wider text-red-500 uppercase opacity-80">
                     Streak
                   </span>
-                  <span className="mt-0.5 block text-sm leading-none">7 Days Running</span>
+                  <span className="mt-0.5 block text-sm leading-none">2 Days Running</span>
                 </div>
               </div>
             </motion.div>
@@ -322,62 +296,72 @@ export const DashboardPage: React.FC = () => {
             {/* 3. Continue Reading & Quick Actions split */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               {/* Continue Reading Large Card */}
-              <motion.div variants={itemVariants} className="lg:col-span-2">
-                <h3 className="text-text-muted mb-4 text-sm font-bold tracking-wider uppercase">
-                  Continue Reading
-                </h3>
-                <div className="from-primary-600 shadow-primary-500/10 relative flex flex-col items-stretch justify-between gap-6 overflow-hidden rounded-3xl bg-gradient-to-br to-indigo-600 p-6 text-white shadow-lg sm:flex-row">
-                  <div className="pointer-events-none absolute top-0 right-0 h-64 w-64 rounded-full bg-white/5 blur-2xl select-none" />
+              {continueReadingBook && (
+                <motion.div variants={itemVariants} className="lg:col-span-2">
+                  <h3 className="text-text-muted mb-4 text-sm font-bold tracking-wider uppercase">
+                    Continue Reading
+                  </h3>
+                  <div className="from-primary-600 shadow-primary-500/10 relative flex flex-col items-stretch justify-between gap-6 overflow-hidden rounded-3xl bg-gradient-to-br to-indigo-600 p-6 text-white shadow-lg sm:flex-row">
+                    <div className="pointer-events-none absolute top-0 right-0 h-64 w-64 rounded-full bg-white/5 blur-2xl select-none" />
 
-                  <div className="flex flex-1 items-start gap-4.5 text-left sm:items-center">
-                    <img
-                      src={recentBooks[0].cover}
-                      alt={recentBooks[0].title}
-                      className="aspect-[0.7/1] w-20 shrink-0 rounded-lg border border-white/10 object-cover shadow-lg"
-                    />
-                    <div className="space-y-2">
-                      <span className="inline-block rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase">
-                        {recentBooks[0].category}
-                      </span>
-                      <h4 className="font-sans text-lg font-bold tracking-tight">
-                        {recentBooks[0].title}
-                      </h4>
-                      <p className="text-xs text-indigo-100">{recentBooks[0].author}</p>
+                    <div className="flex flex-1 items-start gap-4.5 text-left sm:items-center">
+                      <img
+                        src={continueReadingBook.coverPath}
+                        alt={continueReadingBook.title}
+                        className="aspect-[0.7/1] w-20 shrink-0 rounded-lg border border-white/10 object-cover shadow-lg"
+                      />
+                      <div className="space-y-2">
+                        <span className="inline-block rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase">
+                          {continueReadingBook.categoryId === 'cat-2' ? 'Programming' : 'Self-Help'}
+                        </span>
+                        <h4 className="font-sans text-lg font-bold tracking-tight">
+                          {continueReadingBook.title}
+                        </h4>
+                        <p className="text-xs text-indigo-100">{continueReadingBook.author}</p>
 
-                      <div className="mt-2 w-full max-w-[200px]">
-                        <div className="mb-1 flex justify-between text-[9px] font-bold tracking-wider text-indigo-100 uppercase">
-                          <span>Reading Progress</span>
-                          <span>{recentBooks[0].progress}%</span>
-                        </div>
-                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/20">
-                          <div
-                            className="h-full bg-white"
-                            style={{ width: `${recentBooks[0].progress}%` }}
-                          />
+                        <div className="mt-2 w-full max-w-[200px]">
+                          <div className="mb-1 flex justify-between text-[9px] font-bold tracking-wider text-indigo-100 uppercase">
+                            <span>Reading Progress</span>
+                            <span>{continueReadingBook.progress}%</span>
+                          </div>
+                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/20">
+                            <div
+                              className="h-full bg-white"
+                              style={{ width: `${continueReadingBook.progress}%` }}
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex shrink-0 flex-col items-start justify-between border-t border-white/10 pt-4 text-left sm:items-end sm:border-t-0 sm:border-l sm:pt-0 sm:pl-6 sm:text-right">
-                    <div className="space-y-1">
-                      <span className="block text-[9px] tracking-wider text-indigo-200 uppercase">
-                        Est. Time Left
-                      </span>
-                      <span className="block text-sm font-bold">{recentBooks[0].timeLeft}</span>
+                    <div className="flex shrink-0 flex-col items-start justify-between border-t border-white/10 pt-4 text-left sm:items-end sm:border-t-0 sm:border-l sm:pt-0 sm:pl-6 sm:text-right">
+                      <div className="space-y-1">
+                        <span className="block text-[9px] tracking-wider text-indigo-200 uppercase">
+                          Pages logged
+                        </span>
+                        <span className="block text-sm font-bold">
+                          {continueReadingBook.currentPage} / {continueReadingBook.totalPages}
+                        </span>
+                      </div>
+                      <Link
+                        to={ROUTES.READER.replace(':id', continueReadingBook.id)}
+                        className="mt-4 sm:mt-0"
+                      >
+                        <Button className="text-primary-600 flex items-center gap-1.5 border-transparent bg-white px-5 py-2.5 font-bold shadow-sm hover:bg-slate-50">
+                          <Play className="fill-primary-600 stroke-primary-600 h-3.5 w-3.5" />
+                          Resume Reading
+                        </Button>
+                      </Link>
                     </div>
-                    <Link to="/reader/atomic-habits" className="mt-4 sm:mt-0">
-                      <Button className="text-primary-600 flex items-center gap-1.5 border-transparent bg-white px-5 py-2.5 font-bold shadow-sm hover:bg-slate-50">
-                        <Play className="fill-primary-600 stroke-primary-600 h-3.5 w-3.5" />
-                        Resume Reading
-                      </Button>
-                    </Link>
                   </div>
-                </div>
-              </motion.div>
+                </motion.div>
+              )}
 
               {/* Quick Actions Panel */}
-              <motion.div variants={itemVariants}>
+              <motion.div
+                variants={itemVariants}
+                className={!continueReadingBook ? 'lg:col-span-3' : ''}
+              >
                 <h3 className="text-text-muted mb-4 text-sm font-bold tracking-wider uppercase">
                   Quick Actions
                 </h3>
@@ -391,25 +375,11 @@ export const DashboardPage: React.FC = () => {
                       <span className="text-text-main mt-4 text-xs font-bold">Upload Book</span>
                     </Link>
                     <Link
-                      to={ROUTES.CATEGORIES}
-                      className="bg-bg-app border-border-light hover:border-primary-500/20 flex flex-col justify-between rounded-2xl border p-4 text-left transition-all"
-                    >
-                      <Plus className="h-5 w-5 shrink-0 text-cyan-500" />
-                      <span className="text-text-main mt-4 text-xs font-bold">New Shelf</span>
-                    </Link>
-                    <Link
                       to={ROUTES.LIBRARY}
                       className="bg-bg-app border-border-light hover:border-primary-500/20 flex flex-col justify-between rounded-2xl border p-4 text-left transition-all"
                     >
                       <BookOpen className="h-5 w-5 shrink-0 text-emerald-500" />
-                      <span className="text-text-main mt-4 text-xs font-bold">Import PDF</span>
-                    </Link>
-                    <Link
-                      to="/reader/atomic-habits"
-                      className="bg-bg-app border-border-light hover:border-primary-500/20 flex flex-col justify-between rounded-2xl border p-4 text-left transition-all"
-                    >
-                      <Play className="h-5 w-5 shrink-0 text-amber-500" />
-                      <span className="text-text-main mt-4 text-xs font-bold">Resume Last</span>
+                      <span className="text-text-main mt-4 text-xs font-bold">Open Library</span>
                     </Link>
                   </div>
                 </div>
@@ -433,7 +403,6 @@ export const DashboardPage: React.FC = () => {
 
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
                 {recentBooks.map((book) => {
-                  const isStarred = starredBooks[book.id]
                   return (
                     <motion.div
                       key={book.id}
@@ -442,13 +411,13 @@ export const DashboardPage: React.FC = () => {
                     >
                       <div className="flex gap-4">
                         <img
-                          src={book.cover}
+                          src={book.coverPath}
                           alt={book.title}
                           className="border-border-light aspect-[0.7/1] w-14 shrink-0 rounded border object-cover shadow-md"
                         />
                         <div className="min-w-0 space-y-1">
                           <span className="bg-primary-50 dark:bg-primary-500/10 text-primary-600 inline-block rounded px-1.5 py-0.5 text-[8px] font-bold tracking-wider uppercase">
-                            {book.category}
+                            {book.categoryId === 'cat-2' ? 'Programming' : 'Self-Help'}
                           </span>
                           <h4 className="text-text-main truncate text-xs font-bold">
                             {book.title}
@@ -478,7 +447,7 @@ export const DashboardPage: React.FC = () => {
                             className="border-border-base bg-bg-surface text-text-muted hover:bg-bg-app flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border"
                           >
                             <Star
-                              className={`h-4 w-4 ${isStarred ? 'fill-amber-400 text-amber-400' : 'text-text-muted'}`}
+                              className={`h-4 w-4 ${book.isFavorite ? 'fill-amber-400 text-amber-400' : 'text-text-muted'}`}
                             />
                           </button>
 
@@ -486,11 +455,11 @@ export const DashboardPage: React.FC = () => {
                             <button
                               onClick={() => setPreviewBook(book)}
                               className="border-border-base bg-bg-surface text-text-sub hover:bg-bg-app flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border"
-                              title="Quick Preview Details"
+                              title="Quick Preview"
                             >
                               <Eye className="h-4 w-4" />
                             </button>
-                            <Link to="/reader/atomic-habits">
+                            <Link to={ROUTES.READER.replace(':id', book.id)}>
                               <button className="bg-primary-600 hover:bg-primary-700 flex h-7 cursor-pointer items-center rounded-lg px-3 text-[9px] font-bold tracking-wider text-white uppercase transition-colors">
                                 Open
                               </button>
@@ -542,14 +511,14 @@ export const DashboardPage: React.FC = () => {
                 </h3>
                 <div className="bg-bg-surface border-border-base flex h-full flex-col justify-between rounded-3xl border p-5 shadow-sm">
                   <div className="flex-1 space-y-4">
-                    {activities.map((act, idx) => (
+                    {books.slice(0, 3).map((act, idx) => (
                       <div key={idx} className="flex gap-3 text-left">
                         <div className="bg-primary-50 dark:bg-primary-500/10 text-primary-600 mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg">
                           <Activity className="h-4 w-4" />
                         </div>
                         <div>
-                          <p className="text-text-main text-xs font-bold">{act.action}</p>
-                          <p className="text-text-muted mt-0.5 text-[9px]">{act.time}</p>
+                          <p className="text-text-main text-xs font-bold">Uploaded "{act.title}"</p>
+                          <p className="text-text-muted mt-0.5 text-[9px]">Recently synced</p>
                         </div>
                       </div>
                     ))}
@@ -557,93 +526,6 @@ export const DashboardPage: React.FC = () => {
                 </div>
               </motion.div>
             </div>
-
-            {/* 6. Reading Analytics Chart Section */}
-            <motion.div id="analytics-section" variants={itemVariants} className="text-left">
-              <h3 className="text-text-muted mb-4 text-sm font-bold tracking-wider uppercase">
-                Reading Analytics & Streaks
-              </h3>
-              <div className="bg-bg-surface border-border-base grid grid-cols-1 gap-8 rounded-3xl border p-6 shadow-sm md:grid-cols-2">
-                {/* SVG Chart 1: Weekly Reading Hours */}
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="text-text-main text-xs font-bold tracking-wider uppercase">
-                      Weekly Reading (Hours)
-                    </h4>
-                    <p className="text-text-muted mt-0.5 text-[10px]">
-                      Simulated activity log from Mon - Sun
-                    </p>
-                  </div>
-                  {/* Clean Vector SVG Chart */}
-                  <div className="border-border-base flex h-44 w-full items-end justify-between border-b border-l px-2 pt-4">
-                    {[
-                      { day: 'M', hrs: 1.5, pct: '35%' },
-                      { day: 'T', hrs: 2.0, pct: '50%' },
-                      { day: 'W', hrs: 0.5, pct: '12%' },
-                      { day: 'T', hrs: 3.2, pct: '85%' },
-                      { day: 'F', hrs: 1.8, pct: '45%' },
-                      { day: 'S', hrs: 4.0, pct: '100%' },
-                      { day: 'S', hrs: 2.5, pct: '62%' },
-                    ].map((bar, idx) => (
-                      <div key={idx} className="group flex flex-1 flex-col items-center gap-2">
-                        <span className="pointer-events-none absolute -translate-y-8 rounded bg-slate-900 px-1.5 py-0.5 text-[8px] font-bold text-white opacity-0 transition-opacity group-hover:opacity-100">
-                          {bar.hrs}h
-                        </span>
-                        <div
-                          className="bg-primary-600/30 group-hover:bg-primary-600 w-6 cursor-pointer rounded-t transition-all"
-                          style={{ height: `calc(${bar.pct} * 1.2)` }}
-                        />
-                        <span className="text-text-muted mt-1 text-[9px] font-bold select-none">
-                          {bar.day}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* SVG Chart 2: Monthly Progress */}
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="text-text-main text-xs font-bold tracking-wider uppercase">
-                      Pages Read (Trend)
-                    </h4>
-                    <p className="text-text-muted mt-0.5 text-[10px]">
-                      Total pages logged per week
-                    </p>
-                  </div>
-                  {/* Line SVG Chart representation */}
-                  <div className="border-border-base relative h-44 w-full border-b border-l pt-4">
-                    <svg className="h-full w-full" viewBox="0 0 100 40" preserveAspectRatio="none">
-                      <defs>
-                        <linearGradient id="gradient-chart" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#6366f1" stopOpacity="0.2" />
-                          <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
-                        </linearGradient>
-                      </defs>
-                      {/* Area background fill */}
-                      <path
-                        d="M0 40 L0 30 L25 15 L50 25 L75 5 L100 12 L100 40 Z"
-                        fill="url(#gradient-chart)"
-                      />
-                      {/* Line stroke path */}
-                      <path
-                        d="M0 30 L25 15 L50 25 L75 5 L100 12"
-                        fill="none"
-                        stroke="#6366f1"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                    <div className="text-text-muted mt-2 flex items-center justify-between px-2 text-[9px] font-bold select-none">
-                      <span>Wk 1</span>
-                      <span>Wk 2</span>
-                      <span>Wk 3</span>
-                      <span>Wk 4</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -671,12 +553,12 @@ export const DashboardPage: React.FC = () => {
                   onClick={() => setPreviewBook(null)}
                   className="text-text-muted hover:bg-bg-app hover:text-text-main cursor-pointer rounded-lg p-1"
                 >
-                  <X className="h-4.5 w-4.5" />
+                  <XIcon className="h-4.5 w-4.5" />
                 </button>
               </div>
               <div className="flex gap-4">
                 <img
-                  src={previewBook.cover}
+                  src={previewBook.coverPath}
                   alt={previewBook.title}
                   className="border-border-light aspect-[0.7/1] w-16 shrink-0 rounded border object-cover shadow"
                 />
@@ -684,18 +566,21 @@ export const DashboardPage: React.FC = () => {
                   <h5 className="text-text-main text-sm font-bold">{previewBook.title}</h5>
                   <p className="text-text-sub mt-0.5 text-xs">By {previewBook.author}</p>
                   <span className="bg-primary-50 dark:bg-primary-500/10 text-primary-600 mt-2 inline-block rounded px-1.5 py-0.5 text-[8px] font-bold tracking-wider uppercase">
-                    {previewBook.category}
+                    {previewBook.categoryId === 'cat-2' ? 'Programming' : 'Self-Help'}
                   </span>
                 </div>
               </div>
               <p className="text-text-sub font-sans text-xs leading-relaxed">
-                {previewBook.description}
+                {previewBook.description || 'No synopsis provided.'}
               </p>
               <div className="border-border-light flex justify-end gap-2 border-t pt-2">
                 <Button size="sm" variant="outline" onClick={() => setPreviewBook(null)}>
                   Close
                 </Button>
-                <Link to="/reader/atomic-habits" onClick={() => setPreviewBook(null)}>
+                <Link
+                  to={ROUTES.READER.replace(':id', previewBook.id)}
+                  onClick={() => setPreviewBook(null)}
+                >
                   <Button size="sm">Open Reader</Button>
                 </Link>
               </div>
@@ -707,11 +592,11 @@ export const DashboardPage: React.FC = () => {
   )
 }
 
-interface XProps {
+interface XIconProps {
   className?: string
 }
 
-const X: React.FC<XProps> = ({ className = 'h-4 w-4' }) => (
+const XIcon: React.FC<XIconProps> = ({ className = 'h-4 w-4' }) => (
   <svg
     viewBox="0 0 24 24"
     fill="none"
