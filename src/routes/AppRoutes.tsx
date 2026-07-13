@@ -23,6 +23,7 @@ import { FavoritesPage } from '../pages/favorites/FavoritesPage'
 import { CategoriesPage } from '../pages/categories/CategoriesPage'
 import { ProfilePage } from '../pages/profile/ProfilePage'
 import { SettingsPage } from '../pages/settings/SettingsPage'
+import { DesignSystemShowcase } from '../pages/showcase/DesignSystemShowcase'
 
 export const AppRoutes: React.FC = () => {
   return (
@@ -52,6 +53,9 @@ export const AppRoutes: React.FC = () => {
           <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />
         </Route>
       </Route>
+
+      {/* Design System Showcase Route */}
+      <Route path={ROUTES.DESIGN_SYSTEM} element={<DesignSystemShowcase />} />
 
       {/* Fallback Catch All */}
       <Route path="*" element={<Navigate to={ROUTES.LANDING} replace />} />

@@ -11,4 +11,5 @@ export const ROUTES = {
   CATEGORIES: '/categories',
   PROFILE: '/profile',
   SETTINGS: '/settings',
+  DESIGN_SYSTEM: '/design-system',
 } as const

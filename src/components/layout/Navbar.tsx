@@ -29,6 +29,12 @@ export const MarketingNavbar: React.FC = () => {
           <a href="#pricing" className="hover:text-brand-600 text-sm font-medium text-slate-600">
             Pricing
           </a>
+          <Link
+            to={ROUTES.DESIGN_SYSTEM}
+            className="hover:text-brand-600 text-sm font-medium text-slate-600"
+          >
+            UI Showcase
+          </Link>
           <button
             onClick={toggleDemoAuth}
             className="hover:bg-brand-50 hover:text-brand-600 cursor-pointer rounded bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600"
