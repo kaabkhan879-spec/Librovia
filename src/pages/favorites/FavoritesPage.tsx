@@ -37,10 +37,16 @@ export const FavoritesPage: React.FC = () => {
     }, 1500)
   }
 
-  const toggleStar = (id: string, e: React.MouseEvent) => {
+  const toggleStar = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    setStarredBooks((prev) => ({ ...prev, [id]: !prev[id] }))
-    // If unfavorited, keep in list for interactive feedback or filter out
+    try {
+      const isFav = await booksService.toggleFavorite(id)
+      setStarredBooks((prev) => ({ ...prev, [id]: isFav }))
+      const data = await booksService.getBooks()
+      setBooks(data.filter((b) => b.isFavorite))
+    } catch (err) {
+      console.error('Failed to toggle favorite status:', err)
+    }
   }
 
   // Animation variants

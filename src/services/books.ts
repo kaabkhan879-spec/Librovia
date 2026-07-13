@@ -89,6 +89,22 @@ export const booksService = {
       }
     }
 
+    // Fetch favorites if table exists
+    let favBookIds: string[] = []
+    let hasFavsTable = true
+    try {
+      const { data: favsData, error: favsError } = await supabase
+        .from('favorites')
+        .select('book_id')
+      if (favsError && favsError.code === 'PGRST205') {
+        hasFavsTable = false
+      } else if (!favsError && favsData) {
+        favBookIds = favsData.map((f) => f.book_id)
+      }
+    } catch {
+      hasFavsTable = false
+    }
+
     return rows.map((row) => {
       const bookPath = getPathFromUrl(row.file_url, 'books')
       const coverPath = getPathFromUrl(row.cover_url, 'covers')
@@ -99,6 +115,8 @@ export const booksService = {
       const totalPages = rp?.total_pages || row.pages || 320
       const progressPct = totalPages > 0 ? Math.round((currentPage / totalPages) * 100) : 0
 
+      const isFav = hasFavsTable ? favBookIds.includes(row.id) : row.is_favorite
+
       return {
         id: row.id,
         title: row.title,
@@ -107,7 +125,7 @@ export const booksService = {
         filePath: signedBookUrls[bookPath] || row.file_url,
         coverPath: signedCoverUrls[coverPath] || row.cover_url,
         categoryId: row.category,
-        isFavorite: row.is_favorite,
+        isFavorite: isFav,
         tags: row.tags || [],
         fileSize: row.file_size || 0,
         createdAt: row.created_at,
@@ -158,6 +176,21 @@ export const booksService = {
     const totalPages = rp?.total_pages || data.pages || 320
     const progressPct = totalPages > 0 ? Math.round((currentPage / totalPages) * 100) : 0
 
+    let isFav = data.is_favorite
+    try {
+      const { data: favData, error: favError } = await supabase
+        .from('favorites')
+        .select('id')
+        .eq('book_id', id)
+      if (!favError && favData && favData.length > 0) {
+        isFav = true
+      } else if (!favError && favData && favData.length === 0) {
+        isFav = false
+      }
+    } catch {
+      // Ignore
+    }
+
     return {
       id: data.id,
       title: data.title,
@@ -166,7 +199,7 @@ export const booksService = {
       filePath: fileUrl,
       coverPath: coverUrl,
       categoryId: data.category,
-      isFavorite: data.is_favorite,
+      isFavorite: isFav,
       tags: data.tags || [],
       fileSize: data.file_size || 0,
       createdAt: data.created_at,
@@ -289,14 +322,60 @@ export const booksService = {
   },
 
   async toggleFavorite(id: string): Promise<boolean> {
-    const { data: book } = await supabase.from('books').select('is_favorite').eq('id', id).single()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
 
-    const newFavorite = !book?.is_favorite
+    try {
+      const { data: currentFavs, error: checkError } = await supabase
+        .from('favorites')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('book_id', id)
 
-    const { error } = await supabase.from('books').update({ is_favorite: newFavorite }).eq('id', id)
+      if (checkError && checkError.code === 'PGRST205') throw checkError
 
-    if (error) throw error
-    return newFavorite
+      const isFav = currentFavs && currentFavs.length > 0
+      if (isFav) {
+        const { error } = await supabase
+          .from('favorites')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('book_id', id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('favorites').insert({
+          user_id: user.id,
+          book_id: id,
+        })
+        if (error) throw error
+      }
+
+      // Also update books table is_favorite for safety
+      const { data: book } = await supabase
+        .from('books')
+        .select('is_favorite')
+        .eq('id', id)
+        .single()
+      const newFav = !book?.is_favorite
+      await supabase.from('books').update({ is_favorite: newFav }).eq('id', id)
+      return newFav
+    } catch (err) {
+      console.error('Favorites database check failed, falling back to books table:', err)
+      const { data: book } = await supabase
+        .from('books')
+        .select('is_favorite')
+        .eq('id', id)
+        .single()
+      const newFavorite = !book?.is_favorite
+      const { error } = await supabase
+        .from('books')
+        .update({ is_favorite: newFavorite })
+        .eq('id', id)
+      if (error) throw error
+      return newFavorite
+    }
   },
 
   async updateReadingProgress(

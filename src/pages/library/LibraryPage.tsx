@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ROUTES } from '../../constants/routes'
 import { booksService, type Book } from '../../services/books'
+import { collectionsService, type Collection } from '../../services/collections'
 import {
   BookOpen,
   Search,
@@ -28,6 +29,9 @@ type SortType = 'newest' | 'oldest' | 'a-z' | 'recently-opened'
 
 export const LibraryPage: React.FC = () => {
   const [books, setBooks] = useState<Book[]>([])
+  const [collections, setCollections] = useState<Collection[]>([])
+  const [bookCollections, setBookCollections] = useState<Record<string, string[]>>({})
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [isEmptyState, setIsEmptyState] = useState(false)
   const [isSkeletonLoading, setIsSkeletonLoading] = useState(false)
@@ -43,22 +47,59 @@ export const LibraryPage: React.FC = () => {
   const [page, setPage] = useState(1)
   const pageSize = 12
 
-  const fetchBooks = () => {
-    booksService
-      .getBooks()
-      .then((data) => {
-        setBooks(data)
-        setLoading(false)
-      })
-      .catch((err) => {
-        console.error('Failed to fetch books:', err)
-        setErrorMsg('Failed to load library collection. Please check your network connection.')
-        setLoading(false)
-      })
+  const fetchBooksAndCollections = async () => {
+    try {
+      const booksData = await booksService.getBooks()
+      const cols = await collectionsService.getCollections()
+      setCollections(cols)
+
+      const associations: Record<string, string[]> = {}
+      await Promise.all(
+        booksData.map(async (book) => {
+          associations[book.id] = await collectionsService.getBookCollections(book.id)
+        })
+      )
+      setBookCollections(associations)
+      setBooks(booksData)
+      setLoading(false)
+    } catch (err) {
+      console.error('Failed to fetch library details:', err)
+      setErrorMsg('Failed to load library collection. Please check your network connection.')
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
-    fetchBooks()
+    let active = true
+    const load = async () => {
+      try {
+        const booksData = await booksService.getBooks()
+        const cols = await collectionsService.getCollections()
+        if (!active) return
+        setCollections(cols)
+
+        const associations: Record<string, string[]> = {}
+        await Promise.all(
+          booksData.map(async (book) => {
+            associations[book.id] = await collectionsService.getBookCollections(book.id)
+          })
+        )
+        if (!active) return
+        setBookCollections(associations)
+        setBooks(booksData)
+        setLoading(false)
+      } catch (err) {
+        console.error('Failed to fetch library details:', err)
+        if (active) {
+          setErrorMsg('Failed to load library collection. Please check your network connection.')
+          setLoading(false)
+        }
+      }
+    }
+    load()
+    return () => {
+      active = false
+    }
   }, [])
 
   const toggleStar = async (id: string, e: React.MouseEvent) => {
@@ -79,36 +120,43 @@ export const LibraryPage: React.FC = () => {
     try {
       await booksService.deleteBook(id)
       setSelectedBook(null)
-      fetchBooks()
+      fetchBooksAndCollections()
     } catch (err) {
       console.error(err)
     }
   }
 
-  // Collections data computed dynamically from books
-  const collectionsData = useMemo(() => {
-    return [
-      {
-        name: 'Programming',
-        count: books.filter((b) => b.categoryId === 'cat-2').length,
-        color: 'from-blue-500 to-indigo-600',
-      },
-      {
-        name: 'Classics',
-        count: books.filter((b) => b.categoryId === 'cat-1').length,
-        color: 'from-purple-500 to-pink-600',
-      },
-      {
-        name: 'Self-Help',
-        count: books.filter((b) => b.categoryId === 'cat-3').length,
-        color: 'from-violet-500 to-fuchsia-600',
-      },
-    ]
-  }, [books])
+  const handleToggleCollection = async (collectionId: string, bookId: string) => {
+    try {
+      const inCol = bookCollections[bookId]?.includes(collectionId)
+      if (inCol) {
+        await collectionsService.removeBookFromCollection(collectionId, bookId)
+        setBookCollections((prev) => ({
+          ...prev,
+          [bookId]: prev[bookId].filter((id) => id !== collectionId),
+        }))
+      } else {
+        await collectionsService.addBookToCollection(collectionId, bookId)
+        setBookCollections((prev) => ({
+          ...prev,
+          [bookId]: [...(prev[bookId] || []), collectionId],
+        }))
+      }
+      const cols = await collectionsService.getCollections()
+      setCollections(cols)
+    } catch (err) {
+      console.error('Failed to toggle book collection membership:', err)
+    }
+  }
 
   // Filter & Sort Logic
   const filteredBooks = useMemo(() => {
     const result = books.filter((book) => {
+      if (selectedCollectionId) {
+        const belongs = bookCollections[book.id]?.includes(selectedCollectionId)
+        if (!belongs) return false
+      }
+
       const categoryName =
         book.categoryId === 'cat-2'
           ? 'Programming'
@@ -148,7 +196,15 @@ export const LibraryPage: React.FC = () => {
         return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
       return 0
     })
-  }, [books, searchQuery, activeFilter, sortBy, recentThreshold])
+  }, [
+    books,
+    searchQuery,
+    activeFilter,
+    sortBy,
+    recentThreshold,
+    selectedCollectionId,
+    bookCollections,
+  ])
 
   // Paginated books for display
   const paginatedBooks = useMemo(() => {
@@ -448,6 +504,26 @@ export const LibraryPage: React.FC = () => {
               </div>
             </div>
 
+            {selectedCollectionId && (
+              <div className="bg-primary-50 dark:bg-primary-500/10 border-primary-200 dark:border-primary-500/20 text-text-main mb-6 flex items-center justify-between rounded-xl border p-3.5 text-xs font-semibold">
+                <div className="flex items-center gap-2">
+                  <FolderHeart className="text-primary-600 h-4.5 w-4.5" />
+                  <span>
+                    Showing collection:{' '}
+                    <strong className="uppercase">
+                      {collections.find((c) => c.id === selectedCollectionId)?.name || 'Unknown'}
+                    </strong>
+                  </span>
+                </div>
+                <button
+                  onClick={() => setSelectedCollectionId(null)}
+                  className="text-text-muted hover:text-text-main cursor-pointer"
+                >
+                  <X className="h-4.5 w-4.5" />
+                </button>
+              </div>
+            )}
+
             {/* Books display area (Grid / List views) */}
             <AnimatePresence mode="wait">
               {filteredBooks.length === 0 ? (
@@ -665,33 +741,54 @@ export const LibraryPage: React.FC = () => {
               <h3 className="text-text-muted mb-4 text-sm font-bold tracking-wider uppercase">
                 My Collections
               </h3>
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {collectionsData.map((col, idx) => (
-                  <div
-                    key={idx}
-                    className="group border-border-base bg-bg-surface hover:border-primary-500/20 flex h-36 cursor-pointer flex-col justify-between rounded-2xl border p-4 text-left shadow-sm transition-all"
-                  >
-                    <div className="flex items-start justify-between">
+              {collections.length === 0 ? (
+                <div className="border-border-base bg-bg-surface/30 text-text-sub rounded-2xl border border-dashed py-8 text-center text-xs">
+                  No collections created yet. Go to{' '}
+                  <Link to={ROUTES.CATEGORIES} className="text-primary-600 hover:underline">
+                    Collections page
+                  </Link>{' '}
+                  to create one.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  {collections.map((col, idx) => {
+                    const gradients = [
+                      'from-blue-500 to-indigo-600',
+                      'from-purple-500 to-pink-600',
+                      'from-violet-500 to-fuchsia-600',
+                      'from-cyan-500 to-blue-600',
+                      'from-emerald-500 to-teal-600',
+                    ]
+                    const color = gradients[idx % gradients.length]
+                    return (
                       <div
-                        className={`h-12 w-12 rounded-xl bg-gradient-to-tr ${col.color} flex shrink-0 items-center justify-center text-white`}
+                        key={col.id}
+                        onClick={() => setSelectedCollectionId(col.id)}
+                        className="group border-border-base bg-bg-surface hover:border-primary-500/20 flex h-36 cursor-pointer flex-col justify-between rounded-2xl border p-4 text-left shadow-sm transition-all hover:shadow-md"
                       >
-                        <BookOpen className="h-6 w-6" />
+                        <div className="flex items-start justify-between">
+                          <div
+                            className={`h-12 w-12 rounded-xl bg-gradient-to-tr ${color} flex shrink-0 items-center justify-center text-white shadow-md`}
+                          >
+                            <BookOpen className="h-6 w-6" />
+                          </div>
+                          <span className="bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400 rounded px-1.5 py-0.5 text-[10px] font-bold">
+                            Collection
+                          </span>
+                        </div>
+                        <div className="mt-4 flex items-end justify-between">
+                          <h4 className="text-text-main truncate text-xs font-bold tracking-wider uppercase">
+                            {col.name}
+                          </h4>
+                          <span className="text-text-muted font-mono text-[10px] font-bold">
+                            {col.bookCount || 0} {col.bookCount === 1 ? 'Book' : 'Books'}
+                          </span>
+                        </div>
                       </div>
-                      <span className="bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400 rounded px-1.5 py-0.5 text-[10px] font-bold">
-                        Shelf Category
-                      </span>
-                    </div>
-                    <div className="mt-4 flex items-end justify-between">
-                      <h4 className="text-text-main truncate text-xs font-bold tracking-wider uppercase">
-                        {col.name}
-                      </h4>
-                      <span className="text-text-muted font-mono text-[10px] font-bold">
-                        {col.count} {col.count === 1 ? 'Book' : 'Books'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </motion.div>
         )}
@@ -760,6 +857,45 @@ export const LibraryPage: React.FC = () => {
                   <p className="text-text-sub font-sans text-xs leading-relaxed">
                     {selectedBook.description || 'No description provided.'}
                   </p>
+                </div>
+
+                <div className="space-y-3">
+                  <h4 className="text-text-muted text-[10px] font-bold tracking-wider uppercase">
+                    My Collections
+                  </h4>
+                  {collections.length === 0 ? (
+                    <p className="text-text-muted text-[10px] italic">
+                      No collections created yet. Go to{' '}
+                      <Link
+                        to={ROUTES.CATEGORIES}
+                        onClick={() => setSelectedBook(null)}
+                        className="text-primary-600 hover:underline"
+                      >
+                        Collections page
+                      </Link>{' '}
+                      to create one.
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {collections.map((col) => {
+                        const inCollection =
+                          bookCollections[selectedBook.id]?.includes(col.id) || false
+                        return (
+                          <button
+                            key={col.id}
+                            onClick={() => handleToggleCollection(col.id, selectedBook.id)}
+                            className={`cursor-pointer rounded-lg border px-2.5 py-1 text-[10px] font-semibold transition-all ${
+                              inCollection
+                                ? 'bg-primary-50 border-primary-300 text-primary-700 dark:bg-primary-500/10 dark:border-primary-500/30 dark:text-primary-400'
+                                : 'border-border-base bg-bg-surface text-text-sub hover:bg-bg-app'
+                            }`}
+                          >
+                            {col.name}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 <div className="bg-bg-app border-border-light grid grid-cols-2 gap-4 rounded-xl border p-4">
