@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ROUTES } from '../../constants/routes'
 import {
@@ -14,8 +14,11 @@ import {
   Bookmark,
   MessageSquare,
   Info,
+  Trash2,
 } from 'lucide-react'
 import { Button } from '../../components/common/Button'
+import { booksService, type Book } from '../../services/books'
+import { formatBytes } from '../../utils/helpers'
 
 interface BookDetails {
   id: string
@@ -51,142 +54,122 @@ interface BookDetails {
   cover: string
 }
 
-// Realistic Dummy Database
-const booksDb: Record<string, BookDetails> = {
-  'atomic-habits': {
-    id: 'atomic-habits',
-    title: 'Atomic Habits',
-    subtitle: 'An Easy & Proven Way to Build Good Habits & Break Bad Ones',
-    author: 'James Clear',
-    publisher: 'Penguin Books',
-    category: 'Personal Development',
+const mapBookToDetails = (b: Book): BookDetails => {
+  const fileExt = b.filePath.toLowerCase().split('?')[0].split('.').pop()?.toUpperCase() || 'PDF'
+
+  // Calculate est time remaining based on progress (assume 2 minutes per page remaining)
+  const pagesLeft = Math.max(0, b.totalPages - b.currentPage)
+  const minsLeft = pagesLeft * 2
+  const estTimeRemaining =
+    minsLeft > 60 ? `${Math.floor(minsLeft / 60)}h ${minsLeft % 60}m` : `${minsLeft}m`
+
+  const uploadDate = new Date(b.createdAt).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+  const updateDate = new Date(b.updatedAt).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+
+  const categoryName =
+    b.categoryId === 'cat-2' ? 'Programming' : b.categoryId === 'cat-3' ? 'Self-Help' : 'Classics'
+
+  return {
+    id: b.id,
+    title: b.title,
+    subtitle: '',
+    author: b.author,
+    publisher: 'Library Upload',
+    category: categoryName,
     language: 'English',
-    pubYear: 2018,
+    pubYear: new Date(b.createdAt).getFullYear(),
     rating: 4.8,
-    reviewsCount: 1248,
-    progress: 42,
-    currentPage: 134,
-    totalPages: 320,
-    lastOpened: '2 hours ago',
-    estTimeRemaining: '1h 45m',
-    streak: 7,
-    description:
-      'Tiny Changes, Remarkable Results. Atomic Habits is the most comprehensive and practical guide on how to create good habits, break bad ones, and get 1 percent better every day. Clear is known for his ability to distill complex topics into simple behaviors that can be easily applied to daily life and work.',
-    fileSize: '12.4 MB',
-    fileType: 'PDF',
-    uploadedDate: '2026-07-01',
-    lastModified: '2026-07-12',
-    tags: ['Self-Help', 'Productivity', 'Habits', 'Psychology'],
+    reviewsCount: 0,
+    progress: b.progress,
+    currentPage: b.currentPage,
+    totalPages: b.totalPages,
+    lastOpened: 'Recently',
+    estTimeRemaining: estTimeRemaining || '30m',
+    streak: 1,
+    description: b.description || 'No description provided.',
+    fileSize: formatBytes(b.fileSize),
+    fileType: fileExt === 'EPUB' ? 'EPUB' : 'PDF',
+    uploadedDate: uploadDate,
+    lastModified: updateDate,
+    tags: b.tags || [],
     stats: {
-      hoursRead: 8.5,
-      pagesRead: 134,
-      sessions: 12,
-      completion: 42,
-      avgTime: '42m',
+      hoursRead: Math.round(((b.currentPage * 2) / 60) * 10) / 10,
+      pagesRead: b.currentPage,
+      sessions: 1,
+      completion: b.progress,
+      avgTime: '2m per page',
     },
     timeline: [
-      { event: 'Uploaded to cloud library cabinet', date: '2026-07-01' },
-      { event: 'Started reading chapter 1', date: '2026-07-03' },
-      { event: 'Added to Favorite shelf list', date: '2026-07-05' },
-      { event: 'Logged 42% progress checkpoint', date: '2026-07-12' },
+      { event: 'Uploaded to cloud library cabinet', date: uploadDate },
+      { event: 'Last opened checkpoint', date: updateDate },
     ],
     cover:
-      'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=350&q=80',
-  },
-  'deep-work': {
-    id: 'deep-work',
-    title: 'Deep Work',
-    subtitle: 'Rules for Focused Success in a Distracted World',
-    author: 'Cal Newport',
-    publisher: 'Grand Central Publishing',
-    category: 'Productivity',
-    language: 'English',
-    pubYear: 2016,
-    rating: 4.7,
-    reviewsCount: 856,
-    progress: 15,
-    currentPage: 45,
-    totalPages: 304,
-    lastOpened: '1 day ago',
-    estTimeRemaining: '4h 10m',
-    streak: 3,
-    description:
-      'One of the most valuable skills in our economy is becoming increasingly rare. If you master this skill, you will achieve extraordinary results. Deep work is the ability to focus without distraction on a cognitively demanding task.',
-    fileSize: '8.1 MB',
-    fileType: 'PDF',
-    uploadedDate: '2026-07-05',
-    lastModified: '2026-07-05',
-    tags: ['Focus', 'Productivity', 'Business', 'Success'],
-    stats: {
-      hoursRead: 2.2,
-      pagesRead: 45,
-      sessions: 4,
-      completion: 15,
-      avgTime: '33m',
-    },
-    timeline: [
-      { event: 'Uploaded to cloud library cabinet', date: '2026-07-05' },
-      { event: 'Started reading introduction', date: '2026-07-05' },
-    ],
-    cover:
-      'https://images.unsplash.com/photo-1506880018603-83d5b814b5a6?auto=format&fit=crop&w=350&q=80',
-  },
-  'clean-code': {
-    id: 'clean-code',
-    title: 'Clean Code',
-    subtitle: 'A Handbook of Agile Software Craftsmanship',
-    author: 'Robert C. Martin',
-    publisher: 'Prentice Hall',
-    category: 'Programming',
-    language: 'English',
-    pubYear: 2008,
-    rating: 4.9,
-    reviewsCount: 2311,
-    progress: 85,
-    currentPage: 394,
-    totalPages: 464,
-    lastOpened: '3 hours ago',
-    estTimeRemaining: '30m',
-    streak: 15,
-    description:
-      "Even bad code can function. But if code isn't clean, it can bring a development organization to its knees. Every year, countless hours and significant resources are lost because of poorly written code. But it doesn't have to be that way.",
-    fileSize: '24.2 MB',
-    fileType: 'PDF',
-    uploadedDate: '2026-06-20',
-    lastModified: '2026-07-13',
-    tags: ['Software', 'Engineering', 'Coding', 'Craftsmanship'],
-    stats: {
-      hoursRead: 19.8,
-      pagesRead: 394,
-      sessions: 32,
-      completion: 85,
-      avgTime: '38m',
-    },
-    timeline: [
-      { event: 'Uploaded to cloud library cabinet', date: '2026-06-20' },
-      { event: 'Completed Part I principles', date: '2026-07-01' },
-      { event: 'Started Part II code smells listing', date: '2026-07-10' },
-    ],
-    cover:
-      'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=350&q=80',
-  },
+      b.coverPath ||
+      'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=350&q=80',
+  }
 }
 
 export const BookDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
+
+  const [book, setBook] = useState<BookDetails | null>(null)
+  const [rawBook, setRawBook] = useState<Book | null>(null)
+  const [relatedBooks, setRelatedBooks] = useState<Book[]>([])
+  const [loading, setLoading] = useState(true)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   const [isSkeletonLoading, setIsSkeletonLoading] = useState(false)
-  const [isFavorite, setIsFavorite] = useState(true)
+  const [isFavorite, setIsFavorite] = useState(false)
   const [isDescCollapsed, setIsDescCollapsed] = useState(true)
   const [commentText, setCommentText] = useState('')
   const [comments, setComments] = useState<string[]>([])
 
-  // Resolve matching book or fallback to Atomic Habits
-  const book = useMemo(() => {
-    if (id && booksDb[id]) {
-      return booksDb[id]
-    }
-    return booksDb['atomic-habits']
+  useEffect(() => {
+    if (!id) return
+    Promise.resolve().then(() => {
+      setLoading(true)
+      setErrorMsg(null)
+    })
+
+    booksService
+      .getBookById(id)
+      .then(async (data) => {
+        if (!data) {
+          setErrorMsg('Book not found or access denied.')
+          setLoading(false)
+          return
+        }
+        setRawBook(data)
+        setIsFavorite(data.isFavorite)
+
+        const details = mapBookToDetails(data)
+        setBook(details)
+
+        try {
+          const all = await booksService.getBooks()
+          const matching = all
+            .filter((b) => b.categoryId === data.categoryId && b.id !== data.id)
+            .slice(0, 6)
+          setRelatedBooks(matching)
+        } catch (e) {
+          console.error('Failed to load related books:', e)
+        }
+        setLoading(false)
+      })
+      .catch((err) => {
+        console.error(err)
+        setErrorMsg('Failed to load book details. Please check your network connection.')
+        setLoading(false)
+      })
   }, [id])
 
   const handleSimulateLoader = () => {
@@ -201,6 +184,65 @@ export const BookDetailsPage: React.FC = () => {
     if (!commentText.trim()) return
     setComments((prev) => [...prev, commentText.trim()])
     setCommentText('')
+  }
+
+  const handleToggleFavorite = async () => {
+    if (!rawBook) return
+    try {
+      const fav = await booksService.toggleFavorite(rawBook.id)
+      setIsFavorite(fav)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const handleDeleteBook = async () => {
+    if (!rawBook) return
+    if (!confirm('Are you sure you want to delete this book?')) return
+    try {
+      await booksService.deleteBook(rawBook.id)
+      navigate(ROUTES.LIBRARY)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const handleDownloadBook = () => {
+    if (!rawBook) return
+    window.open(rawBook.filePath, '_blank')
+  }
+
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    e.currentTarget.src =
+      'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=350&q=80'
+  }
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="border-primary-600 h-8 w-8 animate-spin rounded-full border-4 border-t-transparent" />
+      </div>
+    )
+  }
+
+  if (errorMsg || !book) {
+    return (
+      <div className="min-h-screen space-y-6 pb-20 text-left select-none">
+        <div className="flex items-center justify-between">
+          <Link
+            to={ROUTES.LIBRARY}
+            className="text-text-muted hover:text-primary-600 inline-flex items-center gap-1.5 text-xs font-bold tracking-wider uppercase transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>Back to Library</span>
+          </Link>
+        </div>
+        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center text-sm font-semibold text-red-600 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400">
+          <p className="font-bold">Error loading book details</p>
+          <p className="text-text-sub mt-2 text-xs font-normal">{errorMsg || 'Book not found.'}</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -265,6 +307,7 @@ export const BookDetailsPage: React.FC = () => {
                     <img
                       src={book.cover}
                       alt={book.title}
+                      onError={handleImageError}
                       className="h-full w-full object-cover transition-transform group-hover:scale-105"
                     />
                   </motion.div>
@@ -283,7 +326,7 @@ export const BookDetailsPage: React.FC = () => {
 
                   {/* Formatted action buttons */}
                   <div className="w-full space-y-2">
-                    <Link to="/reader/atomic-habits" className="block w-full">
+                    <Link to={ROUTES.READER.replace(':id', book.id)} className="block w-full">
                       <Button className="w-full justify-center gap-2 py-2.5 text-xs font-bold tracking-wider uppercase">
                         <Play className="h-4 w-4 fill-white" />
                         Continue Reading
@@ -292,7 +335,7 @@ export const BookDetailsPage: React.FC = () => {
 
                     <div className="grid grid-cols-2 gap-2">
                       <button
-                        onClick={() => setIsFavorite(!isFavorite)}
+                        onClick={handleToggleFavorite}
                         className={`border-border-base bg-bg-surface flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-lg border text-[10px] font-bold tracking-wider uppercase transition-colors ${isFavorite ? 'border-red-200 bg-red-50/20 text-red-500' : 'text-text-sub hover:bg-bg-app'} `}
                       >
                         <Heart
@@ -302,8 +345,9 @@ export const BookDetailsPage: React.FC = () => {
                       </button>
 
                       <button
+                        onClick={handleDownloadBook}
                         className="border-border-base bg-bg-surface text-text-sub hover:bg-bg-app flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-lg border text-[10px] font-bold tracking-wider uppercase"
-                        title="Download UI only"
+                        title="Download Book File"
                       >
                         <Download className="h-4 w-4" />
                         <span>Download</span>
@@ -327,7 +371,11 @@ export const BookDetailsPage: React.FC = () => {
                     <button className="border-border-base bg-bg-app hover:bg-bg-surface text-text-sub flex h-9 cursor-pointer items-center justify-center rounded-lg border text-[10px] font-bold tracking-wider uppercase">
                       Export
                     </button>
-                    <button className="flex h-9 cursor-pointer items-center justify-center rounded-lg border border-red-200 bg-red-50 text-[10px] font-bold tracking-wider text-red-600 uppercase">
+                    <button
+                      onClick={handleDeleteBook}
+                      className="flex h-9 cursor-pointer items-center justify-center rounded-lg border border-red-200 bg-red-50 text-[10px] font-bold tracking-wider text-red-600 uppercase hover:bg-red-100"
+                    >
+                      <Trash2 className="mr-1 h-3.5 w-3.5" />
                       Delete
                     </button>
                   </div>
@@ -564,43 +612,53 @@ export const BookDetailsPage: React.FC = () => {
             </div>
 
             {/* 8. Related Books Carousel horizontal */}
-            <div>
-              <h3 className="text-text-muted mb-4 text-sm font-bold tracking-wider uppercase">
-                Related books
-              </h3>
-              <div className="flex scrollbar-thin gap-6 overflow-x-auto pb-4">
-                {Object.values(booksDb).map((item) => (
-                  <Link
-                    key={item.id}
-                    to={`/books/${item.id}`}
-                    className="bg-bg-surface border-border-base hover:border-primary-500/20 flex w-64 flex-shrink-0 cursor-pointer gap-4 rounded-2xl border p-4 text-left shadow-sm transition-all"
-                  >
-                    <img
-                      src={item.cover}
-                      alt={item.title}
-                      className="border-border-light aspect-[0.7/1] w-14 shrink-0 rounded border object-cover shadow-sm"
-                    />
-                    <div className="flex min-w-0 flex-col justify-between">
-                      <div>
-                        <span className="bg-primary-50 dark:bg-primary-500/10 text-primary-600 inline-block rounded px-1.5 py-0.5 text-[8px] leading-none font-bold tracking-wider uppercase">
-                          {item.category}
-                        </span>
-                        <h4 className="text-text-main mt-1 truncate text-xs font-bold">
-                          {item.title}
-                        </h4>
-                        <p className="text-text-sub mt-0.5 truncate text-[10px]">
-                          By {item.author}
-                        </p>
+            {relatedBooks.length > 0 && (
+              <div>
+                <h3 className="text-text-muted mb-4 text-sm font-bold tracking-wider uppercase">
+                  Related books
+                </h3>
+                <div className="flex scrollbar-thin gap-6 overflow-x-auto pb-4">
+                  {relatedBooks.map((item) => (
+                    <Link
+                      key={item.id}
+                      to={`/books/${item.id}`}
+                      className="bg-bg-surface border-border-base hover:border-primary-500/20 flex w-64 flex-shrink-0 cursor-pointer gap-4 rounded-2xl border p-4 text-left shadow-sm transition-all"
+                    >
+                      <img
+                        src={
+                          item.coverPath ||
+                          'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=350&q=80'
+                        }
+                        alt={item.title}
+                        onError={handleImageError}
+                        className="border-border-light aspect-[0.7/1] w-14 shrink-0 rounded border object-cover shadow-sm"
+                      />
+                      <div className="flex min-w-0 flex-col justify-between">
+                        <div>
+                          <span className="bg-primary-50 dark:bg-primary-500/10 text-primary-600 inline-block rounded px-1.5 py-0.5 text-[8px] leading-none font-bold tracking-wider uppercase">
+                            {item.categoryId === 'cat-2'
+                              ? 'Programming'
+                              : item.categoryId === 'cat-3'
+                                ? 'Self-Help'
+                                : 'Classics'}
+                          </span>
+                          <h4 className="text-text-main mt-1 truncate text-xs font-bold">
+                            {item.title}
+                          </h4>
+                          <p className="text-text-sub mt-0.5 truncate text-[10px]">
+                            By {item.author}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                          <span className="text-text-sub text-[9px] font-bold">4.8</span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                        <span className="text-text-sub text-[9px] font-bold">{item.rating}</span>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
+                    </Link>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
