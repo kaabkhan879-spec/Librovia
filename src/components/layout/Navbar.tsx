@@ -2,7 +2,7 @@ import React from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { ROUTES } from '../../constants/routes'
-import { BookOpen, Menu, User } from 'lucide-react'
+import { BookOpen, Menu, Bell, Search, UploadCloud } from 'lucide-react'
 import { Button } from '../common/Button'
 
 // --- MARKETING NAVBAR (For Public Layout) ---
@@ -80,53 +80,88 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   onToggleSidebar,
   pageTitle = 'Dashboard',
 }) => {
-  const { user, toggleDemoAuth } = useAuth()
+  const { user } = useAuth()
+
+  // Format today's date
+  const today = new Date().toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
 
   return (
-    <header className="sticky top-0 z-40 flex h-16 w-full items-center justify-between border-b border-slate-200/80 bg-white px-4 shadow-sm sm:px-6 lg:px-8">
+    <header className="border-border-base bg-bg-surface/85 sticky top-0 z-40 flex h-16 w-full items-center justify-between border-b px-4 backdrop-blur-md sm:px-6 lg:px-8">
+      {/* Left side: Breadcrumb & Title */}
       <div className="flex items-center gap-3">
         <button
           onClick={onToggleSidebar}
-          className="cursor-pointer rounded-lg p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-950 md:hidden"
+          className="text-text-sub hover:bg-bg-app hover:text-text-main cursor-pointer rounded-lg p-2 md:hidden"
           aria-label="Toggle Sidebar"
         >
           <Menu className="h-5 w-5" />
         </button>
-        <h1 className="text-lg font-bold tracking-tight text-slate-900 md:text-xl">{pageTitle}</h1>
+
+        <div className="hidden flex-col text-left sm:flex">
+          <nav className="text-text-muted flex items-center gap-1.5 text-[10px] font-bold tracking-wider uppercase">
+            <span>Librovia</span>
+            <span className="text-[8px] font-normal opacity-50">/</span>
+            <span>Console</span>
+            <span className="text-[8px] font-normal opacity-50">/</span>
+            <span className="text-primary-600">{pageTitle}</span>
+          </nav>
+          <span className="text-text-muted mt-0.5 font-mono text-[10px] font-semibold">
+            {today}
+          </span>
+        </div>
       </div>
 
+      {/* Center Search Bar */}
+      <div className="mx-4 hidden max-w-md flex-1 md:block">
+        <div className="relative rounded-lg shadow-sm">
+          <div className="text-text-muted pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+            <Search className="h-4 w-4" />
+          </div>
+          <input
+            type="text"
+            placeholder="Quick search books, collections, reviews..."
+            className="border-border-base bg-bg-app text-text-main placeholder:text-text-muted focus:border-primary-500 focus:ring-primary-500/10 block w-full rounded-lg border py-1.5 pr-4 pl-9 text-xs transition-all focus:ring-2 focus:outline-none"
+          />
+        </div>
+      </div>
+
+      {/* Right side Actions */}
       <div className="flex items-center gap-4">
-        {/* Toggle auth button for easy dev review */}
-        <button
-          onClick={toggleDemoAuth}
-          className="hover:bg-brand-50 hover:text-brand-600 cursor-pointer rounded bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600"
-        >
-          Simulate Log Out
+        {/* Upload book button */}
+        <Link to={ROUTES.UPLOAD}>
+          <Button
+            size="sm"
+            variant="outline"
+            leftIcon={<UploadCloud className="h-4 w-4" />}
+            className="hidden animate-pulse hover:animate-none sm:flex"
+          >
+            Upload
+          </Button>
+        </Link>
+
+        {/* Notifications Icon Button */}
+        <button className="border-border-base bg-bg-surface text-text-sub hover:bg-bg-app hover:text-text-main relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border">
+          <Bell className="h-4.5 w-4.5" />
+          <span className="bg-primary-600 ring-bg-surface absolute top-1.5 right-1.5 h-2 w-2 rounded-full ring-2" />
         </button>
 
-        {/* User profile dropdown trigger */}
+        {/* Profile Avatar trigger */}
         {user && (
-          <div className="flex items-center gap-2 border-l border-slate-200 pl-4">
-            <Link to={ROUTES.PROFILE} className="group flex cursor-pointer items-center gap-3">
-              {user.avatarUrl ? (
-                <img
-                  src={user.avatarUrl}
-                  alt={user.displayName || 'User Profile'}
-                  className="ring-brand-500/10 group-hover:ring-brand-500/30 h-9 w-9 rounded-full object-cover ring-2"
-                />
-              ) : (
-                <div className="bg-brand-100 text-brand-600 ring-brand-500/10 flex h-9 w-9 items-center justify-center rounded-full ring-2">
-                  <User className="h-5 w-5" />
-                </div>
-              )}
-              <div className="hidden text-left lg:block">
-                <p className="group-hover:text-brand-600 text-sm leading-none font-semibold text-slate-700">
-                  {user.displayName || 'Library User'}
-                </p>
-                <p className="mt-0.5 text-xs text-slate-500">{user.email}</p>
-              </div>
-            </Link>
-          </div>
+          <Link to={ROUTES.PROFILE} className="flex items-center">
+            <img
+              src={
+                user.avatarUrl ||
+                'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=facearea&facepad=2&w=100&h=100&q=80'
+              }
+              alt={user.displayName || 'Profile'}
+              className="ring-border-base hover:ring-primary-500 h-8.5 w-8.5 rounded-full object-cover shadow-sm ring-1 transition-shadow"
+            />
+          </Link>
         )}
       </div>
     </header>
