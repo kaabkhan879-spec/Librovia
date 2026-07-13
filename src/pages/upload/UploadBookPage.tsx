@@ -1,264 +1,647 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { booksService } from '../../services/books'
+import { useNavigate, Link } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
 import { ROUTES } from '../../constants/routes'
-import { UploadCloud, FileText, ArrowLeft, CheckCircle, AlertTriangle } from 'lucide-react'
+import { UploadCloud, FileText, X, Plus, Star, CheckCircle, Lock, Globe, Tag } from 'lucide-react'
+import { Button } from '../../components/common/Button'
+
+interface TagItem {
+  id: string
+  label: string
+}
 
 export const UploadBookPage: React.FC = () => {
   const navigate = useNavigate()
 
-  const [file, setFile] = useState<File | null>(null)
+  // Form states
+  const [file, setFile] = useState<{ name: string; size: string; type: string } | null>(null)
+  const [coverUrl, setCoverUrl] = useState<string | null>(null)
+
   const [title, setTitle] = useState('')
   const [author, setAuthor] = useState('')
+  const [publisher, setPublisher] = useState('')
+  const [category, setCategory] = useState('Personal Development')
+  const [language, setLanguage] = useState('English')
+  const [isbn, setIsbn] = useState('')
+  const [pubYear, setPubYear] = useState('')
+  const [pages, setPages] = useState('')
+  const [edition, setEdition] = useState('')
   const [description, setDescription] = useState('')
-  const [tags, setTags] = useState('')
 
-  const [status, setStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle')
-  const [progress, setProgress] = useState(0)
+  // Tag input states
+  const [tagInput, setTagInput] = useState('')
+  const [tags, setTags] = useState<TagItem[]>([
+    { id: '1', label: 'Programming' },
+    { id: '2', label: 'Self-Help' },
+  ])
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Toggle options
+  const [options, setOptions] = useState({
+    isFavorite: false,
+    currentlyReading: false,
+    completed: false,
+    wishlist: false,
+  })
+
+  const [visibility, setVisibility] = useState<'private' | 'public'>('private')
+
+  // Upload Simulation states
+  const [status, setStatus] = useState<'idle' | 'uploading' | 'success'>('idle')
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [progressLabel, setProgressLabel] = useState('Uploading Cover...')
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    // Simulate drop book file
+    setFile({
+      name: 'Atomic_Habits_James_Clear.pdf',
+      size: '12.4 MB',
+      type: 'PDF',
+    })
+    setTitle('Atomic Habits')
+    setAuthor('James Clear')
+  }
+
+  const handleBrowseFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0]
-      if (selectedFile.type !== 'application/pdf') {
-        alert('Currently, only PDF files are supported.')
-        return
-      }
-      setFile(selectedFile)
-      // Autofill title with filename (without extension)
+      const ext = selectedFile.name.split('.').pop()?.toUpperCase() || 'PDF'
+      setFile({
+        name: selectedFile.name,
+        size: (selectedFile.size / (1024 * 1024)).toFixed(1) + ' MB',
+        type: ext,
+      })
       setTitle(selectedFile.name.replace(/\.[^/.]+$/, ''))
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleCoverSelect = () => {
+    // Simulate cover image preview select
+    setCoverUrl(
+      'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=150&q=80'
+    )
+  }
+
+  const addTag = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!file || !title) return
+    if (!tagInput.trim()) return
+    setTags((prev) => [...prev, { id: Date.now().toString(), label: tagInput.trim() }])
+    setTagInput('')
+  }
 
-    try {
-      setStatus('uploading')
-      setProgress(10)
+  const removeTag = (id: string) => {
+    setTags((prev) => prev.filter((tag) => tag.id !== id))
+  }
 
-      // Simulate upload increments
-      const interval = setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= 90) {
-            clearInterval(interval)
-            return 90
-          }
-          return prev + 20
-        })
-      }, 200)
+  const handleUploadSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!file) return
 
-      const formattedTags = tags
-        .split(',')
-        .map((t) => t.trim())
-        .filter(Boolean)
-      await booksService.uploadBook(file, {
-        title,
-        author,
-        description,
-        tags: formattedTags,
-      })
+    setStatus('uploading')
+    setUploadProgress(0)
+    setProgressLabel('Uploading Cover Image...')
 
-      clearInterval(interval)
-      setProgress(100)
-      setStatus('success')
-    } catch {
-      setStatus('error')
-    }
+    // Simulated progress transitions
+    let currentProgress = 0
+    const interval = setInterval(() => {
+      currentProgress += 5
+      setUploadProgress(currentProgress)
+
+      if (currentProgress < 30) {
+        setProgressLabel('Uploading Cover Image...')
+      } else if (currentProgress < 75) {
+        setProgressLabel('Uploading PDF Book File...')
+      } else if (currentProgress < 95) {
+        setProgressLabel('Indexing text elements & generating thumbnails...')
+      } else if (currentProgress >= 100) {
+        clearInterval(interval)
+        setStatus('success')
+      }
+    }, 150)
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      {/* Back Header */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => navigate(-1)}
-          className="cursor-pointer rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </button>
-        <span className="text-sm font-semibold text-slate-500">Back to Library</span>
+    <div className="min-h-screen space-y-8 pb-20 text-left select-none">
+      {/* Dynamic Header Banner */}
+      <div className="border-border-base flex flex-col gap-4 border-b pb-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-text-main font-sans text-2xl font-extrabold tracking-tight sm:text-3xl">
+            Upload New Book
+          </h1>
+          <p className="text-text-muted mt-1 text-xs font-semibold tracking-wider uppercase">
+            Add books to your personal cloud library shelf.
+          </p>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="border-border-base bg-bg-surface text-text-sub hover:bg-bg-app cursor-pointer rounded-lg border px-4 py-2 text-xs font-bold tracking-wider uppercase"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate(ROUTES.LIBRARY)}
+            className="border-border-base bg-bg-surface text-text-sub hover:bg-bg-app cursor-pointer rounded-lg border px-4 py-2 text-xs font-bold tracking-wider uppercase"
+          >
+            Save as Draft
+          </button>
+          <Button
+            onClick={handleUploadSubmit}
+            disabled={!file || status === 'uploading'}
+            variant="primary"
+            size="sm"
+            className="font-bold tracking-wider uppercase"
+          >
+            Upload Book
+          </Button>
+        </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm sm:p-8">
+      <AnimatePresence mode="wait">
         {status === 'success' ? (
-          <div className="py-8 text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-50 text-green-500">
-              <CheckCircle className="h-10 w-10" />
+          /* Success Animation Frame */
+          <motion.div
+            key="success-card"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            className="border-border-base bg-bg-surface mx-auto max-w-xl space-y-6 rounded-3xl border p-10 text-center shadow-xl"
+          >
+            <div className="bg-success-50 text-success-500 dark:bg-success-500/10 dark:text-success-400 mx-auto flex h-14 w-14 items-center justify-center rounded-full">
+              <CheckCircle className="h-8 w-8" />
             </div>
-            <h3 className="mt-6 text-xl font-bold text-slate-900">Book Uploaded Successfully!</h3>
-            <p className="mt-2 text-sm text-slate-500">
-              "{title}" is now added to your private library shelf.
-            </p>
-            <div className="mt-8 flex justify-center gap-4">
+
+            <div className="space-y-2">
+              <h2 className="text-text-main font-sans text-xl font-extrabold tracking-tight">
+                Book Uploaded Successfully!
+              </h2>
+              <p className="text-text-sub mx-auto max-w-sm text-xs leading-relaxed">
+                <strong className="text-text-main">{title}</strong> by {author || 'Unknown'} is now
+                processed and synced with your cloud cabinet library.
+              </p>
+            </div>
+
+            <div className="flex justify-center gap-3 pt-2">
               <button
                 onClick={() => {
                   setFile(null)
+                  setCoverUrl(null)
                   setTitle('')
                   setAuthor('')
+                  setPublisher('')
+                  setPages('')
+                  setPubYear('')
+                  setIsbn('')
+                  setEdition('')
                   setDescription('')
-                  setTags('')
                   setStatus('idle')
-                  setProgress(0)
                 }}
-                className="cursor-pointer rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                className="border-border-base bg-bg-surface text-text-sub hover:bg-bg-app cursor-pointer rounded-lg border px-4 py-2.5 text-xs font-bold tracking-wider uppercase"
               >
                 Upload Another
               </button>
-              <button
-                onClick={() => navigate(ROUTES.LIBRARY)}
-                className="bg-brand-600 hover:bg-brand-700 cursor-pointer rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm"
-              >
-                Go to Shelf
-              </button>
+              <Link to={ROUTES.LIBRARY}>
+                <Button size="sm" className="font-bold tracking-wider uppercase">
+                  Go to My Library
+                </Button>
+              </Link>
             </div>
-          </div>
+          </motion.div>
+        ) : status === 'uploading' ? (
+          /* Upload Progress Card */
+          <motion.div
+            key="progress-card"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="border-border-base bg-bg-surface mx-auto max-w-md space-y-5 rounded-3xl border p-8 text-center shadow-lg"
+          >
+            <UploadCloud className="text-primary-500 mx-auto h-10 w-10 animate-bounce" />
+            <div className="space-y-1.5">
+              <h3 className="text-text-main text-sm font-bold tracking-wider uppercase">
+                {progressLabel}
+              </h3>
+              <p className="text-text-muted text-[10px]">Do not close this panel during sync.</p>
+            </div>
+
+            <div className="space-y-2">
+              <div className="bg-border-light relative h-2 w-full overflow-hidden rounded-full">
+                <motion.div
+                  className="bg-primary-600 h-full rounded-full"
+                  animate={{ width: `${uploadProgress}%` }}
+                  transition={{ duration: 0.1 }}
+                />
+              </div>
+              <span className="text-primary-600 text-xs font-bold">{uploadProgress}%</span>
+            </div>
+          </motion.div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* File Drag and Drop */}
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-slate-700">
-                Book File (PDF)
-              </label>
-              {file ? (
-                <div className="border-brand-200 bg-brand-50/20 flex items-center justify-between rounded-xl border p-4">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="bg-brand-100 text-brand-600 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
-                      <FileText className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-slate-900">{file.name}</p>
-                      <p className="text-xs text-slate-400">
-                        {(file.size / (1024 * 1024)).toFixed(2)} MB
-                      </p>
-                    </div>
+          /* Upload Form Grid */
+          <motion.div
+            key="upload-form"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="grid grid-cols-1 gap-8 lg:grid-cols-3"
+          >
+            {/* Left and Center: Form Fields */}
+            <div className="space-y-6 lg:col-span-2">
+              {/* Form card wrapper */}
+              <div className="bg-bg-surface border-border-base space-y-6 rounded-3xl border p-6 shadow-sm sm:p-8">
+                <h3 className="text-primary-600 border-border-light flex items-center gap-1.5 border-b pb-3 text-xs font-extrabold tracking-widest uppercase">
+                  <FileText className="h-4.5 w-4.5" />
+                  <span>Metadata Specifications</span>
+                </h3>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-text-sub font-sans text-xs font-bold tracking-wider uppercase">
+                      Book Title *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="e.g. Clean Code"
+                      className="border-border-base bg-bg-app text-text-main placeholder:text-text-muted focus:border-primary-500 focus:ring-primary-500/10 block w-full rounded-lg border px-3 py-2 text-sm transition-all focus:ring-2 focus:outline-none"
+                    />
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setFile(null)}
-                    className="text-xs font-semibold text-slate-500 hover:text-red-600"
-                  >
-                    Change File
-                  </button>
+
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-text-sub font-sans text-xs font-bold tracking-wider uppercase">
+                      Author *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={author}
+                      onChange={(e) => setAuthor(e.target.value)}
+                      placeholder="e.g. Robert C. Martin"
+                      className="border-border-base bg-bg-app text-text-main placeholder:text-text-muted focus:border-primary-500 focus:ring-primary-500/10 block w-full rounded-lg border px-3 py-2 text-sm transition-all focus:ring-2 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-text-sub font-sans text-xs font-bold tracking-wider uppercase">
+                      Publisher
+                    </label>
+                    <input
+                      type="text"
+                      value={publisher}
+                      onChange={(e) => setPublisher(e.target.value)}
+                      placeholder="Prentice Hall"
+                      className="border-border-base bg-bg-app text-text-main placeholder:text-text-muted focus:border-primary-500 focus:ring-primary-500/10 block w-full rounded-lg border px-3 py-2 text-sm transition-all focus:ring-2 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-text-sub font-sans text-xs font-bold tracking-wider uppercase">
+                      Category
+                    </label>
+                    <select
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      className="border-border-base bg-bg-app text-text-main focus:border-primary-500 focus:ring-primary-500/10 block w-full cursor-pointer rounded-lg border px-3 py-2 text-sm transition-all focus:ring-2 focus:outline-none"
+                    >
+                      <option value="Programming">Programming</option>
+                      <option value="Personal Development">Personal Development</option>
+                      <option value="Productivity">Productivity</option>
+                      <option value="Finance">Finance</option>
+                      <option value="Islamic Books">Islamic Books</option>
+                      <option value="Novels">Novels</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-text-sub font-sans text-xs font-bold tracking-wider uppercase">
+                      Language
+                    </label>
+                    <input
+                      type="text"
+                      value={language}
+                      onChange={(e) => setLanguage(e.target.value)}
+                      className="border-border-base bg-bg-app text-text-main placeholder:text-text-muted focus:border-primary-500 focus:ring-primary-500/10 block w-full rounded-lg border px-3 py-2 text-sm transition-all focus:ring-2 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-text-sub font-sans text-xs font-bold tracking-wider uppercase">
+                      ISBN
+                    </label>
+                    <input
+                      type="text"
+                      value={isbn}
+                      onChange={(e) => setIsbn(e.target.value)}
+                      placeholder="978-0132350884"
+                      className="border-border-base bg-bg-app text-text-main placeholder:text-text-muted focus:border-primary-500 focus:ring-primary-500/10 block w-full rounded-lg border px-3 py-2 text-sm transition-all focus:ring-2 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-text-sub font-sans text-xs font-bold tracking-wider uppercase">
+                      Publication Year
+                    </label>
+                    <input
+                      type="text"
+                      value={pubYear}
+                      onChange={(e) => setPubYear(e.target.value)}
+                      placeholder="2008"
+                      className="border-border-base bg-bg-app text-text-main placeholder:text-text-muted focus:border-primary-500 focus:ring-primary-500/10 block w-full rounded-lg border px-3 py-2 text-sm transition-all focus:ring-2 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-text-sub font-sans text-xs font-bold tracking-wider uppercase">
+                      Number of Pages
+                    </label>
+                    <input
+                      type="number"
+                      value={pages}
+                      onChange={(e) => setPages(e.target.value)}
+                      placeholder="464"
+                      className="border-border-base bg-bg-app text-text-main placeholder:text-text-muted focus:border-primary-500 focus:ring-primary-500/10 block w-full rounded-lg border px-3 py-2 text-sm transition-all focus:ring-2 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-text-sub font-sans text-xs font-bold tracking-wider uppercase">
+                      Edition
+                    </label>
+                    <input
+                      type="text"
+                      value={edition}
+                      onChange={(e) => setEdition(e.target.value)}
+                      placeholder="e.g. 2nd Edition"
+                      className="border-border-base bg-bg-app text-text-main placeholder:text-text-muted focus:border-primary-500 focus:ring-primary-500/10 block w-full rounded-lg border px-3 py-2 text-sm transition-all focus:ring-2 focus:outline-none"
+                    />
+                  </div>
                 </div>
-              ) : (
-                <div className="hover:border-brand-500 hover:bg-brand-50/5 group relative flex cursor-pointer justify-center rounded-2xl border-2 border-dashed border-slate-300 px-6 py-10 text-center">
-                  <input
-                    type="file"
-                    accept=".pdf"
-                    onChange={handleFileChange}
-                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+
+                <div className="space-y-1.5 text-left">
+                  <label className="text-text-sub font-sans text-xs font-bold tracking-wider uppercase">
+                    Description / Notes
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Write a short description of the book..."
+                    className="border-border-base bg-bg-app text-text-main placeholder:text-text-muted focus:border-primary-500 focus:ring-primary-500/10 block w-full rounded-lg border px-3 py-2 text-sm transition-all focus:ring-2 focus:outline-none"
                   />
-                  <div>
-                    <UploadCloud className="group-hover:text-brand-600 mx-auto h-12 w-12 text-slate-400 transition-colors" />
-                    <div className="mt-4 flex justify-center text-sm text-slate-600">
-                      <span className="text-brand-600 group-hover:text-brand-700 font-semibold">
-                        Upload a file
+                </div>
+
+                {/* Interactive tag input */}
+                <div className="space-y-2 text-left">
+                  <label className="text-text-sub flex items-center gap-1.5 font-sans text-xs font-bold tracking-wider uppercase">
+                    <Tag className="h-4 w-4" />
+                    <span>Tags</span>
+                  </label>
+
+                  <form onSubmit={addTag} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      placeholder="Type a tag and press Add"
+                      className="border-border-base bg-bg-app text-text-main placeholder:text-text-muted focus:border-primary-500 focus:ring-primary-500/10 flex-1 rounded-lg border px-3 py-1.5 text-xs focus:ring-2 focus:outline-none"
+                    />
+                    <button
+                      type="submit"
+                      className="bg-bg-app border-border-base text-text-sub hover:bg-bg-surface hover:text-text-main flex h-8 cursor-pointer items-center rounded-lg border px-3.5 text-xs font-bold tracking-wider uppercase"
+                    >
+                      Add
+                    </button>
+                  </form>
+
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {tags.map((tag) => (
+                      <span
+                        key={tag.id}
+                        className="bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400 border-primary-100 dark:border-primary-500/20 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-sans text-[10px] font-bold"
+                      >
+                        {tag.label}
+                        <button
+                          type="button"
+                          onClick={() => removeTag(tag.id)}
+                          className="cursor-pointer hover:text-red-500 focus:outline-none"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
                       </span>
-                      <p className="pl-1">or drag and drop</p>
-                    </div>
-                    <p className="mt-1 text-xs text-slate-400">PDF books up to 50MB</p>
+                    ))}
                   </div>
                 </div>
-              )}
-            </div>
-
-            {/* Metadata Fields */}
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-              <div>
-                <label htmlFor="title" className="block text-sm font-semibold text-slate-700">
-                  Book Title *
-                </label>
-                <input
-                  id="title"
-                  type="text"
-                  required
-                  disabled={!file}
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. The Great Gatsby"
-                  className="focus:border-brand-500 focus:ring-brand-500/10 mt-1 block w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:outline-none disabled:bg-slate-50 disabled:text-slate-400"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="author" className="block text-sm font-semibold text-slate-700">
-                  Author
-                </label>
-                <input
-                  id="author"
-                  type="text"
-                  disabled={!file}
-                  value={author}
-                  onChange={(e) => setAuthor(e.target.value)}
-                  placeholder="e.g. F. Scott Fitzgerald"
-                  className="focus:border-brand-500 focus:ring-brand-500/10 mt-1 block w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:outline-none disabled:bg-slate-50 disabled:text-slate-400"
-                />
               </div>
             </div>
 
-            <div>
-              <label htmlFor="description" className="block text-sm font-semibold text-slate-700">
-                Description / Notes
-              </label>
-              <textarea
-                id="description"
-                rows={3}
-                disabled={!file}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Brief summary or personal study notes about this book..."
-                className="focus:border-brand-500 focus:ring-brand-500/10 mt-1 block w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:outline-none disabled:bg-slate-50 disabled:text-slate-400"
-              />
-            </div>
+            {/* Right Side: Upload Dropzone, Cover Select, & Previews */}
+            <div className="space-y-6">
+              {/* Dropzone container */}
+              <div className="bg-bg-surface border-border-base space-y-4 rounded-3xl border p-6 shadow-sm">
+                <h4 className="text-primary-600 border-border-light flex items-center gap-1.5 border-b pb-3 text-xs font-extrabold tracking-widest uppercase">
+                  <UploadCloud className="h-4.5 w-4.5" />
+                  <span>Book Dropzone</span>
+                </h4>
 
-            <div>
-              <label htmlFor="tags" className="block text-sm font-semibold text-slate-700">
-                Tags (comma separated)
-              </label>
-              <input
-                id="tags"
-                type="text"
-                disabled={!file}
-                value={tags}
-                onChange={(e) => setTags(e.target.value)}
-                placeholder="e.g. Fiction, Classics, Business"
-                className="focus:border-brand-500 focus:ring-brand-500/10 mt-1 block w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:outline-none disabled:bg-slate-50 disabled:text-slate-400"
-              />
-            </div>
-
-            {status === 'uploading' && (
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs font-semibold text-slate-500">
-                  <span>Uploading file...</span>
-                  <span>{progress}%</span>
-                </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                {file ? (
+                  <div className="border-primary-200 dark:border-primary-500/20 bg-primary-50/20 dark:bg-primary-500/5 flex items-center justify-between gap-4 rounded-2xl border p-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="bg-primary-100 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
+                        <FileText className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-text-main truncate text-xs leading-tight font-bold">
+                          {file.name}
+                        </p>
+                        <p className="text-text-muted mt-1 text-[10px] leading-none">
+                          {file.size} • {file.type}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setFile(null)}
+                      className="text-text-muted cursor-pointer p-1 hover:text-red-500"
+                    >
+                      <X className="h-4.5 w-4.5" />
+                    </button>
+                  </div>
+                ) : (
                   <div
-                    className="bg-brand-500 h-full transition-all duration-300"
-                    style={{ width: `${progress}%` }}
-                  />
+                    onDragOver={handleDragOver}
+                    onDrop={handleDrop}
+                    className="hover:border-primary-500 hover:bg-bg-app/40 group border-border-base relative flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-6 text-center transition-all"
+                  >
+                    <input
+                      type="file"
+                      accept=".pdf,.epub"
+                      onChange={handleBrowseFile}
+                      className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                    />
+                    <UploadCloud className="text-text-muted group-hover:text-primary-500 h-10 w-10 transition-colors" />
+                    <span className="text-text-main mt-4 text-xs font-bold">
+                      Drag & drop your book here
+                    </span>
+                    <span className="text-primary-600 hover:text-primary-700 mt-1.5 text-[10px] font-bold tracking-wider uppercase">
+                      or Browse Files
+                    </span>
+                    <p className="text-text-muted mt-3 text-[9px]">
+                      Supports PDF or EPUB (Max 100 MB)
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Cover Select Panel */}
+              <div className="bg-bg-surface border-border-base space-y-4 rounded-3xl border p-6 shadow-sm">
+                <h4 className="text-primary-600 border-border-light flex items-center gap-1.5 border-b pb-3 text-xs font-extrabold tracking-widest uppercase">
+                  <Star className="h-4.5 w-4.5" />
+                  <span>Book Cover</span>
+                </h4>
+
+                <div className="flex items-center gap-4">
+                  {coverUrl ? (
+                    <div className="group relative shrink-0 shadow-md">
+                      <img
+                        src={coverUrl}
+                        alt="Preview"
+                        className="border-border-light aspect-[0.7/1] w-16 rounded-lg border object-cover"
+                      />
+                      <button
+                        onClick={() => setCoverUrl(null)}
+                        className="absolute -top-1.5 -right-1.5 cursor-pointer rounded-full bg-red-500 p-0.5 text-white shadow hover:bg-red-600"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="border-border-base text-text-muted bg-bg-app flex aspect-[0.7/1] w-16 shrink-0 flex-col items-center justify-center rounded-lg border-2 border-dashed">
+                      <Plus className="h-5 w-5" />
+                    </div>
+                  )}
+
+                  <div className="space-y-2 text-left">
+                    <p className="text-text-muted font-sans text-[10px] leading-normal">
+                      PNG, JPG, or WEBP. Upload a custom cover or let us generate one.
+                    </p>
+                    <button
+                      onClick={handleCoverSelect}
+                      className="bg-bg-app border-border-base text-text-sub hover:bg-bg-surface hover:text-text-main flex h-8 cursor-pointer items-center rounded-lg border px-4 text-[10px] font-bold tracking-wider uppercase"
+                    >
+                      {coverUrl ? 'Change Cover' : 'Upload Cover'}
+                    </button>
+                  </div>
                 </div>
               </div>
-            )}
 
-            {status === 'error' && (
-              <div className="flex items-center gap-2 rounded-xl bg-red-50 p-4 text-sm text-red-600">
-                <AlertTriangle className="h-5 w-5 shrink-0" />
-                <p>There was an error uploading this book. Please try again.</p>
+              {/* Reading Options & Flags */}
+              <div className="bg-bg-surface border-border-base space-y-4 rounded-3xl border p-6 text-left shadow-sm">
+                <h4 className="text-primary-600 border-border-light border-b pb-3 text-xs font-extrabold tracking-widest uppercase">
+                  Reading Options
+                </h4>
+
+                <div className="space-y-2.5">
+                  <label className="text-text-sub flex cursor-pointer items-center gap-2.5 text-xs font-bold select-none">
+                    <input
+                      type="checkbox"
+                      checked={options.isFavorite}
+                      onChange={(e) =>
+                        setOptions((prev) => ({ ...prev, isFavorite: e.target.checked }))
+                      }
+                      className="border-border-base text-primary-600 focus:ring-primary-500/10 h-4.5 w-4.5 cursor-pointer rounded"
+                    />
+                    <span>Mark as Favorite</span>
+                  </label>
+
+                  <label className="text-text-sub flex cursor-pointer items-center gap-2.5 text-xs font-bold select-none">
+                    <input
+                      type="checkbox"
+                      checked={options.currentlyReading}
+                      onChange={(e) =>
+                        setOptions((prev) => ({ ...prev, currentlyReading: e.target.checked }))
+                      }
+                      className="border-border-base text-primary-600 focus:ring-primary-500/10 h-4.5 w-4.5 cursor-pointer rounded"
+                    />
+                    <span>Currently Reading</span>
+                  </label>
+
+                  <label className="text-text-sub flex cursor-pointer items-center gap-2.5 text-xs font-bold select-none">
+                    <input
+                      type="checkbox"
+                      checked={options.completed}
+                      onChange={(e) =>
+                        setOptions((prev) => ({ ...prev, completed: e.target.checked }))
+                      }
+                      className="border-border-base text-primary-600 focus:ring-primary-500/10 h-4.5 w-4.5 cursor-pointer rounded"
+                    />
+                    <span>Completed</span>
+                  </label>
+
+                  <label className="text-text-sub flex cursor-pointer items-center gap-2.5 text-xs font-bold select-none">
+                    <input
+                      type="checkbox"
+                      checked={options.wishlist}
+                      onChange={(e) =>
+                        setOptions((prev) => ({ ...prev, wishlist: e.target.checked }))
+                      }
+                      className="border-border-base text-primary-600 focus:ring-primary-500/10 h-4.5 w-4.5 cursor-pointer rounded"
+                    />
+                    <span>Add to Wishlist</span>
+                  </label>
+                </div>
               </div>
-            )}
 
-            <button
-              type="submit"
-              disabled={!file || !title || status === 'uploading'}
-              className="bg-brand-600 hover:bg-brand-700 focus:ring-brand-500/20 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl px-4 py-3.5 text-sm font-semibold text-white shadow-sm focus:ring-2 focus:outline-none disabled:opacity-50"
-            >
-              {status === 'uploading' ? 'Uploading Book...' : 'Upload Book to Library'}
-            </button>
-          </form>
+              {/* VisibilitySelector Radio Cards */}
+              <div className="bg-bg-surface border-border-base space-y-4 rounded-3xl border p-6 text-left shadow-sm">
+                <h4 className="text-primary-600 border-border-light border-b pb-3 text-xs font-extrabold tracking-widest uppercase">
+                  Library Visibility
+                </h4>
+
+                <div className="space-y-3">
+                  <div
+                    onClick={() => setVisibility('private')}
+                    className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition-all ${
+                      visibility === 'private'
+                        ? 'border-primary-500 bg-primary-50/10 dark:bg-primary-500/5'
+                        : 'border-border-base bg-bg-app/40 hover:bg-bg-app'
+                    } `}
+                  >
+                    <Lock
+                      className={`mt-0.5 h-5 w-5 shrink-0 ${visibility === 'private' ? 'text-primary-600' : 'text-text-muted'}`}
+                    />
+                    <div>
+                      <span className="text-text-main block text-xs font-bold">
+                        Private Library
+                      </span>
+                      <span className="text-text-muted mt-1 block text-[9px] leading-normal">
+                        Only you can see and access this book in your cloud shelf.
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="border-border-base bg-bg-app/20 flex cursor-not-allowed items-start gap-3 rounded-2xl border p-4 opacity-60 select-none">
+                    <Globe className="text-text-muted mt-0.5 h-5 w-5 shrink-0" />
+                    <div>
+                      <span className="text-text-muted block text-xs font-bold">
+                        Public Library (Coming Soon)
+                      </span>
+                      <span className="text-text-muted mt-1 block text-[9px] leading-normal">
+                        Share link or host your public reader portal profile.
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
         )}
-      </div>
+      </AnimatePresence>
     </div>
   )
 }
