@@ -22,20 +22,23 @@ import {
   Layers,
 } from 'lucide-react'
 import { Button } from '../../components/common/Button'
+import { useAuth } from '../../context/AuthContext'
 
 export const ProfilePage: React.FC = () => {
+  const { user } = useAuth()
+
   // Demo interactive states
   const [isEmptyState, setIsEmptyState] = useState(false)
   const [isSkeletonLoading, setIsSkeletonLoading] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
 
   // Local profile states (High-fidelity updates!)
-  const [profileName, setProfileName] = useState('Kaab Khan')
-  const [profileUsername, setProfileUsername] = useState('kaabkhan')
+  const [profileName, setProfileName] = useState(user?.displayName || 'Kaab Khan')
+  const [profileUsername, setProfileUsername] = useState(user?.email?.split('@')[0] || 'kaabkhan')
   const [profileBio, setProfileBio] = useState(
     'Avid reader, tech enthusiast, and collector of rare digital books. Compounding knowledge 1% every day.'
   )
-  const [profileEmail, setProfileEmail] = useState('kaab@librovia.com')
+  const [profileEmail, setProfileEmail] = useState(user?.email || 'kaab@librovia.com')
 
   // Edit fields temp storage
   const [editName, setEditName] = useState(profileName)
@@ -209,8 +212,11 @@ export const ProfilePage: React.FC = () => {
                 </span>
 
                 <img
-                  src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=facearea&facepad=2&w=150&h=150&q=80"
-                  alt="Kaab Avatar"
+                  src={
+                    user?.avatarUrl ||
+                    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=facearea&facepad=2&w=150&h=150&q=80'
+                  }
+                  alt={profileName + ' Avatar'}
                   className="ring-primary-500 h-20 w-20 rounded-full object-cover shadow-md ring-2 transition-transform hover:scale-105"
                 />
 

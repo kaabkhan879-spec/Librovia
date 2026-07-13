@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ROUTES } from '../../constants/routes'
+import { supabase } from '../../services/supabase'
 import { Input } from '../common/Input'
 import { Button } from '../common/Button'
 import { Mail, CheckCircle2, ArrowLeft, Send } from 'lucide-react'
@@ -26,11 +27,22 @@ export const ForgotPasswordForm: React.FC = () => {
     setError('')
     setIsLoading(true)
 
-    // Simulate sending link timeout (1.5s)
-    setTimeout(() => {
-      setIsLoading(false)
-      setIsSuccess(true)
-    }, 1500)
+    supabase.auth
+      .resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}${ROUTES.LOGIN}`,
+      })
+      .then(({ error }) => {
+        setIsLoading(false)
+        if (error) {
+          setError(error.message)
+        } else {
+          setIsSuccess(true)
+        }
+      })
+      .catch((err) => {
+        setIsLoading(false)
+        setError(err instanceof Error ? err.message : 'An unexpected error occurred')
+      })
   }
 
   if (isSuccess) {

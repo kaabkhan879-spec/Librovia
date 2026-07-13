@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { ROUTES } from '../../constants/routes'
+import { supabase } from '../../services/supabase'
 import { PasswordInput } from './PasswordInput'
 import { GoogleButton } from './GoogleButton'
 import { Input } from '../common/Input'
@@ -127,16 +128,20 @@ export const LoginForm: React.FC = () => {
         </div>
 
         <GoogleButton
-          onClick={() => {
+          onClick={async () => {
             setIsLoading(true)
-            setTimeout(() => {
-              login('google@librovia.com', 'google-auth-key')
-                .then(() => {
-                  setIsLoading(false)
-                  navigate(ROUTES.DASHBOARD)
-                })
-                .catch(() => setIsLoading(false))
-            }, 1500)
+            try {
+              const { error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                  redirectTo: `${window.location.origin}${ROUTES.DASHBOARD}`,
+                },
+              })
+              if (error) throw error
+            } catch (err) {
+              setIsLoading(false)
+              console.error(err)
+            }
           }}
           disabled={isLoading}
           label={isLoading ? 'Connecting Google...' : 'Continue with Google'}
