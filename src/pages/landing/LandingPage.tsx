@@ -730,22 +730,25 @@ export const LandingPage: React.FC = () => {
         </section>
 
         {/* Final Call to Action */}
-        <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-          <div className="from-primary-600 shadow-primary-500/10 relative space-y-8 overflow-hidden rounded-3xl bg-gradient-to-r to-indigo-600 p-8 text-center text-white shadow-lg sm:p-16">
-            {/* Backdrop graphic */}
-            <div className="pointer-events-none absolute top-0 right-0 h-80 w-80 rounded-full bg-white/5 blur-2xl select-none" />
+        <section className="relative z-10 mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+          <div className="from-primary-600 shadow-primary-500/10 relative z-10 overflow-hidden rounded-3xl bg-gradient-to-r to-indigo-600 p-8 text-center text-white shadow-lg sm:p-16">
+            {/* Background Glow Layers */}
+            <div className="pointer-events-none absolute top-0 right-0 z-0 h-80 w-80 rounded-full bg-white/10 blur-3xl select-none" />
+            <div className="pointer-events-none absolute bottom-0 left-0 z-0 h-40 w-40 rounded-full bg-indigo-500/20 blur-3xl select-none" />
 
-            <div className="mx-auto max-w-xl space-y-4">
-              <h2 className="text-3xl leading-[1.1] font-extrabold tracking-tight sm:text-4xl">
+            {/* Content Container */}
+            <div className="relative z-10 mx-auto max-w-xl space-y-4">
+              <h2 className="text-3xl leading-[1.1] font-extrabold tracking-tight text-white opacity-100 sm:text-4xl">
                 Start Building Your Personal Library Today
               </h2>
-              <p className="mx-auto max-w-md text-sm leading-relaxed text-indigo-100">
+              <p className="mx-auto max-w-md text-sm leading-relaxed text-indigo-50 opacity-100">
                 Upload your documents and check our progressive reader controls immediately. Free
                 tier includes up to 1 GB cloud storage.
               </p>
             </div>
 
-            <div className="flex flex-wrap justify-center gap-4">
+            {/* Buttons Container */}
+            <div className="relative z-10 mt-8 flex flex-wrap justify-center gap-4">
               <Link to={ROUTES.REGISTER}>
                 <Button className="text-primary-600 border-transparent bg-white px-6 py-3 shadow-sm hover:bg-slate-100">
                   Get Started Free
