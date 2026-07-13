@@ -1,91 +1,69 @@
 import React from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { ROUTES } from '../../constants/routes'
-import { BookOpen, LogIn, LogOut, Menu, User, Library } from 'lucide-react'
+import { BookOpen, Menu, User } from 'lucide-react'
+import { Button } from '../common/Button'
 
 // --- MARKETING NAVBAR (For Public Layout) ---
 export const MarketingNavbar: React.FC = () => {
-  const { isAuthenticated, logout, toggleDemoAuth } = useAuth()
-  const navigate = useNavigate()
-
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-slate-200/80 bg-white/80 backdrop-blur-md">
+    <header className="border-border-base/50 bg-bg-surface/75 sticky top-0 z-50 w-full border-b backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link to={ROUTES.LANDING} className="flex items-center gap-2">
-          <div className="bg-brand-600 shadow-brand-500/20 flex h-10 w-10 items-center justify-center rounded-xl text-white shadow-md">
-            <BookOpen className="h-5 w-5" />
+          <div className="bg-primary-600 shadow-primary-500/20 flex h-9 w-9 items-center justify-center rounded-lg text-white shadow-md">
+            <BookOpen className="h-4.5 w-4.5" />
           </div>
-          <span className="font-sans text-xl font-bold tracking-tight text-slate-900">
+          <span className="text-text-main font-sans text-lg font-bold tracking-tight">
             Librovia
           </span>
         </Link>
 
         {/* Desktop Nav */}
-        <nav className="hidden items-center gap-6 md:flex">
-          <a href="#home" className="hover:text-brand-600 text-sm font-medium text-slate-600">
+        <nav className="hidden items-center gap-8 md:flex">
+          <a
+            href="#home"
+            className="hover-underline hover:text-primary-600 text-text-sub text-xs font-bold tracking-wider uppercase"
+          >
             Home
           </a>
-          <a href="#features" className="hover:text-brand-600 text-sm font-medium text-slate-600">
+          <a
+            href="#features"
+            className="hover-underline hover:text-primary-600 text-text-sub text-xs font-bold tracking-wider uppercase"
+          >
             Features
           </a>
-          <a href="#about" className="hover:text-brand-600 text-sm font-medium text-slate-600">
+          <a
+            href="#about"
+            className="hover-underline hover:text-primary-600 text-text-sub text-xs font-bold tracking-wider uppercase"
+          >
             About
           </a>
-          <a href="#faq" className="hover:text-brand-600 text-sm font-medium text-slate-600">
+          <a
+            href="#faq"
+            className="hover-underline hover:text-primary-600 text-text-sub text-xs font-bold tracking-wider uppercase"
+          >
             FAQ
           </a>
           <Link
             to={ROUTES.DESIGN_SYSTEM}
-            className="hover:text-brand-600 text-sm font-medium text-slate-600"
+            className="hover-underline hover:text-primary-600 text-text-sub text-xs font-bold tracking-wider uppercase"
           >
             UI Showcase
           </Link>
-          <button
-            onClick={toggleDemoAuth}
-            className="hover:bg-brand-50 hover:text-brand-600 cursor-pointer rounded bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600"
-            title="Switch Simulated Auth State"
-          >
-            Simulate: {isAuthenticated ? 'Logged In' : 'Guest'}
-          </button>
         </nav>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-3">
-          {isAuthenticated ? (
-            <>
-              <Link
-                to={ROUTES.DASHBOARD}
-                className="hover:text-brand-600 hidden items-center gap-2 text-sm font-medium text-slate-700 sm:flex"
-              >
-                <Library className="h-4 w-4" />
-                Go to Library
-              </Link>
-              <button
-                onClick={() => logout().then(() => navigate(ROUTES.LANDING))}
-                className="flex cursor-pointer items-center gap-2 rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
-              >
-                <LogOut className="h-4 w-4" />
-                Logout
-              </button>
-            </>
-          ) : (
-            <>
-              <Link
-                to={ROUTES.LOGIN}
-                className="hover:text-brand-600 flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-700"
-              >
-                <LogIn className="h-4 w-4" />
-                Sign In
-              </Link>
-              <Link
-                to={ROUTES.REGISTER}
-                className="bg-brand-600 hover:bg-brand-700 shadow-brand-500/10 cursor-pointer rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-sm"
-              >
-                Get Started
-              </Link>
-            </>
-          )}
+        <div className="flex items-center gap-4">
+          <Link
+            to={ROUTES.LOGIN}
+            className="hover:text-primary-600 text-text-sub flex items-center gap-1.5 px-3 py-2 font-sans text-xs font-bold tracking-wider uppercase"
+          >
+            Sign In
+          </Link>
+          <Link to={ROUTES.REGISTER}>
+            <Button size="sm">Get Started</Button>
+          </Link>
         </div>
       </div>
     </header>
