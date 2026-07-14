@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ROUTES } from '../../constants/routes'
@@ -53,12 +53,16 @@ export const LibraryPage: React.FC = () => {
       const cols = await collectionsService.getCollections()
       setCollections(cols)
 
-      const associations: Record<string, string[]> = {}
-      await Promise.all(
-        booksData.map(async (book) => {
-          associations[book.id] = await collectionsService.getBookCollections(book.id)
-        })
-      )
+      const associations = await collectionsService.getBookCollectionsMap()
+      booksData.forEach((book) => {
+        if (book.collectionId) {
+          if (!associations[book.id]) associations[book.id] = []
+          if (!associations[book.id].includes(book.collectionId)) {
+            associations[book.id].push(book.collectionId)
+          }
+        }
+      })
+
       setBookCollections(associations)
       setBooks(booksData)
       setLoading(false)
@@ -78,12 +82,16 @@ export const LibraryPage: React.FC = () => {
         if (!active) return
         setCollections(cols)
 
-        const associations: Record<string, string[]> = {}
-        await Promise.all(
-          booksData.map(async (book) => {
-            associations[book.id] = await collectionsService.getBookCollections(book.id)
-          })
-        )
+        const associations = await collectionsService.getBookCollectionsMap()
+        booksData.forEach((book) => {
+          if (book.collectionId) {
+            if (!associations[book.id]) associations[book.id] = []
+            if (!associations[book.id].includes(book.collectionId)) {
+              associations[book.id].push(book.collectionId)
+            }
+          }
+        })
+
         if (!active) return
         setBookCollections(associations)
         setBooks(booksData)
@@ -149,6 +157,14 @@ export const LibraryPage: React.FC = () => {
     }
   }
 
+  const getCollectionName = useCallback(
+    (colId: string | undefined) => {
+      const col = collections.find((c) => c.id === colId)
+      return col ? col.name : 'Classics'
+    },
+    [collections]
+  )
+
   // Filter & Sort Logic
   const filteredBooks = useMemo(() => {
     const result = books.filter((book) => {
@@ -157,12 +173,7 @@ export const LibraryPage: React.FC = () => {
         if (!belongs) return false
       }
 
-      const categoryName =
-        book.categoryId === 'cat-2'
-          ? 'Programming'
-          : book.categoryId === 'cat-3'
-            ? 'Self-Help'
-            : 'Classics'
+      const categoryName = getCollectionName(book.collectionId)
 
       const matchesSearch =
         book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -204,6 +215,7 @@ export const LibraryPage: React.FC = () => {
     recentThreshold,
     selectedCollectionId,
     bookCollections,
+    getCollectionName,
   ])
 
   // Paginated books for display
@@ -566,11 +578,7 @@ export const LibraryPage: React.FC = () => {
                           <div className="min-w-0 flex-1 space-y-1.5">
                             <div className="flex flex-wrap gap-1.5">
                               <span className="bg-primary-50 dark:bg-primary-500/10 text-primary-600 inline-block rounded px-1.5 py-0.5 text-[8.5px] font-bold tracking-wider uppercase">
-                                {book.categoryId === 'cat-2'
-                                  ? 'Programming'
-                                  : book.categoryId === 'cat-3'
-                                    ? 'Self-Help'
-                                    : 'Classics'}
+                                {getCollectionName(book.collectionId)}
                               </span>
                               {book.progress === 100 && (
                                 <span className="inline-block rounded bg-emerald-50 px-1.5 py-0.5 text-[8.5px] font-bold tracking-wider text-emerald-600 uppercase dark:bg-emerald-500/10">
@@ -673,11 +681,7 @@ export const LibraryPage: React.FC = () => {
                             </div>
                             <div className="hidden sm:flex sm:items-center sm:gap-2">
                               <span className="text-text-sub text-[10px] font-semibold">
-                                {book.categoryId === 'cat-2'
-                                  ? 'Programming'
-                                  : book.categoryId === 'cat-3'
-                                    ? 'Self-Help'
-                                    : 'Classics'}
+                                {getCollectionName(book.collectionId)}
                               </span>
                               {book.progress === 100 && (
                                 <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[8px] leading-none font-bold tracking-wider text-emerald-600 uppercase dark:bg-emerald-500/10">
@@ -832,11 +836,7 @@ export const LibraryPage: React.FC = () => {
                   />
                   <div className="min-w-0 flex-1 space-y-1.5">
                     <span className="bg-primary-50 dark:bg-primary-500/10 text-primary-600 inline-block rounded px-1.5 py-0.5 text-[8px] font-bold tracking-wider uppercase">
-                      {selectedBook.categoryId === 'cat-2'
-                        ? 'Programming'
-                        : selectedBook.categoryId === 'cat-3'
-                          ? 'Self-Help'
-                          : 'Classics'}
+                      {getCollectionName(selectedBook.collectionId)}
                     </span>
                     <h3 className="text-text-main text-base leading-snug font-extrabold tracking-tight break-words">
                       {selectedBook.title}

@@ -8,7 +8,7 @@ export interface Book {
   description?: string
   filePath: string
   coverPath?: string
-  categoryId?: string
+  collectionId?: string
   isFavorite: boolean
   tags: string[]
   fileSize: number
@@ -117,7 +117,7 @@ export const booksService = {
       hasFavsTable = false
     }
 
-    return rows.map((row) => {
+    const books = rows.map((row) => {
       const bookPath = getPathFromUrl(row.file_url, 'books')
       const coverPath = getPathFromUrl(row.cover_url, 'covers')
 
@@ -136,7 +136,7 @@ export const booksService = {
         description: row.description,
         filePath: signedBookUrls[bookPath] || row.file_url,
         coverPath: signedCoverUrls[coverPath] || row.cover_url,
-        categoryId: row.category,
+        collectionId: row.category,
         isFavorite: isFav,
         tags: row.tags || [],
         fileSize: row.file_size || 0,
@@ -148,6 +148,17 @@ export const booksService = {
         lastReadAt: rp?.last_read_at,
       }
     })
+
+    const hasLegacy = books.some(
+      (b) =>
+        b.collectionId &&
+        (b.collectionId === 'cat-1' || b.collectionId === 'cat-2' || b.collectionId === 'cat-3')
+    )
+    if (hasLegacy) {
+      await this.migrateLegacyBooks(books)
+    }
+
+    return books
   },
 
   async getBookById(id: string): Promise<Book | null> {
@@ -219,7 +230,7 @@ export const booksService = {
       description: data.description,
       filePath: fileUrl,
       coverPath: coverUrl,
-      categoryId: data.category,
+      collectionId: data.category,
       isFavorite: isFav,
       tags: data.tags || [],
       fileSize: data.file_size || 0,
@@ -238,7 +249,7 @@ export const booksService = {
       title: string
       author: string
       description: string
-      categoryId?: string
+      collectionId?: string
       tags: string[]
       pages?: number
       publisher?: string
@@ -277,7 +288,7 @@ export const booksService = {
         title: metadata.title,
         author: metadata.author,
         publisher: metadata.publisher,
-        category: metadata.categoryId,
+        category: metadata.collectionId,
         language: metadata.language,
         isbn: metadata.isbn,
         pages: metadata.pages || 320,
@@ -300,7 +311,7 @@ export const booksService = {
       description: data.description,
       filePath: data.file_url,
       coverPath: data.cover_url,
-      categoryId: data.category,
+      collectionId: data.category,
       isFavorite: data.is_favorite,
       tags: data.tags || [],
       fileSize: data.file_size || 0,
@@ -469,6 +480,46 @@ export const booksService = {
       totalPages: data.total_pages || 320,
       lastReadAt: data.last_read_at,
       isCompleted: data.is_completed,
+    }
+  },
+
+  async migrateLegacyBooks(books: Book[]): Promise<void> {
+    const legacyMap: Record<string, string> = {
+      'cat-1': 'Classics',
+      'cat-2': 'Programming',
+      'cat-3': 'Self-Help',
+    }
+
+    try {
+      const { collectionsService } = await import('./collections')
+      const collections = await collectionsService.getCollections()
+
+      for (const book of books) {
+        const legacyId = book.collectionId
+        if (legacyId && legacyMap[legacyId]) {
+          const targetName = legacyMap[legacyId]
+          let col = collections.find((c) => c.name.toLowerCase() === targetName.toLowerCase())
+          if (!col) {
+            try {
+              col = await collectionsService.createCollection(targetName)
+              collections.push(col)
+            } catch (err) {
+              console.error('Failed to create collection for migration:', err)
+              continue
+            }
+          }
+
+          try {
+            await supabase.from('books').update({ category: col.id }).eq('id', book.id)
+            await collectionsService.addBookToCollection(col.id, book.id).catch(() => {})
+            book.collectionId = col.id
+          } catch (err) {
+            console.error('Failed to migrate book category in database:', err)
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to run migration:', err)
     }
   },
 }

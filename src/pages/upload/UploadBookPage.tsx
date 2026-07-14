@@ -1,4 +1,5 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
+import { collectionsService, type Collection } from '../../services/collections'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ROUTES } from '../../constants/routes'
@@ -24,13 +25,47 @@ export const UploadBookPage: React.FC = () => {
   const [title, setTitle] = useState('')
   const [author, setAuthor] = useState('')
   const [publisher, setPublisher] = useState('')
-  const [category, setCategory] = useState('Programming')
+  const [collections, setCollections] = useState<Collection[]>([])
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string>('')
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [newColName, setNewColName] = useState('')
+
   const [language, setLanguage] = useState('English')
   const [isbn, setIsbn] = useState('')
   const [pubYear, setPubYear] = useState('')
   const [pages, setPages] = useState('')
   const [edition, setEdition] = useState('')
   const [description, setDescription] = useState('')
+
+  useEffect(() => {
+    const loadCollections = async () => {
+      try {
+        const cols = await collectionsService.getCollections()
+        setCollections(cols)
+        if (cols.length > 0) {
+          setSelectedCollectionId(cols[0].id)
+        }
+      } catch (err) {
+        console.error('Failed to load collections:', err)
+      }
+    }
+    loadCollections()
+  }, [])
+
+  const handleCreateCollection = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newColName.trim()) return
+    try {
+      const newCol = await collectionsService.createCollection(newColName.trim())
+      setCollections((prev) => [newCol, ...prev])
+      setSelectedCollectionId(newCol.id)
+      setNewColName('')
+      setShowCreateModal(false)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to create collection'
+      alert(msg)
+    }
+  }
 
   // Tag input states
   const [tagInput, setTagInput] = useState('')
@@ -141,14 +176,13 @@ export const UploadBookPage: React.FC = () => {
       setUploadProgress(40)
       setProgressLabel('Uploading PDF file to storage...')
 
-      await booksService.uploadBook(
+      const uploadedBook = await booksService.uploadBook(
         file,
         {
           title: title.trim(),
           author: author.trim(),
           description,
-          categoryId:
-            category === 'Programming' ? 'cat-2' : category === 'Self-Help' ? 'cat-3' : 'cat-1',
+          collectionId: selectedCollectionId || undefined,
           tags: tags.map((t) => t.label),
           pages: parseInt(pages) || 320,
           publisher,
@@ -158,6 +192,14 @@ export const UploadBookPage: React.FC = () => {
         },
         coverFile || undefined
       )
+
+      if (selectedCollectionId) {
+        await collectionsService
+          .addBookToCollection(selectedCollectionId, uploadedBook.id)
+          .catch((e) => {
+            console.error('Failed to add uploaded book to collection:', e)
+          })
+      }
 
       setUploadProgress(80)
       setProgressLabel('Indexing text elements & generating shelf reference...')
@@ -349,21 +391,36 @@ export const UploadBookPage: React.FC = () => {
                   </div>
 
                   <div className="space-y-1.5 text-left">
-                    <label className="text-text-sub font-sans text-xs font-bold tracking-wider uppercase">
-                      Category
-                    </label>
-                    <select
-                      value={category}
-                      onChange={(e) => setCategory(e.target.value)}
-                      className="border-border-base bg-bg-app text-text-main focus:border-primary-500 focus:ring-primary-500/10 block w-full cursor-pointer rounded-lg border px-3 py-2 text-sm transition-all focus:ring-2 focus:outline-none"
-                    >
-                      <option value="Programming">Programming</option>
-                      <option value="Personal Development">Personal Development</option>
-                      <option value="Productivity">Productivity</option>
-                      <option value="Finance">Finance</option>
-                      <option value="Islamic Books">Islamic Books</option>
-                      <option value="Novels">Novels</option>
-                    </select>
+                    <div className="flex items-center justify-between">
+                      <label className="text-text-sub font-sans text-xs font-bold tracking-wider uppercase">
+                        Collection
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowCreateModal(true)}
+                        className="text-primary-600 hover:text-primary-700 flex items-center gap-1 text-[10px] font-bold uppercase transition-all"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        Create Collection
+                      </button>
+                    </div>
+                    {collections.length === 0 ? (
+                      <div className="border-border-base bg-bg-app text-text-muted flex items-center justify-between rounded-lg border px-3 py-2 text-sm">
+                        <span>No collections found.</span>
+                      </div>
+                    ) : (
+                      <select
+                        value={selectedCollectionId}
+                        onChange={(e) => setSelectedCollectionId(e.target.value)}
+                        className="border-border-base bg-bg-app text-text-main focus:border-primary-500 focus:ring-primary-500/10 block w-full cursor-pointer rounded-lg border px-3 py-2 text-sm transition-all focus:ring-2 focus:outline-none"
+                      >
+                        {collections.map((col) => (
+                          <option key={col.id} value={col.id}>
+                            {col.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
 
                   <div className="space-y-1.5 text-left">
@@ -650,6 +707,61 @@ export const UploadBookPage: React.FC = () => {
               </div>
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* CREATE COLLECTION MODAL */}
+      <AnimatePresence>
+        {showCreateModal && (
+          <div className="fixed inset-0 z-999 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-bg-surface border-border-base relative w-full max-w-sm space-y-4 rounded-2xl border p-6 text-left shadow-2xl"
+            >
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="text-text-muted hover:bg-bg-app hover:text-text-main absolute top-4 right-4 rounded-lg p-1.5"
+              >
+                <X className="h-4.5 w-4.5" />
+              </button>
+
+              <h3 className="text-text-main text-sm font-extrabold tracking-wider uppercase">
+                Create Collection
+              </h3>
+
+              <form onSubmit={handleCreateCollection} className="space-y-4 pt-2">
+                <div className="space-y-1.5">
+                  <label className="text-text-muted text-[10px] font-bold tracking-wider uppercase">
+                    Collection Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newColName}
+                    onChange={(e) => setNewColName(e.target.value)}
+                    placeholder="e.g. Science Fiction, Research Paper"
+                    className="border-border-base bg-bg-app text-text-main focus:border-primary-500 focus:ring-primary-500 w-full rounded-xl border px-3.5 py-2 text-xs font-semibold transition-all outline-none focus:ring-1"
+                  />
+                </div>
+                <div className="flex justify-end gap-3 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowCreateModal(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" size="sm">
+                    Create
+                  </Button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>

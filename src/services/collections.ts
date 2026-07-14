@@ -305,4 +305,34 @@ export const collectionsService = {
       return collBooks.filter((cb) => cb.bookId === bookId).map((cb) => cb.collectionId)
     }
   },
+
+  async getBookCollectionsMap(): Promise<Record<string, string[]>> {
+    const isLive = await this.isSupabaseAvailable()
+    if (isLive) {
+      const { data, error } = await supabase
+        .from('collection_books')
+        .select('collection_id, book_id')
+
+      if (error) {
+        console.error('Error fetching collection book associations:', error)
+        return {}
+      }
+
+      const map: Record<string, string[]> = {}
+      ;(data || []).forEach((row) => {
+        if (!map[row.book_id]) map[row.book_id] = []
+        map[row.book_id].push(row.collection_id)
+      })
+      return map
+    } else {
+      const collBooksStr = localStorage.getItem(LOCAL_COLLECTION_BOOKS_KEY) || '[]'
+      const collBooks: CollectionBook[] = JSON.parse(collBooksStr)
+      const map: Record<string, string[]> = {}
+      collBooks.forEach((cb) => {
+        if (!map[cb.bookId]) map[cb.bookId] = []
+        map[cb.bookId].push(cb.collectionId)
+      })
+      return map
+    }
+  },
 }

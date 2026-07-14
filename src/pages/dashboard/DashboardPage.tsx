@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ROUTES } from '../../constants/routes'
 import { booksService, type Book } from '../../services/books'
+import { collectionsService, type Collection } from '../../services/collections'
 import { useAuth } from '../../context/AuthContext'
 import {
   BookOpen,
@@ -31,17 +32,26 @@ export const DashboardPage: React.FC = () => {
   const [isEmptyState, setIsEmptyState] = useState(false)
   const [isSkeletonLoading, setIsSkeletonLoading] = useState(false)
   const [previewBook, setPreviewBook] = useState<Book | null>(null)
+  const [collectionsList, setCollectionsList] = useState<Collection[]>([])
 
   const fetchBooks = () => {
-    booksService.getBooks().then((data) => {
-      setBooks(data)
-      setLoading(false)
-    })
+    Promise.all([booksService.getBooks(), collectionsService.getCollections()]).then(
+      ([booksData, colsData]) => {
+        setBooks(booksData)
+        setCollectionsList(colsData)
+        setLoading(false)
+      }
+    )
   }
 
   useEffect(() => {
     fetchBooks()
   }, [])
+
+  const getCollectionName = (colId: string | undefined) => {
+    const col = collectionsList.find((c) => c.id === colId)
+    return col ? col.name : 'Classics'
+  }
 
   const toggleStar = async (id: string) => {
     try {
@@ -116,23 +126,23 @@ export const DashboardPage: React.FC = () => {
     return inProgress || books[0] || null
   }, [books])
 
-  const collections = [
-    {
-      name: 'Programming',
-      count: books.filter((b) => b.categoryId === 'cat-2').length,
-      color: 'from-blue-500 to-indigo-600',
-    },
-    {
-      name: 'Self-Help',
-      count: books.filter((b) => b.categoryId === 'cat-3').length,
-      color: 'from-amber-500 to-orange-600',
-    },
-    {
-      name: 'Classics',
-      count: books.filter((b) => b.categoryId === 'cat-1').length,
-      color: 'from-purple-500 to-pink-600',
-    },
-  ]
+  const collections = useMemo(() => {
+    const gradients = [
+      'from-blue-500 to-indigo-600',
+      'from-amber-500 to-orange-600',
+      'from-purple-500 to-pink-600',
+      'from-emerald-500 to-teal-600',
+      'from-cyan-500 to-blue-600',
+    ]
+    return collectionsList.map((col, idx) => {
+      const count = books.filter((b) => b.collectionId === col.id).length
+      return {
+        name: col.name,
+        count: count,
+        color: gradients[idx % gradients.length],
+      }
+    })
+  }, [collectionsList, books])
 
   const handleSimulateLoader = () => {
     setIsSkeletonLoading(true)
@@ -312,7 +322,7 @@ export const DashboardPage: React.FC = () => {
                       />
                       <div className="space-y-2">
                         <span className="inline-block rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase">
-                          {continueReadingBook.categoryId === 'cat-2' ? 'Programming' : 'Self-Help'}
+                          {getCollectionName(continueReadingBook.collectionId)}
                         </span>
                         <h4 className="font-sans text-lg font-bold tracking-tight">
                           {continueReadingBook.title}
@@ -417,7 +427,7 @@ export const DashboardPage: React.FC = () => {
                         />
                         <div className="min-w-0 space-y-1">
                           <span className="bg-primary-50 dark:bg-primary-500/10 text-primary-600 inline-block rounded px-1.5 py-0.5 text-[8px] font-bold tracking-wider uppercase">
-                            {book.categoryId === 'cat-2' ? 'Programming' : 'Self-Help'}
+                            {getCollectionName(book.collectionId)}
                           </span>
                           <h4 className="text-text-main truncate text-xs font-bold">
                             {book.title}
@@ -481,26 +491,32 @@ export const DashboardPage: React.FC = () => {
                   My Collections
                 </h3>
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-                  {collections.map((col, idx) => (
-                    <div
-                      key={idx}
-                      className="border-border-base bg-bg-surface hover:border-primary-500/20 flex h-28 flex-col justify-between rounded-2xl border p-4 shadow-sm transition-all"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div
-                          className={`h-8 w-8 rounded-lg bg-gradient-to-tr ${col.color} flex items-center justify-center text-white`}
-                        >
-                          <FolderOpen className="h-4.5 w-4.5" />
-                        </div>
-                        <span className="bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400 rounded px-1.5 py-0.5 text-[10px] font-bold">
-                          {col.count} Books
-                        </span>
-                      </div>
-                      <h4 className="text-text-main mt-4 truncate text-xs font-bold tracking-wider uppercase">
-                        {col.name}
-                      </h4>
+                  {collections.length === 0 ? (
+                    <div className="border-border-base bg-bg-surface/30 text-text-sub col-span-2 flex h-28 w-full items-center justify-center rounded-2xl border border-dashed text-xs sm:col-span-3">
+                      <span>No collections found.</span>
                     </div>
-                  ))}
+                  ) : (
+                    collections.map((col, idx) => (
+                      <div
+                        key={idx}
+                        className="border-border-base bg-bg-surface hover:border-primary-500/20 flex h-28 flex-col justify-between rounded-2xl border p-4 shadow-sm transition-all"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div
+                            className={`h-8 w-8 rounded-lg bg-gradient-to-tr ${col.color} flex items-center justify-center text-white`}
+                          >
+                            <FolderOpen className="h-4.5 w-4.5" />
+                          </div>
+                          <span className="bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400 rounded px-1.5 py-0.5 text-[10px] font-bold">
+                            {col.count} Books
+                          </span>
+                        </div>
+                        <h4 className="text-text-main mt-4 truncate text-xs font-bold tracking-wider uppercase">
+                          {col.name}
+                        </h4>
+                      </div>
+                    ))
+                  )}
                 </div>
               </motion.div>
 
@@ -566,7 +582,7 @@ export const DashboardPage: React.FC = () => {
                   <h5 className="text-text-main text-sm font-bold">{previewBook.title}</h5>
                   <p className="text-text-sub mt-0.5 text-xs">By {previewBook.author}</p>
                   <span className="bg-primary-50 dark:bg-primary-500/10 text-primary-600 mt-2 inline-block rounded px-1.5 py-0.5 text-[8px] font-bold tracking-wider uppercase">
-                    {previewBook.categoryId === 'cat-2' ? 'Programming' : 'Self-Help'}
+                    {getCollectionName(previewBook.collectionId)}
                   </span>
                 </div>
               </div>

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { Button } from '../../components/common/Button'
 import { booksService, type Book } from '../../services/books'
+import { collectionsService, type Collection } from '../../services/collections'
 import { formatBytes } from '../../utils/helpers'
 
 interface BookDetails {
@@ -54,7 +55,7 @@ interface BookDetails {
   cover: string
 }
 
-const mapBookToDetails = (b: Book): BookDetails => {
+const mapBookToDetails = (b: Book, collectionName: string): BookDetails => {
   const fileExt = b.filePath.toLowerCase().split('?')[0].split('.').pop()?.toUpperCase() || 'PDF'
 
   // Calculate est time remaining based on progress (assume 2 minutes per page remaining)
@@ -68,14 +69,13 @@ const mapBookToDetails = (b: Book): BookDetails => {
     month: '2-digit',
     day: '2-digit',
   })
-  const updateDate = new Date(b.updatedAt).toLocaleDateString(undefined, {
+  const updateDate = new Date(b.createdAt).toLocaleDateString(undefined, {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
   })
 
-  const categoryName =
-    b.categoryId === 'cat-2' ? 'Programming' : b.categoryId === 'cat-3' ? 'Self-Help' : 'Classics'
+  const categoryName = collectionName
 
   const lastOpenedStr = b.lastReadAt
     ? new Date(b.lastReadAt).toLocaleDateString(undefined, {
@@ -135,6 +135,7 @@ export const BookDetailsPage: React.FC = () => {
   const [relatedBooks, setRelatedBooks] = useState<Book[]>([])
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [collections, setCollections] = useState<Collection[]>([])
 
   const [isSkeletonLoading, setIsSkeletonLoading] = useState(false)
   const [isFavorite, setIsFavorite] = useState(false)
@@ -149,24 +150,27 @@ export const BookDetailsPage: React.FC = () => {
       setErrorMsg(null)
     })
 
-    booksService
-      .getBookById(id)
-      .then(async (data) => {
+    Promise.all([booksService.getBookById(id), collectionsService.getCollections()])
+      .then(async ([data, cols]) => {
         if (!data) {
           setErrorMsg('Book not found or access denied.')
           setLoading(false)
           return
         }
+        setCollections(cols)
         setRawBook(data)
         setIsFavorite(data.isFavorite)
 
-        const details = mapBookToDetails(data)
+        const col = cols.find((c) => c.id === data.collectionId)
+        const colName = col ? col.name : 'Classics'
+
+        const details = mapBookToDetails(data, colName)
         setBook(details)
 
         try {
           const all = await booksService.getBooks()
           const matching = all
-            .filter((b) => b.categoryId === data.categoryId && b.id !== data.id)
+            .filter((b) => b.collectionId === data.collectionId && b.id !== data.id)
             .slice(0, 6)
           setRelatedBooks(matching)
         } catch (e) {
@@ -645,11 +649,10 @@ export const BookDetailsPage: React.FC = () => {
                       <div className="flex min-w-0 flex-col justify-between">
                         <div>
                           <span className="bg-primary-50 dark:bg-primary-500/10 text-primary-600 inline-block rounded px-1.5 py-0.5 text-[8px] leading-none font-bold tracking-wider uppercase">
-                            {item.categoryId === 'cat-2'
-                              ? 'Programming'
-                              : item.categoryId === 'cat-3'
-                                ? 'Self-Help'
-                                : 'Classics'}
+                            {(() => {
+                              const itemCol = collections.find((c) => c.id === item.collectionId)
+                              return itemCol ? itemCol.name : 'Classics'
+                            })()}
                           </span>
                           <h4 className="text-text-main mt-1 truncate text-xs font-bold">
                             {item.title}
