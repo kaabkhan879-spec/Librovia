@@ -8,10 +8,10 @@ import {
   LayoutDashboard,
   Library,
   Folder,
-  BookOpen as ReadingIcon,
-  UploadCloud,
-  Heart,
+  Star,
+  History,
   BarChart3,
+  Cloud,
   Settings,
   LogOut,
   X,
@@ -62,10 +62,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { name: 'Dashboard', to: ROUTES.DASHBOARD, icon: LayoutDashboard },
     { name: 'My Library', to: ROUTES.LIBRARY, icon: Library },
     { name: 'Collections', to: ROUTES.CATEGORIES, icon: Folder },
-    { name: 'Reading Now', to: '/reader/atomic-habits', icon: ReadingIcon },
-    { name: 'Upload Book', to: ROUTES.UPLOAD, icon: UploadCloud },
-    { name: 'Favorites', to: ROUTES.FAVORITES, icon: Heart },
-    { name: 'Analytics', to: '/dashboard', icon: BarChart3, hash: '#analytics' },
+    { name: 'Favorites', to: ROUTES.FAVORITES, icon: Star },
+    { name: 'Reading History', to: ROUTES.DASHBOARD, icon: History, hash: '#history-section' },
+    { name: 'Analytics', to: ROUTES.DASHBOARD, icon: BarChart3, hash: '#analytics-section' },
+    { name: 'Storage', to: ROUTES.DASHBOARD, icon: Cloud, hash: '#storage-section' },
     { name: 'Settings', to: ROUTES.SETTINGS, icon: Settings },
   ]
 
@@ -112,25 +112,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Sidebar Nav Links */}
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4 text-left">
           {navigation.map((item) => {
-            const isAnalytics = item.name === 'Analytics'
+            const hasHash = !!item.hash
             return (
               <NavLink
                 key={item.name}
-                to={isAnalytics ? ROUTES.DASHBOARD : item.to}
+                to={hasHash ? ROUTES.DASHBOARD : item.to}
                 end={item.to === ROUTES.DASHBOARD}
                 onClick={(e) => {
-                  if (isAnalytics) {
+                  if (hasHash && item.hash) {
                     e.preventDefault()
                     navigate(ROUTES.DASHBOARD)
                     setTimeout(() => {
-                      const el = document.getElementById('analytics-section')
+                      const el = document.getElementById(item.hash!.substring(1))
                       if (el) el.scrollIntoView({ behavior: 'smooth' })
                     }, 100)
                   }
                 }}
                 className={({ isActive }) =>
                   `group text-text-sub hover:bg-bg-app hover:text-text-main relative flex cursor-pointer items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold tracking-wider uppercase transition-all ${
-                    isActive && !isAnalytics
+                    isActive && !hasHash
                       ? 'bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400'
                       : ''
                   } `
@@ -141,7 +141,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <item.icon className="h-5 w-5 shrink-0" />
                     {!isCollapsed && <span>{item.name}</span>}
                     {/* Visual indicator bar on hover/active */}
-                    {isActive && !isAnalytics && (
+                    {isActive && !hasHash && (
                       <motion.div
                         layoutId="active-indicator"
                         className="bg-primary-600 absolute top-3 bottom-3 left-0 w-1 rounded-r-full"
