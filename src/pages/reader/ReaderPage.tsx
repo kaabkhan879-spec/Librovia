@@ -88,6 +88,15 @@ export const ReaderPage: React.FC = () => {
   const [modalTags, setModalTags] = useState<string[]>([])
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
 
+  // Sticky Notes states
+  const [stickyNotePromptPos, setStickyNotePromptPos] = useState<{
+    top: number
+    left: number
+    percentX: number
+    percentY: number
+  } | null>(null)
+  const [modalNoteTitle, setModalNoteTitle] = useState('')
+
   // Selection Floating Toolbar State
   const [floatingToolbarPos, setFloatingToolbarPos] = useState<{
     top: number
@@ -168,7 +177,7 @@ export const ReaderPage: React.FC = () => {
   // Auto highlight overlay DOM injector
   const injectHighlights = useCallback(() => {
     if (!id || !page) return
-    const pageNotes = bookNotes.filter((n) => n.pageNumber === page)
+    const pageNotes = bookNotes.filter((n) => n.pageNumber === page && n.highlightedText)
     const textLayer = containerRef.current?.querySelector('.react-pdf__Page__textLayer')
     if (!textLayer) return
 
@@ -202,7 +211,7 @@ export const ReaderPage: React.FC = () => {
     let active = true
     const timer = setTimeout(() => {
       if (active) injectHighlights()
-    }, 300) // 300ms delay to let textLayer mount in react-pdf
+    }, 300)
 
     return () => {
       active = false
@@ -421,7 +430,7 @@ export const ReaderPage: React.FC = () => {
 
   // Toggle page bookmark status directly
   const toggleBookmark = async () => {
-    const existing = bookNotes.find((n) => n.pageNumber === page)
+    const existing = bookNotes.find((n) => n.pageNumber === page && n.xPosition === undefined)
     try {
       if (existing) {
         const updated = await notesService.saveNote({
@@ -447,7 +456,9 @@ export const ReaderPage: React.FC = () => {
   }
 
   const handleOpenNoteModal = () => {
-    const existing = bookNotes.find((n) => n.pageNumber === page)
+    setStickyNotePromptPos(null)
+    setModalNoteTitle('')
+    const existing = bookNotes.find((n) => n.pageNumber === page && n.xPosition === undefined)
     if (existing) {
       setEditingNoteId(existing.id)
       setModalRating(existing.rating)
@@ -464,6 +475,13 @@ export const ReaderPage: React.FC = () => {
       setModalTags([])
     }
     setIsNotesModalOpen(true)
+  }
+
+  const handleCloseModal = () => {
+    setIsNotesModalOpen(false)
+    setStickyNotePromptPos(null)
+    setModalNoteTitle('')
+    window.getSelection()?.removeAllRanges()
   }
 
   // Quick Highlights creation
@@ -497,6 +515,77 @@ export const ReaderPage: React.FC = () => {
     showNotification('Text copied! 📋')
   }
 
+  // Sticky Note click detector on page
+  const handlePageClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const selection = window.getSelection()
+    if (selection && !selection.isCollapsed) return
+
+    const target = e.target as HTMLElement
+    if (
+      target.closest('mark[data-note-id]') ||
+      target.closest('.sticky-note-marker') ||
+      target.closest('button') ||
+      target.closest('input') ||
+      target.closest('textarea')
+    ) {
+      return
+    }
+
+    const pageContainer = e.currentTarget.querySelector('.react-pdf__Page')
+    if (!pageContainer) return
+
+    const rect = pageContainer.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+
+    if (x < 0 || x > rect.width || y < 0 || y > rect.height) {
+      setStickyNotePromptPos(null)
+      return
+    }
+
+    const percentX = (x / rect.width) * 100
+    const percentY = (y / rect.height) * 100
+
+    setStickyNotePromptPos({
+      top: y,
+      left: x,
+      percentX,
+      percentY,
+    })
+  }
+
+  const handleCreateStickyNote = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!stickyNotePromptPos) return
+
+    setEditingNoteId(null)
+    setModalNoteTitle('')
+    setModalNoteText('')
+    setModalHighlightText('')
+    setModalRating(undefined)
+    setModalBookmark(false)
+    setModalTags([])
+    setIsNotesModalOpen(true)
+  }
+
+  const handleMarkerClick = (note: Note, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setEditingNoteId(note.id)
+    setModalNoteTitle(note.noteTitle || '')
+    setModalNoteText(note.noteText)
+    setModalHighlightText(note.highlightedText || '')
+    setModalRating(note.rating)
+    setModalBookmark(note.isBookmarked)
+    setModalTags(note.tags)
+    setStickyNotePromptPos({
+      top: 0,
+      left: 0,
+      percentX: note.xPosition || 0,
+      percentY: note.yPosition || 0,
+    })
+    setIsNotesModalOpen(true)
+  }
+
   const handleSaveNote = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!id) return
@@ -511,6 +600,9 @@ export const ReaderPage: React.FC = () => {
         highlightedText: modalHighlightText || undefined,
         isBookmarked: modalBookmark,
         tags: modalTags,
+        xPosition: stickyNotePromptPos ? stickyNotePromptPos.percentX : undefined,
+        yPosition: stickyNotePromptPos ? stickyNotePromptPos.percentY : undefined,
+        noteTitle: modalNoteTitle || undefined,
       }
 
       const saved = await notesService.saveNote(payload)
@@ -521,8 +613,10 @@ export const ReaderPage: React.FC = () => {
       }
 
       setIsNotesModalOpen(false)
+      setStickyNotePromptPos(null)
+      setModalNoteTitle('')
       window.getSelection()?.removeAllRanges()
-      showNotification('Note synced to Supabase! 📒')
+      showNotification(editingNoteId ? 'Annotation synced! 💬' : 'Sticky Note placed! 💬')
     } catch (err) {
       console.error(err)
     }
@@ -610,7 +704,9 @@ export const ReaderPage: React.FC = () => {
     setOriginalPageHeight(p.height)
   }
 
-  const bookmarkedPages = bookNotes.filter((n) => n.isBookmarked).map((n) => n.pageNumber)
+  const bookmarkedPages = bookNotes
+    .filter((n) => n.isBookmarked && n.xPosition === undefined)
+    .map((n) => n.pageNumber)
 
   const themeClasses = {
     light: 'bg-white text-slate-900 border-slate-200 shadow-xl',
@@ -905,13 +1001,14 @@ export const ReaderPage: React.FC = () => {
 
             {activeTab === 'bookmarks' && (
               <div className="space-y-2">
-                {bookNotes.filter((n) => n.isBookmarked).length === 0 ? (
+                {bookNotes.filter((n) => n.isBookmarked && n.xPosition === undefined).length ===
+                0 ? (
                   <p className="text-text-muted py-6 text-center text-[10px]">
                     No bookmarks saved.
                   </p>
                 ) : (
                   bookNotes
-                    .filter((n) => n.isBookmarked)
+                    .filter((n) => n.isBookmarked && n.xPosition === undefined)
                     .map((n) => (
                       <button
                         key={n.id}
@@ -948,67 +1045,69 @@ export const ReaderPage: React.FC = () => {
                 </button>
 
                 <div className="border-border-light space-y-2 border-t pt-2">
-                  {bookNotes.length === 0 ? (
+                  {bookNotes.filter((n) => n.xPosition === undefined).length === 0 ? (
                     <p className="text-text-muted py-6 text-center text-[10px]">
                       No study notes written.
                     </p>
                   ) : (
-                    bookNotes.map((n) => (
-                      <div
-                        key={n.id}
-                        onClick={() => setPage(n.pageNumber)}
-                        className={`hover:border-purple-550/35 cursor-pointer space-y-2 rounded-2xl border border-slate-100 bg-white p-3 text-left text-xs shadow-xs transition-colors dark:border-slate-800 dark:bg-slate-900 ${
-                          n.pageNumber === page
-                            ? 'border-purple-500/40 ring-1 ring-purple-500/10'
-                            : ''
-                        }`}
-                      >
-                        {n.rating && (
-                          <div className="flex gap-0.5 text-amber-400">
-                            {Array.from({ length: n.rating }).map((_, idx) => (
-                              <Star key={idx} className="h-3 w-3 fill-current" />
-                            ))}
-                          </div>
-                        )}
-                        {n.highlightedText && (
-                          <p className="line-clamp-2 border-l-2 border-purple-400 bg-purple-50/50 pl-2 font-serif text-[10px] leading-relaxed text-purple-700 italic dark:bg-purple-950/20 dark:text-purple-300">
-                            "{n.highlightedText}"
-                          </p>
-                        )}
-                        {n.noteText && (
-                          <p className="dark:text-slate-350 leading-relaxed font-semibold text-slate-700">
-                            {n.noteText}
-                          </p>
-                        )}
+                    bookNotes
+                      .filter((n) => n.xPosition === undefined)
+                      .map((n) => (
+                        <div
+                          key={n.id}
+                          onClick={() => setPage(n.pageNumber)}
+                          className={`hover:border-purple-550/35 cursor-pointer space-y-2 rounded-2xl border border-slate-100 bg-white p-3 text-left text-xs shadow-xs transition-colors dark:border-slate-800 dark:bg-slate-900 ${
+                            n.pageNumber === page
+                              ? 'border-purple-500/40 ring-1 ring-purple-500/10'
+                              : ''
+                          }`}
+                        >
+                          {n.rating && (
+                            <div className="flex gap-0.5 text-amber-400">
+                              {Array.from({ length: n.rating }).map((_, idx) => (
+                                <Star key={idx} className="h-3 w-3 fill-current" />
+                              ))}
+                            </div>
+                          )}
+                          {n.highlightedText && (
+                            <p className="line-clamp-2 border-l-2 border-purple-400 bg-purple-50/50 pl-2 font-serif text-[10px] leading-relaxed text-purple-700 italic dark:bg-purple-950/20 dark:text-purple-300">
+                              "{n.highlightedText}"
+                            </p>
+                          )}
+                          {n.noteText && (
+                            <p className="dark:text-slate-350 leading-relaxed font-semibold text-slate-700">
+                              {n.noteText}
+                            </p>
+                          )}
 
-                        <div className="text-text-muted mt-1.5 flex items-center justify-between border-t border-slate-50 pt-1.5 font-sans text-[9px] font-bold dark:border-slate-800/40">
-                          <span>Page {n.pageNumber}</span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setEditingNoteId(n.id)
-                                setModalRating(n.rating)
-                                setModalNoteText(n.noteText)
-                                setModalHighlightText(n.highlightedText || '')
-                                setModalBookmark(n.isBookmarked)
-                                setModalTags(n.tags)
-                                setIsNotesModalOpen(true)
-                              }}
-                              className="hover:text-slate-655 text-slate-400"
-                            >
-                              <Edit2 className="h-3 w-3" />
-                            </button>
-                            <button
-                              onClick={(e) => handleDeleteNote(n.id, e)}
-                              className="text-slate-400 hover:text-red-500"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </button>
+                          <div className="text-text-muted mt-1.5 flex items-center justify-between border-t border-slate-50 pt-1.5 font-sans text-[9px] font-bold dark:border-slate-800/40">
+                            <span>Page {n.pageNumber}</span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setEditingNoteId(n.id)
+                                  setModalRating(n.rating)
+                                  setModalNoteText(n.noteText)
+                                  setModalHighlightText(n.highlightedText || '')
+                                  setModalBookmark(n.isBookmarked)
+                                  setModalTags(n.tags)
+                                  setIsNotesModalOpen(true)
+                                }}
+                                className="hover:text-slate-655 text-slate-400"
+                              >
+                                <Edit2 className="h-3 w-3" />
+                              </button>
+                              <button
+                                onClick={(e) => handleDeleteNote(n.id, e)}
+                                className="text-slate-400 hover:text-red-500"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))
+                      ))
                   )}
                 </div>
               </div>
@@ -1119,12 +1218,15 @@ export const ReaderPage: React.FC = () => {
 
           {/* PDF Page Canvas Frame wrapper */}
           <div
-            className={`origin-top transition-all duration-300 ${
+            className={`relative origin-top transition-all duration-300 ${
               themeClasses[theme]
             } ${widthClasses[pageWidth]}`}
             style={{ transform: `scale(${scale})` }}
             onMouseUp={handleTextSelection}
-            onClick={handleContainerClick}
+            onClick={(e) => {
+              handleContainerClick(e)
+              handlePageClick(e)
+            }}
             onMouseOver={handleContainerMouseOver}
             onMouseOut={handleContainerMouseOut}
           >
@@ -1156,6 +1258,46 @@ export const ReaderPage: React.FC = () => {
                 }
               />
             </Document>
+
+            {/* Dynamic Sticky Notes Overlay */}
+            {bookNotes
+              .filter(
+                (n) =>
+                  n.pageNumber === page && n.xPosition !== undefined && n.yPosition !== undefined
+              )
+              .map((note) => (
+                <button
+                  key={note.id}
+                  onClick={(e) => handleMarkerClick(note, e)}
+                  style={{
+                    position: 'absolute',
+                    left: `${note.xPosition}%`,
+                    top: `${note.yPosition}%`,
+                    transform: 'translate(-50%, -50%)',
+                  }}
+                  className="sticky-note-marker z-20 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-purple-600 text-xs text-white shadow-lg transition-transform select-none hover:scale-110 active:scale-95"
+                  title={note.noteTitle || 'Sticky Note'}
+                >
+                  💬
+                </button>
+              ))}
+
+            {/* Add Sticky Note "+" Prompt Button */}
+            {stickyNotePromptPos && (
+              <button
+                onClick={handleCreateStickyNote}
+                style={{
+                  position: 'absolute',
+                  left: `${stickyNotePromptPos.percentX}%`,
+                  top: `${stickyNotePromptPos.percentY}%`,
+                  transform: 'translate(-50%, -50%)',
+                }}
+                className="z-30 flex h-7 w-7 animate-bounce cursor-pointer items-center justify-center rounded-full bg-emerald-500 text-sm font-bold text-white shadow-xl transition-all select-none hover:bg-emerald-600"
+                title="Add Sticky Note Here"
+              >
+                +
+              </button>
+            )}
           </div>
 
           {/* Quick float pagination buttons */}
@@ -1191,7 +1333,7 @@ export const ReaderPage: React.FC = () => {
                 </span>
                 <button
                   onClick={() => setRightSidebarOpen(false)}
-                  className="cursor-pointer font-bold text-slate-400 hover:text-slate-600"
+                  className="animate-pulse cursor-pointer font-bold text-slate-400 hover:animate-none hover:text-slate-600"
                 >
                   ✕
                 </button>
@@ -1214,12 +1356,21 @@ export const ReaderPage: React.FC = () => {
                           : ''
                       }`}
                     >
-                      <div className="text-purple-650 flex items-center justify-between text-[9px] font-extrabold uppercase">
-                        <span>Page {n.pageNumber}</span>
+                      <div className="text-purple-655 flex items-center justify-between text-[9px] font-extrabold uppercase">
+                        <span className="flex items-center gap-1">
+                          {n.xPosition !== undefined ? '📌 Sticky Note' : '📄 Page Note'} (p.{' '}
+                          {n.pageNumber})
+                        </span>
                         {n.isBookmarked && (
                           <Bookmark className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
                         )}
                       </div>
+
+                      {n.noteTitle && (
+                        <h4 className="truncate text-[11px] font-bold text-slate-900 dark:text-white">
+                          {n.noteTitle}
+                        </h4>
+                      )}
 
                       {n.rating && (
                         <div className="flex gap-0.5 text-amber-400">
@@ -1262,11 +1413,22 @@ export const ReaderPage: React.FC = () => {
                           onClick={(e) => {
                             e.stopPropagation()
                             setEditingNoteId(n.id)
+                            setModalNoteTitle(n.noteTitle || '')
                             setModalRating(n.rating)
                             setModalNoteText(n.noteText)
                             setModalHighlightText(n.highlightedText || '')
                             setModalBookmark(n.isBookmarked)
                             setModalTags(n.tags)
+                            if (n.xPosition !== undefined) {
+                              setStickyNotePromptPos({
+                                top: 0,
+                                left: 0,
+                                percentX: n.xPosition,
+                                percentY: n.yPosition || 0,
+                              })
+                            } else {
+                              setStickyNotePromptPos(null)
+                            }
                             setIsNotesModalOpen(true)
                           }}
                           className="hover:text-slate-655 text-slate-400"
@@ -1388,6 +1550,12 @@ export const ReaderPage: React.FC = () => {
               )}
             </div>
 
+            {hoveredNote.noteTitle && (
+              <h4 className="text-[10.5px] font-extrabold text-slate-950 dark:text-white">
+                {hoveredNote.noteTitle}
+              </h4>
+            )}
+
             {hoveredNote.rating && (
               <div className="flex gap-0.5 text-amber-400">
                 {Array.from({ length: hoveredNote.rating }).map((_, idx) => (
@@ -1396,7 +1564,7 @@ export const ReaderPage: React.FC = () => {
               </div>
             )}
 
-            <p className="text-slate-850 text-[10px] leading-relaxed font-semibold dark:text-slate-200">
+            <p className="text-slate-855 text-[10px] leading-relaxed font-semibold dark:text-slate-200">
               {hoveredNote.noteText}
             </p>
 
@@ -1439,29 +1607,42 @@ export const ReaderPage: React.FC = () => {
                   </h3>
                 </div>
                 <button
-                  onClick={() => {
-                    setIsNotesModalOpen(false)
-                    window.getSelection()?.removeAllRanges()
-                  }}
-                  className="hover:text-slate-650 cursor-pointer rounded-lg p-1 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  onClick={handleCloseModal}
+                  className="hover:text-slate-655 cursor-pointer rounded-lg p-1 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
                   <X className="h-4.5 w-4.5" />
                 </button>
               </div>
 
               <form onSubmit={handleSaveNote} className="space-y-4">
-                {/* Highlight text input */}
+                {/* Note Title Input */}
                 <div className="space-y-1">
-                  <label className="block text-[9px] font-bold tracking-widest text-slate-400 uppercase">
-                    Selected Text (Read-Only)
+                  <label className="block font-sans text-[9px] font-bold tracking-widest text-slate-400 uppercase">
+                    Note Title (Optional)
                   </label>
-                  <textarea
-                    readOnly
-                    value={modalHighlightText}
-                    placeholder="No selection captured."
-                    className="min-h-16 w-full rounded-2xl border border-slate-200 bg-slate-100/50 p-3 text-xs text-slate-500 outline-hidden transition-all focus:border-purple-600 focus:bg-white dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400"
+                  <input
+                    type="text"
+                    placeholder="Enter annotation title..."
+                    value={modalNoteTitle}
+                    onChange={(e) => setModalNoteTitle(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-2 text-xs font-semibold text-slate-900 placeholder-slate-400 outline-hidden transition-all focus:border-purple-600 focus:bg-white dark:border-slate-800 dark:bg-slate-800/40 dark:text-white"
                   />
                 </div>
+
+                {/* Highlight text input */}
+                {modalHighlightText && (
+                  <div className="space-y-1">
+                    <label className="block text-[9px] font-bold tracking-widest text-slate-400 uppercase">
+                      Selected Text (Read-Only)
+                    </label>
+                    <textarea
+                      readOnly
+                      value={modalHighlightText}
+                      placeholder="No selection captured."
+                      className="min-h-16 w-full rounded-2xl border border-slate-200 bg-slate-100/50 p-3 font-serif text-xs text-slate-500 italic outline-hidden transition-all focus:border-purple-600 focus:bg-white dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400"
+                    />
+                  </div>
+                )}
 
                 {/* Rating Input */}
                 <div className="space-y-1">
@@ -1490,7 +1671,7 @@ export const ReaderPage: React.FC = () => {
 
                 {/* Notes Input */}
                 <div className="space-y-1">
-                  <label className="block text-[9px] font-bold tracking-widest text-slate-400 uppercase">
+                  <label className="block font-sans text-[9px] font-bold tracking-widest text-slate-400 uppercase">
                     Personal Thoughts & Notes
                   </label>
                   <textarea
@@ -1539,7 +1720,7 @@ export const ReaderPage: React.FC = () => {
                   />
                   <label
                     htmlFor="modal-bookmark"
-                    className="cursor-pointer text-xs font-bold text-slate-600 dark:text-slate-300"
+                    className="animate-pulse cursor-pointer text-xs font-bold text-slate-600 dark:text-slate-300"
                   >
                     Bookmark this page
                   </label>
@@ -1548,10 +1729,7 @@ export const ReaderPage: React.FC = () => {
                 <div className="flex justify-end gap-2 border-t border-slate-50 pt-3 dark:border-slate-800/40">
                   <button
                     type="button"
-                    onClick={() => {
-                      setIsNotesModalOpen(false)
-                      window.getSelection()?.removeAllRanges()
-                    }}
+                    onClick={handleCloseModal}
                     className="cursor-pointer rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold tracking-wider text-slate-600 uppercase transition-colors hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800/50"
                   >
                     Cancel

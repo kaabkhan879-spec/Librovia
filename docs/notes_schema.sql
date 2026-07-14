@@ -10,8 +10,16 @@ CREATE TABLE IF NOT EXISTS public.notes (
   is_bookmarked BOOLEAN DEFAULT FALSE,
   tags TEXT[] DEFAULT '{}'::TEXT[],
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  x_position NUMERIC,
+  y_position NUMERIC,
+  note_title TEXT
 );
+
+-- Alter table queries for existing tables migration
+ALTER TABLE public.notes ADD COLUMN IF NOT EXISTS x_position NUMERIC;
+ALTER TABLE public.notes ADD COLUMN IF NOT EXISTS y_position NUMERIC;
+ALTER TABLE public.notes ADD COLUMN IF NOT EXISTS note_title TEXT;
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE public.notes ENABLE ROW LEVEL SECURITY;

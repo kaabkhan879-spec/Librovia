@@ -12,6 +12,9 @@ export interface Note {
   tags: string[]
   createdAt: string
   updatedAt: string
+  xPosition?: number
+  yPosition?: number
+  noteTitle?: string
 }
 
 const LOCAL_NOTES_KEY = 'librovia-fallback-notes'
@@ -66,6 +69,9 @@ export const notesService = {
         tags: row.tags || [],
         createdAt: row.created_at,
         updatedAt: row.updated_at,
+        xPosition: row.x_position !== null ? Number(row.x_position) : undefined,
+        yPosition: row.y_position !== null ? Number(row.y_position) : undefined,
+        noteTitle: row.note_title || undefined,
       }))
     } else {
       return this.getLocalNotes(bookId, user.id)
@@ -95,6 +101,9 @@ export const notesService = {
           is_bookmarked: note.isBookmarked,
           tags: note.tags,
           updated_at: now,
+          x_position: note.xPosition !== undefined ? note.xPosition : null,
+          y_position: note.yPosition !== undefined ? note.yPosition : null,
+          note_title: note.noteTitle || null,
         }
 
         let result
@@ -131,6 +140,9 @@ export const notesService = {
           tags: result.tags || [],
           createdAt: result.created_at,
           updatedAt: result.updated_at,
+          xPosition: result.x_position !== null ? Number(result.x_position) : undefined,
+          yPosition: result.y_position !== null ? Number(result.y_position) : undefined,
+          noteTitle: result.note_title || undefined,
         }
       } catch (err) {
         console.error('Failed to save to Supabase, falling back to local:', err)
@@ -187,6 +199,9 @@ export const notesService = {
         tags: row.tags || [],
         createdAt: row.created_at,
         updatedAt: row.updated_at,
+        xPosition: row.x_position !== null ? Number(row.x_position) : undefined,
+        yPosition: row.y_position !== null ? Number(row.y_position) : undefined,
+        noteTitle: row.note_title || undefined,
       }))
     } else {
       return this.getAllLocalNotes(user.id)
@@ -238,6 +253,9 @@ export const notesService = {
           isBookmarked: note.isBookmarked,
           tags: note.tags,
           updatedAt: now,
+          xPosition: note.xPosition,
+          yPosition: note.yPosition,
+          noteTitle: note.noteTitle,
         }
         allNotes[idx] = saved
       } else {
@@ -254,6 +272,9 @@ export const notesService = {
           tags: note.tags,
           createdAt: now,
           updatedAt: now,
+          xPosition: note.xPosition,
+          yPosition: note.yPosition,
+          noteTitle: note.noteTitle,
         }
         allNotes.push(saved)
       }
@@ -271,6 +292,9 @@ export const notesService = {
         tags: note.tags,
         createdAt: now,
         updatedAt: now,
+        xPosition: note.xPosition,
+        yPosition: note.yPosition,
+        noteTitle: note.noteTitle,
       }
       allNotes.push(saved)
     }
