@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react'
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ROUTES } from '../../constants/routes'
@@ -10,104 +10,78 @@ import {
   Plus,
   Play,
   Star,
-  BookMarked,
   Info,
   List,
   Grid,
-  ArrowUpDown,
-  X,
-  Heart,
-  FolderHeart,
   Trash2,
-  CheckCircle,
+  Download,
+  FolderOpen,
+  MoreVertical,
+  Edit2,
+  Calendar,
+  X,
 } from 'lucide-react'
 import { Button } from '../../components/common/Button'
-import { formatBytes } from '../../utils/helpers'
 
-type FilterType = 'all' | 'reading' | 'completed' | 'favorites' | 'pdf' | 'epub' | 'recent'
 type SortType = 'newest' | 'oldest' | 'a-z' | 'recently-opened'
 
 export const LibraryPage: React.FC = () => {
   const [books, setBooks] = useState<Book[]>([])
   const [collections, setCollections] = useState<Collection[]>([])
-  const [bookCollections, setBookCollections] = useState<Record<string, string[]>>({})
-  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [isEmptyState, setIsEmptyState] = useState(false)
   const [isSkeletonLoading, setIsSkeletonLoading] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [searchQuery, setSearchQuery] = useState('')
-  const [activeFilter, setActiveFilter] = useState<FilterType>('all')
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string>('all')
+  const [selectedAuthor, setSelectedAuthor] = useState<string>('all')
   const [sortBy, setSortBy] = useState<SortType>('newest')
-  const [selectedBook, setSelectedBook] = useState<Book | null>(null)
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  const [recentThreshold] = useState(() => Date.now() - 7 * 24 * 60 * 60 * 1000)
 
-  // Pagination states
-  const [page, setPage] = useState(1)
-  const pageSize = 12
+  // Context Menu & Modal States
+  const [activeMenuBookId, setActiveMenuBookId] = useState<string | null>(null)
+  const [renamingBook, setRenamingBook] = useState<Book | null>(null)
+  const [renameTitleInput, setRenameTitleInput] = useState('')
+  const [movingBook, setMovingBook] = useState<Book | null>(null)
+  const [movingCollectionId, setMovingCollectionId] = useState('')
 
-  const fetchBooksAndCollections = async () => {
-    try {
-      const booksData = await booksService.getBooks()
-      const cols = await collectionsService.getCollections()
-      setCollections(cols)
+  const menuRef = useRef<HTMLDivElement | null>(null)
 
-      const associations = await collectionsService.getBookCollectionsMap()
-      booksData.forEach((book) => {
-        if (book.collectionId) {
-          if (!associations[book.id]) associations[book.id] = []
-          if (!associations[book.id].includes(book.collectionId)) {
-            associations[book.id].push(book.collectionId)
-          }
-        }
-      })
-
-      setBookCollections(associations)
-      setBooks(booksData)
-      setLoading(false)
-    } catch (err) {
-      console.error('Failed to fetch library details:', err)
-      setErrorMsg('Failed to load library collection. Please check your network connection.')
-      setLoading(false)
-    }
-  }
+  const fetchBooksAndCollections = useCallback(() => {
+    Promise.all([booksService.getBooks(), collectionsService.getCollections()]).then(
+      ([booksData, cols]) => {
+        setCollections(cols)
+        setBooks(booksData)
+      }
+    )
+  }, [])
 
   useEffect(() => {
     let active = true
-    const load = async () => {
-      try {
-        const booksData = await booksService.getBooks()
-        const cols = await collectionsService.getCollections()
+    Promise.all([booksService.getBooks(), collectionsService.getCollections()])
+      .then(([booksData, cols]) => {
         if (!active) return
         setCollections(cols)
-
-        const associations = await collectionsService.getBookCollectionsMap()
-        booksData.forEach((book) => {
-          if (book.collectionId) {
-            if (!associations[book.id]) associations[book.id] = []
-            if (!associations[book.id].includes(book.collectionId)) {
-              associations[book.id].push(book.collectionId)
-            }
-          }
-        })
-
-        if (!active) return
-        setBookCollections(associations)
         setBooks(booksData)
         setLoading(false)
-      } catch (err) {
-        console.error('Failed to fetch library details:', err)
-        if (active) {
-          setErrorMsg('Failed to load library collection. Please check your network connection.')
-          setLoading(false)
-        }
-      }
-    }
-    load()
+      })
+      .catch((err) => {
+        console.error(err)
+        if (active) setLoading(false)
+      })
     return () => {
       active = false
     }
+  }, [])
+
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setActiveMenuBookId(null)
+      }
+    }
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
   }, [])
 
   const toggleStar = async (id: string, e: React.MouseEvent) => {
@@ -115,45 +89,47 @@ export const LibraryPage: React.FC = () => {
     try {
       const isFav = await booksService.toggleFavorite(id)
       setBooks((prev) => prev.map((b) => (b.id === id ? { ...b, isFavorite: isFav } : b)))
-      if (selectedBook && selectedBook.id === id) {
-        setSelectedBook((prev) => (prev ? { ...prev, isFavorite: isFav } : null))
-      }
+      setActiveMenuBookId(null)
     } catch (err) {
       console.error(err)
     }
   }
 
-  const handleDeleteBook = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this book?')) return
+  const handleDeleteBook = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!confirm('Are you sure you want to delete this book? This will permanently remove it.'))
+      return
     try {
       await booksService.deleteBook(id)
-      setSelectedBook(null)
+      fetchBooksAndCollections()
+      setActiveMenuBookId(null)
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const handleRenameSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!renamingBook || !renameTitleInput.trim()) return
+    try {
+      await booksService.renameBook(renamingBook.id, renameTitleInput.trim())
+      setRenamingBook(null)
       fetchBooksAndCollections()
     } catch (err) {
       console.error(err)
     }
   }
 
-  const handleToggleCollection = async (collectionId: string, bookId: string) => {
+  const handleMoveSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!movingBook) return
     try {
-      const inCol = bookCollections[bookId]?.includes(collectionId)
-      if (inCol) {
-        await collectionsService.removeBookFromCollection(collectionId, bookId)
-        setBookCollections((prev) => ({
-          ...prev,
-          [bookId]: prev[bookId].filter((id) => id !== collectionId),
-        }))
-      } else {
-        await collectionsService.addBookToCollection(collectionId, bookId)
-        setBookCollections((prev) => ({
-          ...prev,
-          [bookId]: [...(prev[bookId] || []), collectionId],
-        }))
-      }
-      const cols = await collectionsService.getCollections()
-      setCollections(cols)
+      const targetColId = movingCollectionId === 'none' ? null : movingCollectionId
+      await booksService.updateBookCollection(movingBook.id, targetColId)
+      setMovingBook(null)
+      fetchBooksAndCollections()
     } catch (err) {
-      console.error('Failed to toggle book collection membership:', err)
+      console.error(err)
     }
   }
 
@@ -165,16 +141,17 @@ export const LibraryPage: React.FC = () => {
     [collections]
   )
 
+  // Extract unique authors
+  const uniqueAuthors = useMemo(() => {
+    const authorsSet = new Set(books.map((b) => b.author).filter(Boolean))
+    return Array.from(authorsSet)
+  }, [books])
+
   // Filter & Sort Logic
   const filteredBooks = useMemo(() => {
     const result = books.filter((book) => {
-      if (selectedCollectionId) {
-        const belongs = bookCollections[book.id]?.includes(selectedCollectionId)
-        if (!belongs) return false
-      }
-
+      // 1. Search Query
       const categoryName = getCollectionName(book.collectionId)
-
       const matchesSearch =
         book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         book.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -182,46 +159,34 @@ export const LibraryPage: React.FC = () => {
 
       if (!matchesSearch) return false
 
-      if (activeFilter === 'reading') return book.progress > 0 && book.progress < 100
-      if (activeFilter === 'completed') return book.progress === 100
-      if (activeFilter === 'favorites') return book.isFavorite
-      if (activeFilter === 'pdf') return book.filePath.toLowerCase().split('?')[0].endsWith('.pdf')
-      if (activeFilter === 'epub')
-        return book.filePath.toLowerCase().split('?')[0].endsWith('.epub')
-      if (activeFilter === 'recent') {
-        const addedTime = new Date(book.createdAt).getTime()
-        return addedTime > recentThreshold
+      // 2. Collection Filter
+      if (selectedCollectionId !== 'all') {
+        if (book.collectionId !== selectedCollectionId) return false
+      }
+
+      // 3. Author Filter
+      if (selectedAuthor !== 'all') {
+        if (book.author !== selectedAuthor) return false
       }
 
       return true
     })
 
-    // Sort mappings
+    // 4. Sorting
     return result.sort((a, b) => {
       if (sortBy === 'a-z') return a.title.localeCompare(b.title)
       if (sortBy === 'oldest')
         return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
       if (sortBy === 'newest')
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      if (sortBy === 'recently-opened')
-        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      if (sortBy === 'recently-opened') {
+        const timeA = new Date(a.lastReadAt || a.updatedAt || a.createdAt).getTime()
+        const timeB = new Date(b.lastReadAt || b.updatedAt || b.createdAt).getTime()
+        return timeB - timeA
+      }
       return 0
     })
-  }, [
-    books,
-    searchQuery,
-    activeFilter,
-    sortBy,
-    recentThreshold,
-    selectedCollectionId,
-    bookCollections,
-    getCollectionName,
-  ])
-
-  // Paginated books for display
-  const paginatedBooks = useMemo(() => {
-    return filteredBooks.slice(0, page * pageSize)
-  }, [filteredBooks, page, pageSize])
+  }, [books, searchQuery, selectedCollectionId, selectedAuthor, sortBy, getCollectionName])
 
   const handleSimulateLoader = () => {
     setIsSkeletonLoading(true)
@@ -230,45 +195,6 @@ export const LibraryPage: React.FC = () => {
     }, 1500)
   }
 
-  const filterPills: { id: FilterType; label: string }[] = [
-    { id: 'all', label: 'All Books' },
-    { id: 'favorites', label: 'Favorites' },
-    { id: 'reading', label: 'Reading' },
-    { id: 'completed', label: 'Completed' },
-    { id: 'pdf', label: 'PDF' },
-    { id: 'epub', label: 'EPUB' },
-    { id: 'recent', label: 'Recently Added' },
-  ]
-
-  // Stats calculation
-  const totalBooks = books.length
-  const currentlyReading = books.filter((b) => b.progress > 0 && b.progress < 100).length
-  const completedBooks = books.filter((b) => b.progress === 100).length
-  const favoritesCount = books.filter((b) => b.isFavorite).length
-
-  const statsData = [
-    { title: 'Total Books', value: String(totalBooks), icon: BookOpen, color: 'text-indigo-500' },
-    {
-      title: 'Currently Reading',
-      value: String(currentlyReading),
-      icon: BookMarked,
-      color: 'text-cyan-500',
-    },
-    {
-      title: 'Completed Books',
-      value: String(completedBooks),
-      icon: CheckCircle,
-      color: 'text-emerald-500',
-    },
-    { title: 'Favorites', value: String(favoritesCount), icon: Heart, color: 'text-red-500' },
-  ]
-
-  const recentlyOpened = useMemo(() => {
-    return [...books]
-      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-      .slice(0, 3)
-  }, [books])
-
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     e.currentTarget.src =
       'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=300&q=80'
@@ -276,33 +202,36 @@ export const LibraryPage: React.FC = () => {
 
   return (
     <div className="relative min-h-screen space-y-8 pb-20 text-left select-none">
-      {/* Error Alert Display */}
-      {errorMsg && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs font-semibold text-red-600 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400">
-          Error: {errorMsg}
-        </div>
-      )}
-
       {/* Simulation Tools Row */}
-      <div className="bg-bg-surface border-border-base flex flex-wrap items-center justify-between gap-4 rounded-2xl border p-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-100 bg-white/80 p-4 shadow-xs backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/80">
         <div className="text-text-sub flex items-center gap-2 text-xs font-semibold">
-          <Info className="text-primary-500 h-4.5 w-4.5 shrink-0" />
-          <span>Interactive UI Demos: Toggle empty states or skeleton layouts.</span>
+          <Info className="h-4.5 w-4.5 shrink-0 text-purple-600" />
+          <span>Interactive UI Demos: Toggle empty states or skeleton layouts below.</span>
         </div>
         <div className="flex gap-2">
           <button
             onClick={handleSimulateLoader}
-            className="border-border-base bg-bg-app text-text-sub hover:bg-bg-surface cursor-pointer rounded-lg border px-3.5 py-1.5 text-xs font-bold transition-colors"
+            className="cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             Simulate Loading Skeletons
           </button>
           <button
             onClick={() => setIsEmptyState(!isEmptyState)}
-            className={`cursor-pointer rounded-lg border px-3.5 py-1.5 text-xs font-bold transition-all ${isEmptyState ? 'bg-primary-600 border-primary-600 text-white' : 'bg-bg-app border-border-base text-text-sub hover:bg-bg-surface'} `}
+            className={`cursor-pointer rounded-xl border px-3.5 py-1.5 text-xs font-bold transition-all ${isEmptyState ? 'border-purple-600 bg-purple-600 text-white' : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-800'} `}
           >
             {isEmptyState ? 'Show Real Library' : 'Show Empty States'}
           </button>
         </div>
+      </div>
+
+      {/* Header Section */}
+      <div className="space-y-1">
+        <h1 className="font-sans text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
+          My Library
+        </h1>
+        <p className="text-sm font-semibold tracking-wider text-slate-500 dark:text-slate-400">
+          Manage, organize and access all your books.
+        </p>
       </div>
 
       <AnimatePresence mode="wait">
@@ -317,11 +246,11 @@ export const LibraryPage: React.FC = () => {
             {Array.from({ length: 4 }).map((_, idx) => (
               <div
                 key={idx}
-                className="border-border-base bg-bg-surface flex h-64 animate-pulse flex-col justify-between rounded-2xl border p-4"
+                className="flex h-64 animate-pulse flex-col justify-between rounded-3xl border border-slate-100 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
               >
-                <div className="bg-border-light h-32 rounded" />
-                <div className="bg-border-light mt-4 h-4 w-2/3 rounded" />
-                <div className="bg-border-light h-3 w-1/3 rounded" />
+                <div className="h-32 rounded bg-slate-100 dark:bg-slate-800" />
+                <div className="mt-4 h-4 w-2/3 rounded bg-slate-100 dark:bg-slate-800" />
+                <div className="h-3 w-1/3 rounded bg-slate-100 dark:bg-slate-800" />
               </div>
             ))}
           </motion.div>
@@ -332,15 +261,17 @@ export const LibraryPage: React.FC = () => {
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="border-border-base bg-bg-surface mx-auto max-w-xl space-y-6 rounded-3xl border-2 border-dashed p-12 text-center"
+            className="mx-auto max-w-xl space-y-6 rounded-3xl border-2 border-dashed border-slate-100 bg-white p-12 text-center dark:border-slate-800 dark:bg-slate-900"
           >
-            <div className="bg-primary-50 text-primary-600 dark:bg-primary-500/10 mx-auto flex h-14 w-14 items-center justify-center rounded-full">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-purple-50 text-purple-600 dark:bg-purple-950/20">
               <BookOpen className="h-7 w-7" />
             </div>
             <div className="space-y-2">
-              <h3 className="text-text-main text-lg font-bold">No books found</h3>
-              <p className="text-text-sub mx-auto max-w-xs text-xs leading-relaxed">
-                Upload your first book to start building your library.
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                📚 Your library is empty
+              </h3>
+              <p className="mx-auto max-w-xs text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                Upload your first book to start building your personal library.
               </p>
             </div>
             <Link to={ROUTES.UPLOAD} className="inline-block">
@@ -353,606 +284,496 @@ export const LibraryPage: React.FC = () => {
             key="library-canvas"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="space-y-10"
+            className="space-y-6"
           >
-            {/* Header section */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h1 className="text-text-main font-sans text-2xl font-extrabold tracking-tight sm:text-3xl">
-                  My Library
-                </h1>
-                <p className="text-text-muted mt-1 text-xs font-semibold tracking-wider uppercase">
-                  Manage and organize your personal digital collection.
-                </p>
-              </div>
-
-              <div className="flex gap-3">
-                <Link to={ROUTES.UPLOAD}>
-                  <Button size="sm" variant="outline" leftIcon={<Plus className="h-4 w-4" />}>
-                    Upload Book
-                  </Button>
-                </Link>
-              </div>
-            </div>
-
-            {/* Statistics row */}
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              {statsData.map((stat, idx) => (
-                <motion.div
-                  key={idx}
-                  whileHover={{ y: -3 }}
-                  className="bg-bg-surface border-border-base hover:border-primary-500/20 flex flex-col justify-between rounded-2xl border p-4 shadow-sm transition-all"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-text-muted text-[9px] leading-none font-bold tracking-wider uppercase">
-                      {stat.title}
-                    </span>
-                    <stat.icon className={`h-4 w-4 ${stat.color} shrink-0`} />
-                  </div>
-                  <h3 className="text-text-main mt-3 text-2xl leading-none font-extrabold">
-                    {stat.value}
-                  </h3>
-                </motion.div>
-              ))}
-            </div>
-
-            {/* Recently Opened Scroll */}
-            {recentlyOpened.length > 0 && (
-              <div>
-                <h3 className="text-text-muted mb-4 text-sm font-bold tracking-wider uppercase">
-                  Recently Opened
-                </h3>
-                <div className="flex scrollbar-thin gap-4 overflow-x-auto pb-4 select-none">
-                  {recentlyOpened.map((book) => (
-                    <div
-                      key={book.id}
-                      onClick={() => setSelectedBook(book)}
-                      className="bg-bg-surface border-border-base hover:border-primary-500/20 flex w-64 flex-shrink-0 cursor-pointer gap-4 rounded-2xl border p-3 text-left shadow-sm transition-all"
-                    >
-                      <img
-                        src={
-                          book.coverPath ||
-                          'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=300&q=80'
-                        }
-                        alt={book.title}
-                        onError={handleImageError}
-                        className="border-border-light aspect-[0.7/1] w-12 shrink-0 rounded border object-cover shadow-sm"
-                      />
-                      <div className="flex min-w-0 flex-col justify-between">
-                        <div>
-                          <h4 className="text-text-main truncate text-xs font-bold">
-                            {book.title}
-                          </h4>
-                          <p className="text-text-muted mt-0.5 truncate text-[10px]">
-                            {book.author}
-                          </p>
-                        </div>
-                        <Link
-                          to={ROUTES.READER.replace(':id', book.id)}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <button className="text-primary-600 flex items-center gap-1 text-[9px] font-bold uppercase hover:underline">
-                            <Play className="fill-primary-600 stroke-primary-600 h-3 w-3" />
-                            Open
-                          </button>
-                        </Link>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Filters and Sorting Toolbar */}
-            <div className="border-border-base flex flex-col justify-between gap-4 border-b pb-4 md:flex-row md:items-center">
-              <div className="flex flex-wrap items-center gap-1.5">
-                {filterPills.map((pill) => (
-                  <button
-                    key={pill.id}
-                    onClick={() => {
-                      setActiveFilter(pill.id)
-                      setPage(1)
-                    }}
-                    className={`cursor-pointer rounded-lg border px-3.5 py-1.5 text-xs font-bold tracking-wider uppercase transition-all ${
-                      activeFilter === pill.id
-                        ? 'bg-primary-600 border-primary-600 shadow-primary-500/10 text-white shadow-sm'
-                        : 'bg-bg-surface border-border-base text-text-sub hover:bg-bg-app'
-                    } `}
-                  >
-                    {pill.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Search and Sort */}
-              <div className="flex items-center gap-3 self-stretch md:self-auto">
-                <div className="relative flex-1 rounded-lg shadow-sm md:w-60 md:flex-none">
-                  <div className="text-text-muted pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
-                    <Search className="h-4 w-4" />
-                  </div>
+            {/* Top Toolbar */}
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-100 bg-white/60 p-4 shadow-xs backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/60">
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+                {/* Search Bar */}
+                <div className="relative w-full max-w-xs shrink-0">
+                  <Search className="absolute top-2.5 left-3.5 h-4.5 w-4.5 text-slate-400" />
                   <input
                     type="text"
+                    placeholder="Search Books..."
                     value={searchQuery}
-                    onChange={(e) => {
-                      setSearchQuery(e.target.value)
-                      setPage(1)
-                    }}
-                    placeholder="Search books..."
-                    className="border-border-base bg-bg-surface text-text-main placeholder:text-text-muted focus:border-primary-500 focus:ring-primary-500/10 block w-full rounded-lg border py-1.5 pr-3 pl-8 text-xs transition-all focus:ring-2 focus:outline-none"
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 py-2 pr-4 pl-10 text-xs font-semibold text-slate-900 placeholder-slate-400 outline-hidden transition-all focus:border-purple-600 focus:bg-white dark:border-slate-800 dark:bg-slate-800/40 dark:text-white"
                   />
                 </div>
 
-                <div className="border-border-base bg-bg-surface relative flex items-center rounded-lg border px-2 py-1">
-                  <ArrowUpDown className="text-text-muted mr-1.5 h-3.5 w-3.5" />
-                  <select
-                    value={sortBy}
-                    onChange={(e) => {
-                      setSortBy(e.target.value as SortType)
-                      setPage(1)
-                    }}
-                    className="text-text-sub cursor-pointer border-none bg-transparent pr-4 text-xs font-bold focus:outline-none"
-                  >
-                    <option value="newest">Newest</option>
-                    <option value="oldest">Oldest</option>
-                    <option value="a-z">A - Z</option>
-                    <option value="recently-opened">Recently Opened</option>
-                  </select>
-                </div>
+                {/* Collection Filter */}
+                <select
+                  value={selectedCollectionId}
+                  onChange={(e) => setSelectedCollectionId(e.target.value)}
+                  className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-bold text-slate-700 outline-hidden transition-all dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300"
+                >
+                  <option value="all">📁 All Collections</option>
+                  {collections.map((col) => (
+                    <option key={col.id} value={col.id}>
+                      {col.name}
+                    </option>
+                  ))}
+                </select>
 
-                <div className="border-border-base bg-bg-surface flex overflow-hidden rounded-lg border">
+                {/* Author Filter */}
+                <select
+                  value={selectedAuthor}
+                  onChange={(e) => setSelectedAuthor(e.target.value)}
+                  className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-bold text-slate-700 outline-hidden transition-all dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300"
+                >
+                  <option value="all">✍ All Authors</option>
+                  {uniqueAuthors.map((author) => (
+                    <option key={author} value={author}>
+                      {author}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Sort dropdown */}
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortType)}
+                  className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-bold text-slate-700 outline-hidden transition-all dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300"
+                >
+                  <option value="newest">↕ Newest Added</option>
+                  <option value="oldest">↕ Oldest Added</option>
+                  <option value="a-z">↕ Alphabetical (A-Z)</option>
+                  <option value="recently-opened">↕ Recently Opened</option>
+                </select>
+              </div>
+
+              <div className="flex shrink-0 items-center gap-3">
+                {/* Grid/List Toggle */}
+                <div className="flex rounded-2xl border border-slate-200 bg-slate-50/50 p-1 dark:border-slate-800 dark:bg-slate-800/40">
                   <button
                     onClick={() => setViewMode('grid')}
-                    className={`hover:bg-bg-app cursor-pointer p-1.5 ${viewMode === 'grid' ? 'bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400' : 'text-text-muted'}`}
+                    className={`cursor-pointer rounded-xl p-1.5 transition-all ${viewMode === 'grid' ? 'bg-white text-purple-600 shadow-xs dark:bg-slate-800 dark:text-white' : 'text-slate-400 hover:text-slate-600'} `}
+                    title="Grid View"
                   >
                     <Grid className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => setViewMode('list')}
-                    className={`hover:bg-bg-app cursor-pointer p-1.5 ${viewMode === 'list' ? 'bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400' : 'text-text-muted'}`}
+                    className={`cursor-pointer rounded-xl p-1.5 transition-all ${viewMode === 'list' ? 'bg-white text-purple-600 shadow-xs dark:bg-slate-800 dark:text-white' : 'text-slate-400 hover:text-slate-600'} `}
+                    title="List View"
                   >
                     <List className="h-4 w-4" />
                   </button>
                 </div>
+
+                {/* Upload Book button */}
+                <Link to={ROUTES.UPLOAD}>
+                  <Button leftIcon={<Plus className="h-4 w-4" />}>Upload Book</Button>
+                </Link>
               </div>
             </div>
 
-            {selectedCollectionId && (
-              <div className="bg-primary-50 dark:bg-primary-500/10 border-primary-200 dark:border-primary-500/20 text-text-main mb-6 flex items-center justify-between rounded-xl border p-3.5 text-xs font-semibold">
-                <div className="flex items-center gap-2">
-                  <FolderHeart className="text-primary-600 h-4.5 w-4.5" />
-                  <span>
-                    Showing collection:{' '}
-                    <strong className="uppercase">
-                      {collections.find((c) => c.id === selectedCollectionId)?.name || 'Unknown'}
-                    </strong>
-                  </span>
-                </div>
-                <button
-                  onClick={() => setSelectedCollectionId(null)}
-                  className="text-text-muted hover:text-text-main cursor-pointer"
-                >
-                  <X className="h-4.5 w-4.5" />
-                </button>
+            {/* Book Display List/Grid Canvas */}
+            {filteredBooks.length === 0 ? (
+              <div className="flex h-48 items-center justify-center rounded-3xl border border-dashed border-slate-100 bg-white/40 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900/40">
+                <span>No books match your criteria. Try adjusting filters or search string.</span>
               </div>
-            )}
-
-            {/* Books display area (Grid / List views) */}
-            <AnimatePresence mode="wait">
-              {filteredBooks.length === 0 ? (
-                <motion.div
-                  key="no-filter-match"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-text-sub border-border-base bg-bg-surface/30 space-y-2 rounded-2xl border border-dashed py-12 text-center"
-                >
-                  <FolderHeart className="text-text-muted mx-auto h-8 w-8" />
-                  <p className="text-xs font-bold">No matching books found</p>
-                </motion.div>
-              ) : viewMode === 'grid' ? (
-                /* Grid layout */
-                <motion.div
-                  key="grid-shelf"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
-                >
-                  {paginatedBooks.map((book) => {
-                    return (
-                      <motion.div
-                        key={book.id}
-                        whileHover={{ y: -4 }}
-                        onClick={() => setSelectedBook(book)}
-                        className="bg-bg-surface border-border-base hover:border-primary-500/20 flex h-64 cursor-pointer flex-col justify-between rounded-2xl border p-4 text-left shadow-sm transition-all hover:shadow-md"
-                      >
-                        <div className="flex gap-4">
-                          <img
-                            src={
-                              book.coverPath ||
-                              'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=300&q=80'
-                            }
-                            alt={book.title}
-                            onError={handleImageError}
-                            className="border-border-light aspect-[0.7/1] w-16 shrink-0 rounded border object-cover shadow"
+            ) : viewMode === 'grid' ? (
+              /* Grid Layout Rendering */
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                {filteredBooks.map((book) => (
+                  <div
+                    key={book.id}
+                    className="group/card relative flex flex-col justify-between rounded-3xl border border-slate-100 bg-white p-4.5 text-left shadow-xs transition-all duration-300 hover:border-purple-500/20 hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    <div className="relative aspect-[0.7/1] w-full animate-none overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 shadow-xs dark:border-slate-800 dark:bg-slate-950/20">
+                      <img
+                        src={book.coverPath}
+                        alt={book.title}
+                        onError={handleImageError}
+                        className="h-full w-full object-cover transition-transform duration-500 group-hover/card:scale-105"
+                      />
+                      {/* Action buttons drawer overlay */}
+                      <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 opacity-100 transition-opacity duration-200 md:opacity-0 md:group-hover/card:opacity-100">
+                        <button
+                          onClick={(e) => toggleStar(book.id, e)}
+                          className="flex h-7.5 w-7.5 cursor-pointer items-center justify-center rounded-xl border border-slate-100/50 bg-white/95 text-slate-400 shadow-sm backdrop-blur-xs transition-colors hover:text-amber-500 dark:border-slate-800/50 dark:bg-slate-900/95"
+                        >
+                          <Star
+                            className={`h-4.5 w-4.5 ${book.isFavorite ? 'fill-amber-400 text-amber-400' : ''}`}
                           />
-                          <div className="min-w-0 flex-1 space-y-1.5">
-                            <div className="flex flex-wrap gap-1.5">
-                              <span className="bg-primary-50 dark:bg-primary-500/10 text-primary-600 inline-block rounded px-1.5 py-0.5 text-[8.5px] font-bold tracking-wider uppercase">
-                                {getCollectionName(book.collectionId)}
-                              </span>
-                              {book.progress === 100 && (
-                                <span className="inline-block rounded bg-emerald-50 px-1.5 py-0.5 text-[8.5px] font-bold tracking-wider text-emerald-600 uppercase dark:bg-emerald-500/10">
-                                  Completed
-                                </span>
-                              )}
-                            </div>
-                            <h4 className="text-text-main truncate text-xs font-bold">
-                              {book.title}
-                            </h4>
-                            <p className="text-text-sub truncate text-[10px]">By {book.author}</p>
-                            {book.lastReadAt && (
-                              <p className="text-text-muted mt-0.5 font-mono text-[8px] leading-none">
-                                Opened {new Date(book.lastReadAt).toLocaleDateString()}
-                              </p>
-                            )}
-                          </div>
-                        </div>
+                        </button>
+                        <div className="relative">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setActiveMenuBookId(activeMenuBookId === book.id ? null : book.id)
+                            }}
+                            className="flex h-7.5 w-7.5 cursor-pointer items-center justify-center rounded-xl border border-slate-100/50 bg-white/95 text-slate-500 shadow-sm backdrop-blur-xs transition-colors hover:text-slate-700 dark:border-slate-800/50 dark:bg-slate-900/95 dark:hover:text-white"
+                          >
+                            <MoreVertical className="h-4.5 w-4.5" />
+                          </button>
 
-                        {/* Progress and bottom actions bar */}
-                        <div className="border-border-light mt-3 space-y-3 border-t pt-3">
-                          <div>
-                            <div className="text-text-sub mb-1 flex justify-between text-[8px] font-semibold tracking-wider uppercase">
-                              <span>Pages read</span>
-                              <span>{book.progress}%</span>
-                            </div>
-                            <div className="bg-border-light h-1.5 w-full overflow-hidden rounded-full">
-                              <div
-                                className="bg-primary-600 h-full"
-                                style={{ width: `${book.progress}%` }}
-                              />
-                            </div>
-                          </div>
-
-                          <div className="flex items-center justify-between">
-                            <button
-                              onClick={(e) => toggleStar(book.id, e)}
-                              className="border-border-base bg-bg-surface text-text-muted hover:bg-bg-app flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border"
+                          {/* Context menu */}
+                          {activeMenuBookId === book.id && (
+                            <div
+                              ref={menuRef}
+                              className="absolute top-9 right-0 z-40 w-44 rounded-2xl border border-slate-100 bg-white p-1.5 text-xs font-semibold shadow-xl dark:border-slate-800 dark:bg-slate-950"
                             >
-                              <Star
-                                className={`h-4 w-4 ${book.isFavorite ? 'fill-amber-400 text-amber-400' : 'text-text-muted'}`}
-                              />
-                            </button>
-
-                            <div className="flex gap-1.5">
-                              <Link
-                                to={ROUTES.READER.replace(':id', book.id)}
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <button className="bg-primary-600 hover:bg-primary-700 flex h-7 cursor-pointer items-center rounded-lg px-3.5 text-[9px] font-bold tracking-wider text-white uppercase transition-colors">
-                                  Read
+                              <Link to={ROUTES.READER.replace(':id', book.id)}>
+                                <button className="flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-left text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800">
+                                  <Play className="h-3.5 w-3.5 fill-current text-purple-600" />
+                                  Open
                                 </button>
                               </Link>
+                              <button
+                                onClick={() => {
+                                  setMovingBook(book)
+                                  setMovingCollectionId(book.collectionId || 'none')
+                                  setActiveMenuBookId(null)
+                                }}
+                                className="flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-left text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                              >
+                                <FolderOpen className="h-3.5 w-3.5 text-blue-600" />
+                                Move to Collection
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setRenamingBook(book)
+                                  setRenameTitleInput(book.title)
+                                  setActiveMenuBookId(null)
+                                }}
+                                className="flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-left text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                              >
+                                <Edit2 className="h-3.5 w-3.5 text-emerald-600" />
+                                Rename
+                              </button>
+                              <a
+                                href={book.filePath}
+                                download
+                                className="block"
+                                onClick={() => setActiveMenuBookId(null)}
+                              >
+                                <button className="flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-left text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800">
+                                  <Download className="h-3.5 w-3.5 text-cyan-600" />
+                                  Download
+                                </button>
+                              </a>
+                              <div className="dark:border-slate-850 my-1 border-t border-slate-50" />
+                              <button
+                                onClick={(e) => handleDeleteBook(book.id, e)}
+                                className="flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-left text-red-600 hover:bg-red-50/50 dark:text-red-400 dark:hover:bg-red-950/20"
+                              >
+                                <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                                Delete
+                              </button>
                             </div>
-                          </div>
+                          )}
                         </div>
-                      </motion.div>
-                    )
-                  })}
-                </motion.div>
-              ) : (
-                /* List layout */
-                <motion.div
-                  key="list-shelf"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className="bg-bg-surface border-border-base divide-border-light divide-y overflow-hidden rounded-2xl border shadow-sm"
-                >
-                  {paginatedBooks.map((book) => {
-                    return (
-                      <div
-                        key={book.id}
-                        onClick={() => setSelectedBook(book)}
-                        className="hover:bg-bg-app flex cursor-pointer items-center justify-between gap-4 p-4 text-left transition-colors"
-                      >
-                        <div className="flex min-w-0 flex-1 items-center gap-4">
-                          <img
-                            src={
-                              book.coverPath ||
-                              'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=300&q=80'
-                            }
-                            alt={book.title}
-                            onError={handleImageError}
-                            className="border-border-light aspect-[0.7/1] w-9 shrink-0 rounded border object-cover shadow-sm"
+                      </div>
+                    </div>
+
+                    <div className="mt-4 space-y-3">
+                      <div className="space-y-1">
+                        <span className="block w-fit rounded bg-purple-50 px-1.5 py-0.5 text-[8px] font-bold text-purple-600 uppercase dark:bg-purple-950/20">
+                          {getCollectionName(book.collectionId)}
+                        </span>
+                        <h4 className="truncate text-xs font-bold text-slate-950 dark:text-white">
+                          {book.title}
+                        </h4>
+                        <p className="truncate text-[10px] text-slate-500 dark:text-slate-400">
+                          By {book.author || 'Unknown'}
+                        </p>
+                      </div>
+
+                      {/* Reading Progress Indicator */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[9px] leading-none font-bold text-slate-400 uppercase">
+                          <span>Progress</span>
+                          <span>{book.progress}%</span>
+                        </div>
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                          <div
+                            className="h-full rounded-full bg-purple-600"
+                            style={{ width: `${book.progress}%` }}
                           />
-                          <div className="min-w-0 flex-1 items-center gap-4 sm:grid sm:grid-cols-2 md:grid-cols-3">
-                            <div>
-                              <h4 className="text-text-main truncate text-xs font-bold">
-                                {book.title}
-                              </h4>
-                              <p className="text-text-muted mt-0.5 truncate text-[10px]">
-                                By {book.author}
-                              </p>
-                              {book.lastReadAt && (
-                                <p className="text-text-muted mt-0.5 font-mono text-[8px] leading-none">
-                                  Opened {new Date(book.lastReadAt).toLocaleDateString()}
-                                </p>
-                              )}
-                            </div>
-                            <div className="hidden sm:flex sm:items-center sm:gap-2">
-                              <span className="text-text-sub text-[10px] font-semibold">
-                                {getCollectionName(book.collectionId)}
-                              </span>
-                              {book.progress === 100 && (
-                                <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[8px] leading-none font-bold tracking-wider text-emerald-600 uppercase dark:bg-emerald-500/10">
-                                  Completed
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-text-muted hidden font-mono text-[9px] md:inline-block">
-                              {formatBytes(book.fileSize)}
+                        </div>
+                      </div>
+
+                      {/* Metadata Last read date */}
+                      <div className="flex items-center gap-1 border-t border-slate-50 pt-1 text-[9px] font-semibold text-slate-400 dark:border-slate-800/40">
+                        <Calendar className="h-3.5 w-3.5 shrink-0" />
+                        <span>
+                          {book.lastReadAt
+                            ? `Read ${new Date(book.lastReadAt).toLocaleDateString()}`
+                            : 'Not read yet'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              /* List Layout Rendering */
+              <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                <table className="w-full border-collapse text-left text-xs text-slate-500 dark:text-slate-400">
+                  <thead className="border-b border-slate-50 bg-slate-50/40 text-[10px] font-bold tracking-wider uppercase dark:border-slate-800/40 dark:bg-slate-800/20">
+                    <tr>
+                      <th className="px-6 py-4.5">Book</th>
+                      <th className="px-6 py-4.5">Collection</th>
+                      <th className="px-6 py-4.5">Author</th>
+                      <th className="px-6 py-4.5">Progress</th>
+                      <th className="px-6 py-4.5">Last read</th>
+                      <th className="px-6 py-4.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50 dark:divide-slate-800/40">
+                    {filteredBooks.map((book) => (
+                      <tr
+                        key={book.id}
+                        className="transition-colors hover:bg-slate-50/30 dark:hover:bg-slate-800/20"
+                      >
+                        <td className="flex items-center gap-3 px-6 py-4">
+                          <img
+                            src={book.coverPath}
+                            alt=""
+                            onError={handleImageError}
+                            className="h-9 w-7 shrink-0 rounded object-cover shadow-xs"
+                          />
+                          <div className="min-w-0">
+                            <span className="block max-w-[200px] truncate font-bold text-slate-900 md:max-w-[320px] dark:text-white">
+                              {book.title}
                             </span>
                           </div>
-                        </div>
-
-                        {/* Progress and star */}
-                        <div className="flex shrink-0 items-center gap-6">
-                          <div className="hidden w-24 sm:block">
-                            <div className="text-text-sub mb-1 flex justify-between text-[8px] font-semibold uppercase">
-                              <span>Progress</span>
-                              <span>{book.progress}%</span>
-                            </div>
-                            <div className="bg-border-light h-1 w-full overflow-hidden rounded-full">
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="w-fit rounded bg-purple-50 px-1.5 py-0.5 text-[8px] font-bold text-purple-600 uppercase dark:bg-purple-950/20">
+                            {getCollectionName(book.collectionId)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 font-semibold text-slate-700 dark:text-slate-300">
+                          {book.author || 'Unknown'}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <div className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                               <div
-                                className="bg-primary-600 h-full"
+                                className="h-full rounded-full bg-purple-600"
                                 style={{ width: `${book.progress}%` }}
                               />
                             </div>
+                            <span className="text-[9px] font-bold text-slate-400">
+                              {book.progress}%
+                            </span>
                           </div>
+                        </td>
+                        <td className="px-6 py-4 font-semibold text-slate-400">
+                          {book.lastReadAt ? new Date(book.lastReadAt).toLocaleDateString() : '—'}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2.5">
+                            <button
+                              onClick={(e) => toggleStar(book.id, e)}
+                              className="flex items-center justify-center text-slate-400 hover:text-amber-500"
+                            >
+                              <Star
+                                className={`h-4 w-4 ${book.isFavorite ? 'fill-amber-400 text-amber-400' : ''}`}
+                              />
+                            </button>
+                            <div className="relative">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setActiveMenuBookId(activeMenuBookId === book.id ? null : book.id)
+                                }}
+                                className="flex items-center justify-center rounded-lg p-1.5 text-slate-500 hover:text-slate-700 dark:hover:text-white"
+                              >
+                                <MoreVertical className="h-4.5 w-4.5" />
+                              </button>
 
-                          <button
-                            onClick={(e) => toggleStar(book.id, e)}
-                            className="border-border-base bg-bg-surface text-text-muted hover:bg-bg-app flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border"
-                          >
-                            <Star
-                              className={`h-3.5 w-3.5 ${book.isFavorite ? 'fill-amber-400 text-amber-400' : 'text-text-muted'}`}
-                            />
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Pagination Load More control */}
-            {filteredBooks.length > paginatedBooks.length && (
-              <div className="flex justify-center pt-4">
-                <Button
-                  onClick={() => setPage((p) => p + 1)}
-                  variant="outline"
-                  size="sm"
-                  className="animate-fade-in font-bold tracking-wider uppercase"
-                >
-                  Load More Books
-                </Button>
+                              {/* Context menu */}
+                              {activeMenuBookId === book.id && (
+                                <div
+                                  ref={menuRef}
+                                  className="absolute top-9 right-0 z-40 w-44 rounded-2xl border border-slate-100 bg-white p-1.5 text-left text-xs font-semibold shadow-xl dark:border-slate-800 dark:bg-slate-950"
+                                >
+                                  <Link to={ROUTES.READER.replace(':id', book.id)}>
+                                    <button className="flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-left text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800">
+                                      <Play className="h-3.5 w-3.5 fill-current text-purple-600" />
+                                      Open
+                                    </button>
+                                  </Link>
+                                  <button
+                                    onClick={() => {
+                                      setMovingBook(book)
+                                      setMovingCollectionId(book.collectionId || 'none')
+                                      setActiveMenuBookId(null)
+                                    }}
+                                    className="flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-left text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                                  >
+                                    <FolderOpen className="h-3.5 w-3.5 text-blue-600" />
+                                    Move to Collection
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setRenamingBook(book)
+                                      setRenameTitleInput(book.title)
+                                      setActiveMenuBookId(null)
+                                    }}
+                                    className="flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-left text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                                  >
+                                    <Edit2 className="h-3.5 w-3.5 text-emerald-600" />
+                                    Rename
+                                  </button>
+                                  <a
+                                    href={book.filePath}
+                                    download
+                                    className="block"
+                                    onClick={() => setActiveMenuBookId(null)}
+                                  >
+                                    <button className="flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-left text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800">
+                                      <Download className="h-3.5 w-3.5 text-cyan-600" />
+                                      Download
+                                    </button>
+                                  </a>
+                                  <div className="dark:border-slate-85 my-1 border-t border-slate-50" />
+                                  <button
+                                    onClick={(e) => handleDeleteBook(book.id, e)}
+                                    className="flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-left text-red-600 hover:bg-red-50/50 dark:text-red-400 dark:hover:bg-red-950/20"
+                                  >
+                                    <Trash2 className="text-red-555 h-3.5 w-3.5" />
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
-
-            {/* Collections Section */}
-            <div>
-              <h3 className="text-text-muted mb-4 text-sm font-bold tracking-wider uppercase">
-                My Collections
-              </h3>
-              {collections.length === 0 ? (
-                <div className="border-border-base bg-bg-surface/30 text-text-sub rounded-2xl border border-dashed py-8 text-center text-xs">
-                  No collections created yet. Go to{' '}
-                  <Link to={ROUTES.COLLECTIONS} className="text-primary-600 hover:underline">
-                    Collections page
-                  </Link>{' '}
-                  to create one.
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                  {collections.map((col, idx) => {
-                    const gradients = [
-                      'from-blue-500 to-indigo-600',
-                      'from-purple-500 to-pink-600',
-                      'from-violet-500 to-fuchsia-600',
-                      'from-cyan-500 to-blue-600',
-                      'from-emerald-500 to-teal-600',
-                    ]
-                    const color = gradients[idx % gradients.length]
-                    return (
-                      <div
-                        key={col.id}
-                        onClick={() => setSelectedCollectionId(col.id)}
-                        className="group border-border-base bg-bg-surface hover:border-primary-500/20 flex h-36 cursor-pointer flex-col justify-between rounded-2xl border p-4 text-left shadow-sm transition-all hover:shadow-md"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div
-                            className={`h-12 w-12 rounded-xl bg-gradient-to-tr ${color} flex shrink-0 items-center justify-center text-white shadow-md`}
-                          >
-                            <BookOpen className="h-6 w-6" />
-                          </div>
-                          <span className="bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400 rounded px-1.5 py-0.5 text-[10px] font-bold">
-                            Collection
-                          </span>
-                        </div>
-                        <div className="mt-4 flex items-end justify-between">
-                          <h4 className="text-text-main truncate text-xs font-bold tracking-wider uppercase">
-                            {col.name}
-                          </h4>
-                          <span className="text-text-muted font-mono text-[10px] font-bold">
-                            {col.bookCount || 0} {col.bookCount === 1 ? 'Book' : 'Books'}
-                          </span>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Book Details Sliding Drawer Panel */}
+      {/* 1. Rename Modal */}
       <AnimatePresence>
-        {selectedBook && (
-          <div className="fixed inset-0 z-999 flex justify-end bg-slate-950/20 backdrop-blur-xs select-none">
-            <div className="absolute inset-0" onClick={() => setSelectedBook(null)} />
-
+        {renamingBook && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-999 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-xs"
+          >
             <motion.div
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ duration: 0.35, ease: 'easeOut' }}
-              className="bg-bg-surface border-border-base relative z-10 flex h-full w-full max-w-md flex-col justify-between overflow-y-auto border-l p-6 text-left shadow-2xl sm:p-8"
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              className="w-full max-w-sm rounded-3xl border border-slate-100 bg-white p-6 text-left shadow-2xl dark:border-slate-800 dark:bg-slate-900"
             >
-              <div className="space-y-6">
-                <div className="border-border-light flex items-center justify-between border-b pb-4">
-                  <span className="text-primary-600 text-xs font-bold tracking-widest uppercase">
-                    Book Details
-                  </span>
-                  <button
-                    onClick={() => setSelectedBook(null)}
-                    className="text-text-muted hover:bg-bg-app hover:text-text-main cursor-pointer rounded-lg p-1.5"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
-
-                <div className="flex items-start gap-5">
-                  <img
-                    src={
-                      selectedBook.coverPath ||
-                      'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=300&q=80'
-                    }
-                    alt={selectedBook.title}
-                    onError={handleImageError}
-                    className="border-border-light aspect-[0.7/1] w-24 shrink-0 rounded-lg border object-cover shadow-md"
-                  />
-                  <div className="min-w-0 flex-1 space-y-1.5">
-                    <span className="bg-primary-50 dark:bg-primary-500/10 text-primary-600 inline-block rounded px-1.5 py-0.5 text-[8px] font-bold tracking-wider uppercase">
-                      {getCollectionName(selectedBook.collectionId)}
-                    </span>
-                    <h3 className="text-text-main text-base leading-snug font-extrabold tracking-tight break-words">
-                      {selectedBook.title}
-                    </h3>
-                    <p className="text-text-sub text-xs font-semibold">By {selectedBook.author}</p>
-                    <div className="flex items-center gap-1.5 pt-1">
-                      <span className="text-text-muted font-mono text-[9px] font-bold">
-                        {selectedBook.totalPages} Pages
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <h4 className="text-text-muted text-[10px] font-bold tracking-wider uppercase">
-                    Synopsis
-                  </h4>
-                  <p className="text-text-sub font-sans text-xs leading-relaxed">
-                    {selectedBook.description || 'No description provided.'}
-                  </p>
-                </div>
-
-                <div className="space-y-3">
-                  <h4 className="text-text-muted text-[10px] font-bold tracking-wider uppercase">
-                    My Collections
-                  </h4>
-                  {collections.length === 0 ? (
-                    <p className="text-text-muted text-[10px] italic">
-                      No collections created yet. Go to{' '}
-                      <Link
-                        to={ROUTES.COLLECTIONS}
-                        onClick={() => setSelectedBook(null)}
-                        className="text-primary-600 hover:underline"
-                      >
-                        Collections page
-                      </Link>{' '}
-                      to create one.
-                    </p>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {collections.map((col) => {
-                        const inCollection =
-                          bookCollections[selectedBook.id]?.includes(col.id) || false
-                        return (
-                          <button
-                            key={col.id}
-                            onClick={() => handleToggleCollection(col.id, selectedBook.id)}
-                            className={`cursor-pointer rounded-lg border px-2.5 py-1 text-[10px] font-semibold transition-all ${
-                              inCollection
-                                ? 'bg-primary-50 border-primary-300 text-primary-700 dark:bg-primary-500/10 dark:border-primary-500/30 dark:text-primary-400'
-                                : 'border-border-base bg-bg-surface text-text-sub hover:bg-bg-app'
-                            }`}
-                          >
-                            {col.name}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                <div className="bg-bg-app border-border-light grid grid-cols-2 gap-4 rounded-xl border p-4">
-                  <div>
-                    <span className="text-text-muted block text-[8px] tracking-wider uppercase">
-                      Progress
-                    </span>
-                    <span className="text-text-main mt-0.5 block text-xs font-bold">
-                      {selectedBook.progress}% Read
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-text-muted block text-[8px] tracking-wider uppercase">
-                      File Size
-                    </span>
-                    <span className="text-text-main mt-0.5 block text-xs font-bold">
-                      {formatBytes(selectedBook.fileSize)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Actions row */}
-              <div className="border-border-light mt-6 flex flex-col gap-3 border-t pt-6">
-                <div className="flex gap-3">
-                  <button
-                    onClick={(e) => {
-                      toggleStar(selectedBook.id, e)
-                    }}
-                    className="border-border-base bg-bg-surface text-text-sub hover:bg-bg-app flex h-10 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg border text-xs font-bold tracking-wider uppercase"
-                  >
-                    <Star
-                      className={`h-4.5 w-4.5 ${selectedBook.isFavorite ? 'fill-amber-400 text-amber-400' : 'text-text-muted'}`}
-                    />
-                    <span>Favorite</span>
-                  </button>
-                  <Link
-                    to={ROUTES.READER.replace(':id', selectedBook.id)}
-                    onClick={() => setSelectedBook(null)}
-                    className="flex-1"
-                  >
-                    <Button className="w-full justify-center py-2.5 text-xs font-bold tracking-wider uppercase">
-                      Read Book
-                    </Button>
-                  </Link>
-                </div>
-
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-sm font-bold tracking-wider text-slate-900 uppercase dark:text-white">
+                  Rename Book
+                </h3>
                 <button
-                  onClick={() => handleDeleteBook(selectedBook.id)}
-                  className="flex h-10 w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-red-50 text-xs font-bold tracking-wider text-red-600 uppercase hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400"
+                  onClick={() => setRenamingBook(null)}
+                  className="hover:text-slate-650 cursor-pointer rounded-lg p-1 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
-                  <Trash2 className="h-4 w-4" />
-                  <span>Delete Book</span>
+                  <X className="h-4.5 w-4.5" />
                 </button>
               </div>
+
+              <form onSubmit={handleRenameSubmit} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-bold tracking-widest text-slate-400 uppercase">
+                    Book Title
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={renameTitleInput}
+                    onChange={(e) => setRenameTitleInput(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-2 text-xs font-semibold text-slate-900 placeholder-slate-400 outline-hidden transition-all focus:border-purple-600 focus:bg-white dark:border-slate-800 dark:bg-slate-800/40 dark:text-white"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 border-t border-slate-50 pt-3 dark:border-slate-800/40">
+                  <Button size="sm" variant="outline" onClick={() => setRenamingBook(null)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    type="submit"
+                    className="rounded-xl bg-purple-600 text-white shadow-xs hover:bg-purple-700"
+                  >
+                    Save Changes
+                  </Button>
+                </div>
+              </form>
             </motion.div>
-          </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 2. Move to Collection Modal */}
+      <AnimatePresence>
+        {movingBook && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-999 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-xs"
+          >
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              className="w-full max-w-sm rounded-3xl border border-slate-100 bg-white p-6 text-left shadow-2xl dark:border-slate-800 dark:bg-slate-900"
+            >
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-sm font-bold tracking-wider text-slate-900 uppercase dark:text-white">
+                  Move to Collection
+                </h3>
+                <button
+                  onClick={() => setMovingBook(null)}
+                  className="hover:text-slate-650 cursor-pointer rounded-lg p-1 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                >
+                  <X className="h-4.5 w-4.5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleMoveSubmit} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-bold tracking-widest text-slate-400 uppercase">
+                    Choose Shelf
+                  </label>
+                  <select
+                    value={movingCollectionId}
+                    onChange={(e) => setMovingCollectionId(e.target.value)}
+                    className="w-full cursor-pointer rounded-2xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-bold text-slate-700 outline-hidden transition-all dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300"
+                  >
+                    <option value="none">Classics (Default)</option>
+                    {collections.map((col) => (
+                      <option key={col.id} value={col.id}>
+                        {col.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex justify-end gap-2 border-t border-slate-50 pt-3 dark:border-slate-800/40">
+                  <Button size="sm" variant="outline" onClick={() => setMovingBook(null)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    type="submit"
+                    className="rounded-xl bg-purple-600 text-white shadow-xs hover:bg-purple-700"
+                  >
+                    Confirm Move
+                  </Button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

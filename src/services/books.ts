@@ -353,6 +353,19 @@ export const booksService = {
     if (error) throw error
   },
 
+  async renameBook(id: string, newTitle: string): Promise<void> {
+    const { error } = await supabase.from('books').update({ title: newTitle }).eq('id', id)
+    if (error) throw error
+  },
+
+  async updateBookCollection(bookId: string, collectionId: string | null): Promise<void> {
+    const { error } = await supabase
+      .from('books')
+      .update({ category: collectionId })
+      .eq('id', bookId)
+    if (error) throw error
+  },
+
   async toggleFavorite(id: string): Promise<boolean> {
     const {
       data: { user },
