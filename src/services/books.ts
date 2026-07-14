@@ -53,7 +53,7 @@ export const booksService = {
     let rows = res.data || []
     let error = res.error
 
-    if (error && error.code === 'PGRST205') {
+    if (error) {
       const fallbackRes = await supabase
         .from('books')
         .select('*')
@@ -160,7 +160,7 @@ export const booksService = {
     let data = res.data
     let error = res.error
 
-    if (error && error.code === 'PGRST205') {
+    if (error) {
       const fallbackRes = await supabase.from('books').select('*').eq('id', id).single()
       data = fallbackRes.data
       error = fallbackRes.error
