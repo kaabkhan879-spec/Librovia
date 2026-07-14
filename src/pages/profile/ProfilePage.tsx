@@ -1,11 +1,9 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  User,
   ShieldAlert,
   CheckCircle,
   Award,
-  Flame,
   BookOpen,
   Clock,
   CheckCircle2,
@@ -14,7 +12,6 @@ import {
   Edit,
   Activity,
   Sparkles,
-  Info,
   Compass,
   ChevronRight,
   BookMarked,
@@ -23,13 +20,15 @@ import {
 } from 'lucide-react'
 import { Button } from '../../components/common/Button'
 import { useAuth } from '../../context/AuthContext'
+import { booksService, type Book } from '../../services/books'
+import { collectionsService, type Collection } from '../../services/collections'
 
 export const ProfilePage: React.FC = () => {
   const { user } = useAuth()
 
-  // Demo interactive states
-  const [isEmptyState, setIsEmptyState] = useState(false)
-  const [isSkeletonLoading, setIsSkeletonLoading] = useState(false)
+  const [books, setBooks] = useState<Book[]>([])
+  const [collections, setCollections] = useState<Collection[]>([])
+  const [loading, setLoading] = useState(true)
   const [showEditModal, setShowEditModal] = useState(false)
 
   // Local profile states (High-fidelity updates!)
@@ -46,6 +45,16 @@ export const ProfilePage: React.FC = () => {
   const [editBio, setEditBio] = useState(profileBio)
   const [editEmail, setEditEmail] = useState(profileEmail)
 
+  useEffect(() => {
+    Promise.all([booksService.getBooks(), collectionsService.getCollections()]).then(
+      ([booksData, colsData]) => {
+        setBooks(booksData)
+        setCollections(colsData)
+        setLoading(false)
+      }
+    )
+  }, [])
+
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setProfileName(editName)
@@ -55,65 +64,123 @@ export const ProfilePage: React.FC = () => {
     setShowEditModal(false)
   }
 
-  const handleSimulateLoader = () => {
-    setIsSkeletonLoading(true)
-    setTimeout(() => {
-      setIsSkeletonLoading(false)
-    }, 1500)
-  }
+  // --- STATS CALCULATION ---
+  const totalBooksRead = useMemo(() => books.filter((b) => b.progress === 100).length, [books])
+  const currentlyReading = useMemo(
+    () => books.filter((b) => b.progress > 0 && b.progress < 100).length,
+    [books]
+  )
+  const pagesRead = useMemo(
+    () => books.reduce((acc, b) => acc + (b.progress > 0 ? b.currentPage : 0), 0),
+    [books]
+  )
+  const totalReadingSeconds = useMemo(
+    () => books.reduce((acc, b) => acc + (b.readingTime || 0), 0),
+    [books]
+  )
+  const readingTimeStr = useMemo(() => {
+    const mins = Math.floor(totalReadingSeconds / 60)
+    if (mins >= 60) {
+      return `${(totalReadingSeconds / 3600).toFixed(1)}h`
+    }
+    return `${mins}m`
+  }, [totalReadingSeconds])
 
-  // Realistic mock data
   const stats = [
-    { title: 'Total Books Read', value: '12', icon: CheckCircle2, color: 'text-emerald-500' },
-    { title: 'Currently Reading', value: '2', icon: BookMarked, color: 'text-cyan-500' },
-    { title: 'Pages Read', value: '3,450', icon: BookOpen, color: 'text-indigo-500' },
-    { title: 'Reading Hours', value: '24.5h', icon: Clock, color: 'text-amber-500' },
-    { title: 'Reading Streak', value: '7 days', icon: Flame, color: 'text-red-500' },
-  ]
-
-  const achievements = [
     {
-      title: 'First Book Completed',
-      desc: 'Read a full book cover-to-cover.',
+      title: 'Total Books Read',
+      value: String(totalBooksRead),
       icon: CheckCircle2,
-      color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-100',
-      progress: 100,
+      color: 'text-emerald-500',
     },
     {
-      title: '7 Day Reading Streak',
-      desc: 'Read at least 15 mins daily for a week.',
-      icon: Flame,
-      color: 'text-red-500 bg-red-50 dark:bg-red-500/10 border-red-100',
-      progress: 100,
+      title: 'Currently Reading',
+      value: String(currentlyReading),
+      icon: BookMarked,
+      color: 'text-cyan-500',
     },
     {
-      title: 'Book Explorer',
-      desc: 'Upload and start 5 books.',
-      icon: Compass,
-      color: 'text-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 border-indigo-100',
-      progress: 80,
+      title: 'Pages Read',
+      value: pagesRead.toLocaleString(),
+      icon: BookOpen,
+      color: 'text-indigo-500',
     },
-    {
-      title: 'Knowledge Seeker',
-      desc: 'Log 50 reading hours.',
-      icon: Award,
-      color: 'text-purple-500 bg-purple-50 dark:bg-purple-500/10 border-purple-100',
-      progress: 49,
-    },
+    { title: 'Reading Time', value: readingTimeStr, icon: Clock, color: 'text-amber-500' },
+    { title: 'Uploaded Books', value: String(books.length), icon: Compass, color: 'text-rose-500' },
   ]
 
-  const categories = [
-    { name: 'Business & Finance', percent: 90, count: '6 books' },
-    { name: 'Technology & Code', percent: 80, count: '5 books' },
-    { name: 'Islamic Books', percent: 60, count: '3 books' },
-    { name: 'Fiction / Novels', percent: 40, count: '2 books' },
-  ]
+  const achievements = useMemo(() => {
+    return [
+      {
+        title: 'First Book Completed',
+        desc: 'Read a full book cover-to-cover.',
+        icon: CheckCircle2,
+        color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-100',
+        progress: totalBooksRead > 0 ? 100 : 0,
+      },
+      {
+        title: 'Book Explorer',
+        desc: 'Upload at least 5 books.',
+        icon: Compass,
+        color: 'text-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 border-indigo-100',
+        progress: Math.min(100, Math.round((books.length / 5) * 100)),
+      },
+      {
+        title: 'Knowledge Seeker',
+        desc: 'Log 5 hours of total reading time.',
+        icon: Award,
+        color: 'text-purple-500 bg-purple-50 dark:bg-purple-500/10 border-purple-100',
+        progress: Math.min(100, Math.round((totalReadingSeconds / 18000) * 100)),
+      },
+    ]
+  }, [books.length, totalBooksRead, totalReadingSeconds])
 
-  const recentHistory = [
-    { book: 'Atomic Habits', activity: 'Read Chapter 4 (Page 134)', time: '2 hours ago' },
-    { book: 'Clean Code', activity: 'Logged 85% progress milestone', time: '1 day ago' },
-    { book: 'Deep Work', activity: 'Added to Favorites bookshelf', time: '2 days ago' },
-  ]
+  const categoryStats = useMemo(() => {
+    if (collections.length === 0) {
+      return [
+        { name: 'Classics', percent: books.length > 0 ? 100 : 0, count: `${books.length} books` },
+      ]
+    }
+    const list = collections.map((col) => {
+      const count = books.filter((b) => b.collectionId === col.id).length
+      const percent = books.length > 0 ? Math.round((count / books.length) * 100) : 0
+      return {
+        name: col.name,
+        percent,
+        count: count === 1 ? '1 book' : `${count} books`,
+      }
+    })
+    return list.sort((a, b) => b.percent - a.percent).slice(0, 4)
+  }, [collections, books])
+
+  const recentHistory = useMemo(() => {
+    return books
+      .filter((b) => b.lastReadAt !== undefined)
+      .sort((a, b) => new Date(b.lastReadAt!).getTime() - new Date(a.lastReadAt!).getTime())
+      .slice(0, 3)
+      .map((b) => {
+        const timeDiff = new Date().getTime() - new Date(b.lastReadAt!).getTime()
+        const hrs = Math.floor(timeDiff / (1000 * 60 * 60))
+        let timeStr = 'Just now'
+        if (hrs > 0) {
+          timeStr = hrs === 1 ? '1 hour ago' : `${hrs} hours ago`
+          if (hrs >= 24) {
+            const days = Math.floor(hrs / 24)
+            timeStr = days === 1 ? '1 day ago' : `${days} days ago`
+          }
+        } else {
+          const mins = Math.floor(timeDiff / (1000 * 60))
+          if (mins > 0) {
+            timeStr = `${mins} mins ago`
+          }
+        }
+        return {
+          book: b.title,
+          activity: `Logged page ${b.currentPage} (${b.progress}% progress)`,
+          time: timeStr,
+        }
+      })
+  }, [books])
 
   // Animations variants
   const containerVariants = {
@@ -131,30 +198,8 @@ export const ProfilePage: React.FC = () => {
 
   return (
     <div className="relative min-h-screen space-y-8 pb-20 text-left select-none">
-      {/* Simulation Bar */}
-      <div className="bg-bg-surface border-border-base flex flex-wrap items-center justify-between gap-4 rounded-2xl border p-4 shadow-sm">
-        <div className="text-text-sub flex items-center gap-2 text-xs font-semibold">
-          <Info className="text-primary-500 h-4.5 w-4.5 shrink-0" />
-          <span>Interactive UI Demos: Toggle empty states or skeleton layouts below.</span>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={handleSimulateLoader}
-            className="border-border-base bg-bg-app text-text-sub hover:bg-bg-surface cursor-pointer rounded-lg border px-3.5 py-1.5 text-xs font-bold transition-colors"
-          >
-            Simulate Loading Skeletons
-          </button>
-          <button
-            onClick={() => setIsEmptyState(!isEmptyState)}
-            className={`cursor-pointer rounded-lg border px-3.5 py-1.5 text-xs font-bold transition-all ${isEmptyState ? 'bg-primary-600 border-primary-600 text-white' : 'bg-bg-app border-border-base text-text-sub hover:bg-bg-surface'} `}
-          >
-            {isEmptyState ? 'Show Real Profile' : 'Show Empty States'}
-          </button>
-        </div>
-      </div>
-
       <AnimatePresence mode="wait">
-        {isSkeletonLoading ? (
+        {loading ? (
           /* Profile Skeletons */
           <motion.div
             key="skeleton"
@@ -166,26 +211,6 @@ export const ProfilePage: React.FC = () => {
             <div className="border-border-base bg-bg-surface h-[250px] animate-pulse rounded-3xl border p-6" />
             <div className="border-border-base bg-bg-surface h-[400px] animate-pulse rounded-3xl border p-8 lg:col-span-2" />
           </motion.div>
-        ) : isEmptyState ? (
-          /* Empty reading activity layouts */
-          <motion.div
-            key="empty"
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="border-border-base bg-bg-surface mx-auto max-w-xl space-y-6 rounded-3xl border-2 border-dashed p-12 text-center"
-          >
-            <div className="bg-primary-50 text-primary-600 dark:bg-primary-500/10 mx-auto flex h-14 w-14 items-center justify-center rounded-full">
-              <User className="h-7 w-7" />
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-text-main text-lg font-bold">No Profile Activity Recorded</h3>
-              <p className="text-text-sub mx-auto max-w-xs text-xs leading-relaxed">
-                You haven't read or annotated any books. Start reading to build your profile
-                milestones.
-              </p>
-            </div>
-          </motion.div>
         ) : (
           /* Real Profile view */
           <motion.div
@@ -193,110 +218,102 @@ export const ProfilePage: React.FC = () => {
             variants={containerVariants}
             initial="hidden"
             animate="show"
-            className="animate-fade-in grid grid-cols-1 items-start gap-8 lg:grid-cols-3"
+            className="grid grid-cols-1 items-start gap-8 lg:grid-cols-3"
           >
-            {/* Left Column: Profile Card & User Info & Settings Shortcut */}
-            <div className="space-y-6">
-              {/* Profile Card Header */}
+            {/* Left Column: Avatar, Bio, Details card */}
+            <div className="space-y-6 lg:col-span-1">
               <motion.div
                 variants={itemVariants}
-                className="bg-bg-surface border-border-base relative flex flex-col items-center gap-4 overflow-hidden rounded-3xl border p-6 text-center shadow-sm"
+                className="bg-bg-surface border-border-base relative overflow-hidden rounded-3xl border p-6 text-center shadow-sm sm:p-8"
               >
-                {/* Visual mesh bg */}
-                <div className="from-primary-600 absolute inset-x-0 top-0 h-2 bg-gradient-to-r via-indigo-600 to-cyan-500" />
+                {/* Decorative gradients */}
+                <div className="bg-primary-500/10 dark:bg-primary-500/5 absolute top-0 left-0 h-24 w-full" />
 
-                {/* Premium badge */}
-                <span className="bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400 border-primary-100 dark:border-primary-500/20 mt-2 inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[8px] font-bold tracking-widest uppercase">
-                  <Sparkles className="h-2.5 w-2.5" />
-                  Premium Member
-                </span>
+                <div className="relative z-10 flex flex-col items-center">
+                  <div className="relative">
+                    <img
+                      src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=facearea&facepad=2&w=200&h=200&q=80"
+                      alt="Kaab Khan"
+                      className="border-bg-surface h-20 w-20 rounded-full border-4 object-cover shadow-md"
+                    />
+                    <div className="bg-primary-500 absolute right-0 bottom-0 rounded-full p-1.5 text-white shadow-xs">
+                      <Sparkles className="h-3 w-3" />
+                    </div>
+                  </div>
 
-                <img
-                  src={
-                    user?.avatarUrl ||
-                    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=facearea&facepad=2&w=150&h=150&q=80'
-                  }
-                  alt={profileName + ' Avatar'}
-                  className="ring-primary-500 h-20 w-20 rounded-full object-cover shadow-md ring-2 transition-transform hover:scale-105"
-                />
-
-                <div>
-                  <h3 className="text-text-main font-sans text-base font-extrabold">
-                    {profileName}
-                  </h3>
-                  <p className="text-text-muted mt-0.5 font-mono text-[10px] font-bold">
+                  <h3 className="text-text-main mt-4 text-lg font-bold">{profileName}</h3>
+                  <p className="text-primary-600 dark:text-primary-400 text-xs font-semibold">
                     @{profileUsername}
                   </p>
+
+                  <p className="text-text-sub mt-4 text-center font-sans text-xs leading-relaxed">
+                    {profileBio}
+                  </p>
+
+                  <div className="mt-6 flex w-full justify-center gap-3">
+                    <button
+                      onClick={() => setShowEditModal(true)}
+                      className="border-border-base bg-bg-surface text-text-sub hover:bg-bg-app flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border px-4 py-2 text-xs font-bold shadow-2xs transition-all"
+                    >
+                      <Edit className="h-3.5 w-3.5" />
+                      <span>Edit Profile</span>
+                    </button>
+                  </div>
                 </div>
-
-                <p className="text-text-sub px-2 font-sans text-xs leading-relaxed">{profileBio}</p>
-
-                <Button
-                  onClick={() => {
-                    setEditName(profileName)
-                    setEditUsername(profileUsername)
-                    setEditBio(profileBio)
-                    setEditEmail(profileEmail)
-                    setShowEditModal(true)
-                  }}
-                  size="sm"
-                  variant="outline"
-                  leftIcon={<Edit className="h-3.5 w-3.5" />}
-                  className="w-full justify-center py-2 text-[10px] font-bold tracking-wider uppercase"
-                >
-                  Edit Profile
-                </Button>
               </motion.div>
 
-              {/* User Info details */}
+              {/* Personal account properties list card */}
               <motion.div
                 variants={itemVariants}
-                className="bg-bg-surface border-border-base space-y-4 rounded-3xl border p-5 text-left shadow-sm"
+                className="bg-bg-surface border-border-base space-y-4 rounded-3xl border p-6 text-left shadow-sm"
               >
-                <h4 className="text-primary-600 border-border-light border-b pb-2 text-[10px] font-extrabold tracking-widest uppercase">
-                  Account details
-                </h4>
+                <div className="border-border-light border-b pb-2.5">
+                  <h4 className="text-primary-600 text-xs font-extrabold tracking-widest uppercase">
+                    Account Details
+                  </h4>
+                </div>
 
-                <div className="space-y-3 font-sans text-xs">
+                <div className="space-y-3 font-sans text-xs font-semibold">
                   <div>
-                    <span className="text-text-muted block text-[8px] tracking-wider uppercase">
+                    <span className="text-text-muted block text-[10px] uppercase">
                       Registered Email
                     </span>
-                    <span className="text-text-main block truncate font-bold">{profileEmail}</span>
+                    <span className="text-text-main mt-0.5 block">{profileEmail}</span>
                   </div>
                   <div>
-                    <span className="text-text-muted block text-[8px] tracking-wider uppercase">
-                      Member Since
+                    <span className="text-text-muted block text-[10px] uppercase">
+                      Account Status
                     </span>
-                    <span className="text-text-main block truncate font-bold">
-                      October 15, 2025
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-text-muted block text-[8px] tracking-wider uppercase">
-                      Sync Status
-                    </span>
-                    <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                    <span className="mt-0.5 flex items-center gap-1 text-emerald-600">
                       <CheckCircle className="h-3.5 w-3.5" />
-                      Active / Synced
+                      <span>Verified Sandbox (Active)</span>
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-text-muted block text-[10px] uppercase">
+                      Default Server
+                    </span>
+                    <span className="text-text-main mt-0.5 block font-mono text-[10px]">
+                      ap-south-1.supabase.co
                     </span>
                   </div>
                 </div>
               </motion.div>
 
-              {/* Settings Shortcut Card */}
+              {/* Sidebar Quick controls shortcuts */}
               <motion.div
                 variants={itemVariants}
-                className="bg-bg-surface border-border-base space-y-3 rounded-3xl border p-5 text-left shadow-sm"
+                className="bg-bg-surface border-border-base space-y-4 rounded-3xl border p-6 text-left shadow-sm"
               >
-                <h4 className="text-primary-600 border-border-light border-b pb-2 text-[10px] font-extrabold tracking-widest uppercase">
-                  Quick Settings
-                </h4>
-
+                <div className="border-border-light border-b pb-2.5">
+                  <h4 className="text-primary-600 text-xs font-extrabold tracking-widest uppercase">
+                    Quick Links
+                  </h4>
+                </div>
                 <div className="space-y-1">
                   {[
-                    { label: 'Security & Password', icon: Lock },
-                    { label: 'Push Notifications', icon: Bell },
+                    { label: 'Security & Keys Defaults', icon: Lock },
+                    { label: 'Subscribed Alerts Alerts', icon: Bell },
                     { label: 'Data & Privacy Settings', icon: ShieldAlert },
                   ].map((set, idx) => (
                     <div
@@ -439,7 +456,7 @@ export const ProfilePage: React.FC = () => {
                 </h4>
 
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                  {categories.map((cat, idx) => (
+                  {categoryStats.map((cat, idx) => (
                     <div key={idx} className="space-y-1.5">
                       <div className="flex justify-between text-xs font-semibold">
                         <span className="text-text-main">{cat.name}</span>
@@ -457,33 +474,35 @@ export const ProfilePage: React.FC = () => {
               </motion.div>
 
               {/* Reading History Activity log */}
-              <motion.div
-                variants={itemVariants}
-                className="bg-bg-surface border-border-base space-y-4 rounded-3xl border p-6 text-left shadow-sm"
-              >
-                <h4 className="text-primary-600 border-border-light flex items-center gap-1.5 border-b pb-2.5 text-xs font-extrabold tracking-widest uppercase">
-                  <Activity className="h-4.5 w-4.5" />
-                  <span>Reading Activity history</span>
-                </h4>
-                <div className="space-y-3.5">
-                  {recentHistory.map((hist, idx) => (
-                    <div key={idx} className="flex gap-3 text-left">
-                      <div className="bg-primary-50 dark:bg-primary-500/10 text-primary-600 mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg">
-                        <BookOpen className="h-4 w-4" />
+              {recentHistory.length > 0 && (
+                <motion.div
+                  variants={itemVariants}
+                  className="bg-bg-surface border-border-base space-y-4 rounded-3xl border p-6 text-left shadow-sm"
+                >
+                  <h4 className="text-primary-600 border-border-light flex items-center gap-1.5 border-b pb-2.5 text-xs font-extrabold tracking-widest uppercase">
+                    <Activity className="h-4.5 w-4.5" />
+                    <span>Reading Activity history</span>
+                  </h4>
+                  <div className="space-y-3.5">
+                    {recentHistory.map((hist, idx) => (
+                      <div key={idx} className="flex gap-3 text-left">
+                        <div className="bg-primary-50 dark:bg-primary-500/10 text-primary-600 mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg">
+                          <BookOpen className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <p className="text-text-main text-xs font-bold">
+                            {hist.activity} in{' '}
+                            <span className="text-primary-600 cursor-pointer hover:underline">
+                              {hist.book}
+                            </span>
+                          </p>
+                          <p className="text-text-muted mt-0.5 font-mono text-[9px]">{hist.time}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-text-main text-xs font-bold">
-                          {hist.activity} in{' '}
-                          <span className="text-primary-600 cursor-pointer hover:underline">
-                            {hist.book}
-                          </span>
-                        </p>
-                        <p className="text-text-muted mt-0.5 font-mono text-[9px]">{hist.time}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
             </div>
           </motion.div>
         )}
@@ -492,7 +511,7 @@ export const ProfilePage: React.FC = () => {
       {/* Edit Profile Modal Dialog Overlay */}
       <AnimatePresence>
         {showEditModal && (
-          <div className="fixed inset-0 z-999 flex items-center justify-center bg-slate-950/30 p-4 backdrop-blur-xs select-none">
+          <div className="fixed inset-0 z-999 flex items-center justify-center bg-slate-950/30 p-4 font-sans backdrop-blur-xs select-none">
             {/* Backdrop click dismiss */}
             <div className="absolute inset-0" onClick={() => setShowEditModal(false)} />
 

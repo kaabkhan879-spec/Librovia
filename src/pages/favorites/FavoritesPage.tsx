@@ -3,15 +3,13 @@ import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { booksService, type Book } from '../../services/books'
 import { ROUTES } from '../../constants/routes'
-import { BookOpen, Heart, Info } from 'lucide-react'
+import { BookOpen, Heart } from 'lucide-react'
 import { formatBytes } from '../../utils/helpers'
 import { Button } from '../../components/common/Button'
 
 export const FavoritesPage: React.FC = () => {
   const [books, setBooks] = useState<Book[]>([])
   const [loading, setLoading] = useState(true)
-  const [isSkeletonLoading, setIsSkeletonLoading] = useState(false)
-  const [isEmptyState, setIsEmptyState] = useState(false)
 
   // Track starred items locally
   const [starredBooks, setStarredBooks] = useState<Record<string, boolean>>({})
@@ -29,13 +27,6 @@ export const FavoritesPage: React.FC = () => {
       setLoading(false)
     })
   }, [])
-
-  const handleSimulateLoader = () => {
-    setIsSkeletonLoading(true)
-    setTimeout(() => {
-      setIsSkeletonLoading(false)
-    }, 1500)
-  }
 
   const toggleStar = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
@@ -67,28 +58,6 @@ export const FavoritesPage: React.FC = () => {
 
   return (
     <div className="min-h-screen space-y-8 pb-20 text-left select-none">
-      {/* Simulation Tools Row */}
-      <div className="bg-bg-surface border-border-base flex flex-wrap items-center justify-between gap-4 rounded-2xl border p-4 shadow-sm">
-        <div className="text-text-sub flex items-center gap-2 text-xs font-semibold">
-          <Info className="text-primary-500 h-4.5 w-4.5 shrink-0" />
-          <span>Interactive UI Demos: Toggle empty states or skeleton layouts below.</span>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={handleSimulateLoader}
-            className="border-border-base bg-bg-app text-text-sub hover:bg-bg-surface cursor-pointer rounded-lg border px-3.5 py-1.5 text-xs font-bold transition-colors"
-          >
-            Simulate Loading Skeletons
-          </button>
-          <button
-            onClick={() => setIsEmptyState(!isEmptyState)}
-            className={`cursor-pointer rounded-lg border px-3.5 py-1.5 text-xs font-bold transition-all ${isEmptyState ? 'bg-primary-600 border-primary-600 text-white' : 'bg-bg-app border-border-base text-text-sub hover:bg-bg-surface'} `}
-          >
-            {isEmptyState ? 'Show Real Favorites' : 'Show Empty States'}
-          </button>
-        </div>
-      </div>
-
       {/* Header section */}
       <div className="space-y-1">
         <h1 className="text-text-main font-sans text-2xl font-extrabold tracking-tight sm:text-3xl">
@@ -100,7 +69,7 @@ export const FavoritesPage: React.FC = () => {
       </div>
 
       <AnimatePresence mode="wait">
-        {isSkeletonLoading || loading ? (
+        {loading ? (
           /* Loading skeletons */
           <motion.div
             key="skeleton"
@@ -120,7 +89,7 @@ export const FavoritesPage: React.FC = () => {
               </div>
             ))}
           </motion.div>
-        ) : isEmptyState || activeBooks.length === 0 ? (
+        ) : activeBooks.length === 0 ? (
           /* Empty state view */
           <motion.div
             key="empty"

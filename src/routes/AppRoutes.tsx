@@ -27,7 +27,6 @@ import { SettingsPage } from '../pages/settings/SettingsPage'
 import { StoragePage } from '../pages/storage/StoragePage'
 import { ReadingPage } from '../pages/reading/ReadingPage'
 import { AnalyticsPage } from '../pages/analytics/AnalyticsPage'
-import { DesignSystemShowcase } from '../pages/showcase/DesignSystemShowcase'
 
 export const AppRoutes: React.FC = () => {
   return (
@@ -61,9 +60,6 @@ export const AppRoutes: React.FC = () => {
           <Route path={ROUTES.STORAGE} element={<StoragePage />} />
         </Route>
       </Route>
-
-      {/* Design System Showcase Route */}
-      <Route path={ROUTES.DESIGN_SYSTEM} element={<DesignSystemShowcase />} />
 
       {/* Fallback Catch All */}
       <Route path="*" element={<Navigate to={ROUTES.LANDING} replace />} />

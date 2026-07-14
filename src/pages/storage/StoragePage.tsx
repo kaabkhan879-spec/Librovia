@@ -3,29 +3,19 @@ import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { booksService, type Book } from '../../services/books'
 import { ROUTES } from '../../constants/routes'
-import { Cloud, Info, Database } from 'lucide-react'
+import { Cloud, Database } from 'lucide-react'
 import { formatBytes } from '../../utils/helpers'
 import { Button } from '../../components/common/Button'
 
 export const StoragePage: React.FC = () => {
   const [books, setBooks] = useState<Book[]>([])
   const [loading, setLoading] = useState(true)
-  const [isSkeletonLoading, setIsSkeletonLoading] = useState(false)
-  const [isEmptyState, setIsEmptyState] = useState(false)
-
   useEffect(() => {
     booksService.getBooks().then((data) => {
       setBooks(data)
       setLoading(false)
     })
   }, [])
-
-  const handleSimulateLoader = () => {
-    setIsSkeletonLoading(true)
-    setTimeout(() => {
-      setIsSkeletonLoading(false)
-    }, 1500)
-  }
 
   // Calculate storage usage
   const totalStorageBytes = useMemo(() => {
@@ -58,28 +48,6 @@ export const StoragePage: React.FC = () => {
 
   return (
     <div className="min-h-screen space-y-8 pb-20 text-left select-none">
-      {/* Simulation Tools Row */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-100 bg-white/80 p-4 shadow-xs backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/80">
-        <div className="text-text-sub flex items-center gap-2 text-xs font-semibold">
-          <Info className="h-4.5 w-4.5 shrink-0 text-purple-600" />
-          <span>Interactive UI Demos: Toggle empty states or skeleton layouts below.</span>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={handleSimulateLoader}
-            className="cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-800"
-          >
-            Simulate Loading Skeletons
-          </button>
-          <button
-            onClick={() => setIsEmptyState(!isEmptyState)}
-            className={`cursor-pointer rounded-xl border px-3.5 py-1.5 text-xs font-bold transition-all ${isEmptyState ? 'border-purple-600 bg-purple-600 text-white' : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-800'} `}
-          >
-            {isEmptyState ? 'Show Real Storage' : 'Show Empty States'}
-          </button>
-        </div>
-      </div>
-
       {/* Header section */}
       <div className="space-y-1">
         <h1 className="font-sans text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
@@ -91,7 +59,7 @@ export const StoragePage: React.FC = () => {
       </div>
 
       <AnimatePresence mode="wait">
-        {isSkeletonLoading || loading ? (
+        {loading ? (
           <motion.div
             key="skeleton"
             initial={{ opacity: 0 }}
@@ -102,7 +70,7 @@ export const StoragePage: React.FC = () => {
             <div className="h-44 animate-pulse rounded-3xl border border-slate-100 bg-white p-6 dark:border-slate-800 dark:bg-slate-900" />
             <div className="h-64 animate-pulse rounded-3xl border border-slate-100 bg-white p-6 dark:border-slate-800 dark:bg-slate-900" />
           </motion.div>
-        ) : isEmptyState || books.length === 0 ? (
+        ) : books.length === 0 ? (
           <motion.div
             key="empty"
             initial={{ opacity: 0, y: 15 }}

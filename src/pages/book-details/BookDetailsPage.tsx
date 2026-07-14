@@ -13,7 +13,6 @@ import {
   Activity,
   Bookmark,
   MessageSquare,
-  Info,
   Trash2,
   Edit2,
   X,
@@ -145,7 +144,6 @@ export const BookDetailsPage: React.FC = () => {
   const [collections, setCollections] = useState<Collection[]>([])
 
   // Layout states
-  const [isSkeletonLoading, setIsSkeletonLoading] = useState(false)
   const [isFavorite, setIsFavorite] = useState(false)
   const [isDescCollapsed, setIsDescCollapsed] = useState(true)
   const [activeDetailsTab, setActiveDetailsTab] = useState<'overview' | 'notes'>('overview')
@@ -223,13 +221,6 @@ export const BookDetailsPage: React.FC = () => {
 
     fetchNotes()
   }, [id, fetchNotes])
-
-  const handleSimulateLoader = () => {
-    setIsSkeletonLoading(true)
-    setTimeout(() => {
-      setIsSkeletonLoading(false)
-    }, 1500)
-  }
 
   const handleToggleFavorite = async () => {
     if (!rawBook) return
@@ -367,537 +358,507 @@ export const BookDetailsPage: React.FC = () => {
 
   return (
     <div className="min-h-screen space-y-8 pb-20 text-left select-none">
-      {/* Simulation Tools Row */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-100 bg-white/80 p-4 shadow-xs backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/80">
-        <div className="text-text-sub flex items-center gap-2 text-xs font-semibold">
-          <Info className="h-4.5 w-4.5 shrink-0 text-purple-600" />
-          <span>Interactive UI Demos: Trigger skeleton loading states below.</span>
-        </div>
-        <div>
-          <button
-            onClick={handleSimulateLoader}
-            className="border-slate-250 dark:text-slate-350 dark:hover:bg-slate-850 cursor-pointer rounded-xl border bg-slate-50 px-3.5 py-1.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/50"
-          >
-            Simulate Loading Skeletons
-          </button>
-        </div>
-      </div>
-
       <AnimatePresence mode="wait">
-        {isSkeletonLoading ? (
-          /* Loading Skeletons Layout */
-          <motion.div
-            key="skeleton"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="grid grid-cols-1 gap-8 lg:grid-cols-3"
-          >
-            <div className="h-[300px] animate-pulse rounded-3xl border border-slate-100 bg-white p-6 dark:border-slate-800 dark:bg-slate-900" />
-            <div className="h-[450px] animate-pulse rounded-3xl border border-slate-100 bg-white p-8 lg:col-span-2 dark:border-slate-800 dark:bg-slate-900" />
-          </motion.div>
-        ) : (
-          /* Cinematic Layout */
-          <motion.div
-            key="details-canvas"
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-8"
-          >
-            {/* Back to Library Navigation Header */}
-            <div className="flex items-center justify-between">
-              <Link
-                to={ROUTES.LIBRARY}
-                className="inline-flex items-center gap-1.5 text-xs font-bold tracking-wider text-slate-400 uppercase transition-colors hover:text-purple-600"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                <span>Back to Library</span>
-              </Link>
-            </div>
+        {/* Cinematic Layout */}
+        <motion.div
+          key="details-canvas"
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-8"
+        >
+          {/* Back to Library Navigation Header */}
+          <div className="flex items-center justify-between">
+            <Link
+              to={ROUTES.LIBRARY}
+              className="inline-flex items-center gap-1.5 text-xs font-bold tracking-wider text-slate-400 uppercase transition-colors hover:text-purple-600"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>Back to Library</span>
+            </Link>
+          </div>
 
-            <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-3">
-              {/* Left Column: Cover & Primary Action buttons */}
-              <div className="space-y-6">
-                <div className="flex flex-col items-center gap-6 rounded-3xl border border-slate-100 bg-white p-6 shadow-xs hover:border-purple-500/10 dark:border-slate-800 dark:bg-slate-900">
-                  {/* Floating cover frame */}
-                  <motion.div
-                    whileHover={{ scale: 1.02 }}
-                    className="group relative aspect-[0.7/1] w-44 shrink-0 cursor-pointer overflow-hidden rounded-xl border border-slate-100 shadow-xl"
-                  >
-                    <img
-                      src={book.cover}
-                      alt={book.title}
-                      onError={handleImageError}
-                      className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                    />
-                  </motion.div>
+          <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-3">
+            {/* Left Column: Cover & Primary Action buttons */}
+            <div className="space-y-6">
+              <div className="flex flex-col items-center gap-6 rounded-3xl border border-slate-100 bg-white p-6 shadow-xs hover:border-purple-500/10 dark:border-slate-800 dark:bg-slate-900">
+                {/* Floating cover frame */}
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  className="group relative aspect-[0.7/1] w-44 shrink-0 cursor-pointer overflow-hidden rounded-xl border border-slate-100 shadow-xl"
+                >
+                  <img
+                    src={book.cover}
+                    alt={book.title}
+                    onError={handleImageError}
+                    className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                  />
+                </motion.div>
 
-                  {/* Stars rating widget */}
-                  <div className="flex flex-col items-center gap-1 text-center">
-                    <div className="flex gap-1 text-amber-400">
-                      {Array.from({ length: 5 }).map((_, idx) => (
-                        <Star key={idx} className="h-4 w-4 fill-amber-400 text-amber-400" />
-                      ))}
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-400">
-                      {book.rating} • {book.reviewsCount} reviews
-                    </span>
+                {/* Stars rating widget */}
+                <div className="flex flex-col items-center gap-1 text-center">
+                  <div className="flex gap-1 text-amber-400">
+                    {Array.from({ length: 5 }).map((_, idx) => (
+                      <Star key={idx} className="h-4 w-4 fill-amber-400 text-amber-400" />
+                    ))}
                   </div>
-
-                  {/* Formatted action buttons */}
-                  <div className="w-full space-y-2">
-                    <Link to={ROUTES.READER.replace(':id', book.id)} className="block w-full">
-                      <Button className="w-full justify-center gap-2 bg-purple-600 py-2.5 text-xs font-bold tracking-wider text-white uppercase hover:bg-purple-700">
-                        <Play className="h-4 w-4 fill-white" />
-                        Continue Reading
-                      </Button>
-                    </Link>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        onClick={handleToggleFavorite}
-                        className={`dark:border-slate-750 flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-[10px] font-bold tracking-wider uppercase transition-colors dark:bg-slate-800 ${isFavorite ? 'border-red-200 bg-red-50/20 text-red-500' : 'text-slate-600 hover:bg-slate-50'} `}
-                      >
-                        <Heart
-                          className={`h-4 w-4 ${isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`}
-                        />
-                        <span>Favorite</span>
-                      </button>
-
-                      <button
-                        onClick={handleDownloadBook}
-                        className="dark:border-slate-750 flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-[10px] font-bold tracking-wider text-slate-600 uppercase hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-300"
-                        title="Download Book File"
-                      >
-                        <Download className="h-4 w-4" />
-                        <span>Download</span>
-                      </button>
-                    </div>
-                  </div>
+                  <span className="text-[10px] font-bold text-slate-400">
+                    {book.rating} • {book.reviewsCount} reviews
+                  </span>
                 </div>
 
-                {/* Quick actions panel */}
-                <div className="space-y-2 rounded-3xl border border-slate-100 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-                  <h4 className="mb-2 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
-                    Actions
-                  </h4>
+                {/* Formatted action buttons */}
+                <div className="w-full space-y-2">
+                  <Link to={ROUTES.READER.replace(':id', book.id)} className="block w-full">
+                    <Button className="w-full justify-center gap-2 bg-purple-600 py-2.5 text-xs font-bold tracking-wider text-white uppercase hover:bg-purple-700">
+                      <Play className="h-4 w-4 fill-white" />
+                      Continue Reading
+                    </Button>
+                  </Link>
+
                   <div className="grid grid-cols-2 gap-2">
                     <button
-                      onClick={() => navigate(ROUTES.LIBRARY)}
-                      className="border-slate-250 flex h-9 cursor-pointer items-center justify-center rounded-xl border bg-slate-50 text-[10px] font-bold tracking-wider text-slate-600 uppercase transition-all hover:bg-white dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300"
-                    >
-                      Library List
-                    </button>
-                    <button
                       onClick={handleToggleFavorite}
-                      className="border-slate-250 flex h-9 cursor-pointer items-center justify-center rounded-xl border bg-slate-50 text-[10px] font-bold tracking-wider text-slate-600 uppercase transition-all hover:bg-white dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300"
+                      className={`dark:border-slate-750 flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-[10px] font-bold tracking-wider uppercase transition-colors dark:bg-slate-800 ${isFavorite ? 'border-red-200 bg-red-50/20 text-red-500' : 'text-slate-600 hover:bg-slate-50'} `}
                     >
-                      Toggle Star
+                      <Heart
+                        className={`h-4 w-4 ${isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`}
+                      />
+                      <span>Favorite</span>
                     </button>
+
                     <button
                       onClick={handleDownloadBook}
-                      className="border-slate-250 flex h-9 cursor-pointer items-center justify-center rounded-xl border bg-slate-50 text-[10px] font-bold tracking-wider text-slate-600 uppercase transition-all hover:bg-white dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300"
+                      className="dark:border-slate-750 flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-[10px] font-bold tracking-wider text-slate-600 uppercase hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-300"
+                      title="Download Book File"
                     >
-                      Export PDF
-                    </button>
-                    <button
-                      onClick={handleDeleteBook}
-                      className="text-red-655 flex h-9 cursor-pointer items-center justify-center rounded-xl border border-red-200 bg-red-50 text-[10px] font-bold tracking-wider uppercase hover:bg-red-100"
-                    >
-                      <Trash2 className="mr-1 h-3.5 w-3.5" />
-                      Delete Book
+                      <Download className="h-4 w-4" />
+                      <span>Download</span>
                     </button>
                   </div>
                 </div>
               </div>
 
-              {/* Right Column: Information, Statistics, Description, Notes & Timeline */}
-              <div className="space-y-6 lg:col-span-2">
-                {/* 1. Header Information */}
-                <div className="space-y-3 rounded-3xl border border-slate-100 bg-white p-6 shadow-xs sm:p-8 dark:border-slate-800 dark:bg-slate-900">
-                  <div className="space-y-1">
-                    <span className="inline-block rounded bg-purple-50 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-purple-600 uppercase dark:bg-purple-950/20">
-                      {book.category}
-                    </span>
-                    <h2 className="font-sans text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-                      {book.title}
-                    </h2>
-                    <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                      By {book.author}
+              {/* Quick actions panel */}
+              <div className="space-y-2 rounded-3xl border border-slate-100 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                <h4 className="mb-2 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+                  Actions
+                </h4>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => navigate(ROUTES.LIBRARY)}
+                    className="border-slate-250 flex h-9 cursor-pointer items-center justify-center rounded-xl border bg-slate-50 text-[10px] font-bold tracking-wider text-slate-600 uppercase transition-all hover:bg-white dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300"
+                  >
+                    Library List
+                  </button>
+                  <button
+                    onClick={handleToggleFavorite}
+                    className="border-slate-250 flex h-9 cursor-pointer items-center justify-center rounded-xl border bg-slate-50 text-[10px] font-bold tracking-wider text-slate-600 uppercase transition-all hover:bg-white dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300"
+                  >
+                    Toggle Star
+                  </button>
+                  <button
+                    onClick={handleDownloadBook}
+                    className="border-slate-250 flex h-9 cursor-pointer items-center justify-center rounded-xl border bg-slate-50 text-[10px] font-bold tracking-wider text-slate-600 uppercase transition-all hover:bg-white dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300"
+                  >
+                    Export PDF
+                  </button>
+                  <button
+                    onClick={handleDeleteBook}
+                    className="text-red-655 flex h-9 cursor-pointer items-center justify-center rounded-xl border border-red-200 bg-red-50 text-[10px] font-bold tracking-wider uppercase hover:bg-red-100"
+                  >
+                    <Trash2 className="mr-1 h-3.5 w-3.5" />
+                    Delete Book
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Information, Statistics, Description, Notes & Timeline */}
+            <div className="space-y-6 lg:col-span-2">
+              {/* 1. Header Information */}
+              <div className="space-y-3 rounded-3xl border border-slate-100 bg-white p-6 shadow-xs sm:p-8 dark:border-slate-800 dark:bg-slate-900">
+                <div className="space-y-1">
+                  <span className="inline-block rounded bg-purple-50 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-purple-600 uppercase dark:bg-purple-950/20">
+                    {book.category}
+                  </span>
+                  <h2 className="font-sans text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+                    {book.title}
+                  </h2>
+                  <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    By {book.author}
+                  </p>
+                </div>
+
+                {/* Progress section */}
+                <div className="grid grid-cols-1 gap-4 border-t border-slate-50 pt-4 sm:grid-cols-2 dark:border-slate-800/40">
+                  <div className="space-y-2">
+                    <div className="text-slate-550 dark:text-slate-350 flex justify-between text-[10px] font-bold tracking-wider uppercase">
+                      <span>Reading Progress</span>
+                      <span>{book.progress}% Completed</span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                      <div
+                        className="h-full bg-purple-600"
+                        style={{ width: `${book.progress}%` }}
+                      />
+                    </div>
+                    <p className="font-mono text-[10px] leading-none text-slate-400">
+                      Page {book.currentPage} of {book.totalPages}
                     </p>
                   </div>
 
-                  {/* Progress section */}
-                  <div className="grid grid-cols-1 gap-4 border-t border-slate-50 pt-4 sm:grid-cols-2 dark:border-slate-800/40">
-                    <div className="space-y-2">
-                      <div className="text-slate-550 dark:text-slate-350 flex justify-between text-[10px] font-bold tracking-wider uppercase">
-                        <span>Reading Progress</span>
-                        <span>{book.progress}% Completed</span>
-                      </div>
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                        <div
-                          className="h-full bg-purple-600"
-                          style={{ width: `${book.progress}%` }}
-                        />
-                      </div>
-                      <p className="font-mono text-[10px] leading-none text-slate-400">
-                        Page {book.currentPage} of {book.totalPages}
-                      </p>
+                  <div className="dark:border-slate-850 flex items-start justify-between gap-4 border-l border-slate-50 pl-4 text-left">
+                    <div>
+                      <span className="block text-[8px] tracking-wider text-slate-400 uppercase">
+                        Est. Remaining
+                      </span>
+                      <span className="mt-0.5 block text-xs font-bold text-slate-700 dark:text-slate-300">
+                        {book.estTimeRemaining}
+                      </span>
                     </div>
-
-                    <div className="dark:border-slate-850 flex items-start justify-between gap-4 border-l border-slate-50 pl-4 text-left">
-                      <div>
-                        <span className="block text-[8px] tracking-wider text-slate-400 uppercase">
-                          Est. Remaining
-                        </span>
-                        <span className="mt-0.5 block text-xs font-bold text-slate-700 dark:text-slate-300">
-                          {book.estTimeRemaining}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="block text-[8px] tracking-wider text-slate-400 uppercase">
-                          Last opened
-                        </span>
-                        <span className="mt-0.5 block text-xs font-bold text-slate-700 dark:text-slate-300">
-                          {book.lastOpened}
-                        </span>
-                      </div>
+                    <div>
+                      <span className="block text-[8px] tracking-wider text-slate-400 uppercase">
+                        Last opened
+                      </span>
+                      <span className="mt-0.5 block text-xs font-bold text-slate-700 dark:text-slate-300">
+                        {book.lastOpened}
+                      </span>
                     </div>
                   </div>
                 </div>
+              </div>
 
-                {/* Tab Header Selectors */}
-                <div className="flex rounded-2xl border border-slate-100 bg-white p-1 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-                  <button
-                    onClick={() => setActiveDetailsTab('overview')}
-                    className={`flex-1 cursor-pointer rounded-xl py-2.5 text-center text-xs font-bold tracking-wider uppercase transition-all ${
-                      activeDetailsTab === 'overview'
-                        ? 'bg-purple-600 text-white shadow-xs'
-                        : 'text-slate-550 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800/40'
-                    }`}
+              {/* Tab Header Selectors */}
+              <div className="flex rounded-2xl border border-slate-100 bg-white p-1 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                <button
+                  onClick={() => setActiveDetailsTab('overview')}
+                  className={`flex-1 cursor-pointer rounded-xl py-2.5 text-center text-xs font-bold tracking-wider uppercase transition-all ${
+                    activeDetailsTab === 'overview'
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'text-slate-550 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800/40'
+                  }`}
+                >
+                  📖 Overview & Specs
+                </button>
+                <button
+                  onClick={() => setActiveDetailsTab('notes')}
+                  className={`flex-1 cursor-pointer rounded-xl py-2.5 text-center text-xs font-bold tracking-wider uppercase transition-all ${
+                    activeDetailsTab === 'notes'
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'text-slate-550 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800/40'
+                  }`}
+                >
+                  📒 My Notes ({bookNotes.length})
+                </button>
+              </div>
+
+              {/* Tab Content Canvas */}
+              <AnimatePresence mode="wait">
+                {activeDetailsTab === 'overview' ? (
+                  <motion.div
+                    key="overview-tab"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="space-y-6"
                   >
-                    📖 Overview & Specs
-                  </button>
-                  <button
-                    onClick={() => setActiveDetailsTab('notes')}
-                    className={`flex-1 cursor-pointer rounded-xl py-2.5 text-center text-xs font-bold tracking-wider uppercase transition-all ${
-                      activeDetailsTab === 'notes'
-                        ? 'bg-purple-600 text-white shadow-xs'
-                        : 'text-slate-550 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800/40'
-                    }`}
-                  >
-                    📒 My Notes ({bookNotes.length})
-                  </button>
-                </div>
-
-                {/* Tab Content Canvas */}
-                <AnimatePresence mode="wait">
-                  {activeDetailsTab === 'overview' ? (
-                    <motion.div
-                      key="overview-tab"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="space-y-6"
-                    >
-                      {/* 2. Synopsis Card */}
-                      <div className="space-y-3 rounded-3xl border border-slate-100 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-                        <h3 className="flex items-center gap-1.5 border-b border-slate-50 pb-2.5 text-xs font-extrabold tracking-widest text-purple-600 uppercase dark:border-slate-800/40">
-                          <BookOpen className="h-4.5 w-4.5" />
-                          <span>Synopsis / About Book</span>
-                        </h3>
-                        <div className="space-y-3">
-                          <p
-                            className={`text-slate-650 dark:text-slate-350 font-sans text-xs leading-relaxed ${
-                              isDescCollapsed ? 'line-clamp-3' : ''
-                            }`}
-                          >
-                            {book.description}
-                          </p>
-                          <button
-                            onClick={() => setIsDescCollapsed(!isDescCollapsed)}
-                            className="cursor-pointer text-[10px] font-bold tracking-wider text-purple-600 uppercase hover:text-purple-700"
-                          >
-                            {isDescCollapsed ? 'Read More' : 'Collapse'}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* 3. Book Details Information Grid */}
-                      <div className="space-y-4 rounded-3xl border border-slate-100 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-                        <h3 className="border-b border-slate-50 pb-2.5 text-xs font-extrabold tracking-widest text-purple-600 uppercase dark:border-slate-800/40">
-                          Technical Specifications
-                        </h3>
-                        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-                          {[
-                            { label: 'Language', value: book.language },
-                            { label: 'Publisher', value: book.publisher },
-                            { label: 'Pub Year', value: book.pubYear },
-                            { label: 'File Type', value: book.fileType },
-                            { label: 'File Size', value: book.fileSize },
-                            { label: 'Uploaded', value: book.uploadedDate },
-                          ].map((spec, idx) => (
-                            <div key={idx} className="space-y-1">
-                              <span className="block text-[8px] tracking-wider text-slate-400 uppercase">
-                                {spec.label}
-                              </span>
-                              <span className="dark:text-slate-350 block truncate text-xs font-bold text-slate-700">
-                                {spec.value}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Pill Tags */}
-                        <div className="flex flex-wrap gap-1.5 pt-2">
-                          {book.tags.map((tag, idx) => (
-                            <span
-                              key={idx}
-                              className="text-slate-655 dark:border-slate-850 inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-2.5 py-1 font-sans text-[10px] font-bold tracking-wider uppercase dark:bg-slate-800/50 dark:text-slate-400"
-                            >
-                              <Tag className="h-3 w-3 text-slate-400" />
-                              <span>{tag}</span>
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* 4. Reading Statistics Widget */}
-                      <div className="space-y-4 rounded-3xl border border-slate-100 bg-white p-6 text-left shadow-xs dark:border-slate-800 dark:bg-slate-900">
-                        <h3 className="border-b border-slate-50 pb-2.5 text-xs font-extrabold tracking-widest text-purple-600 uppercase dark:border-slate-800/40">
-                          Reading Statistics
-                        </h3>
-                        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                          {[
-                            { label: 'Hours Read', value: `${book.stats.hoursRead}h` },
-                            { label: 'Pages Read', value: book.stats.pagesRead },
-                            { label: 'Sessions logged', value: book.stats.sessions },
-                            { label: 'Average session', value: book.stats.avgTime },
-                          ].map((stat, idx) => (
-                            <div
-                              key={idx}
-                              className="space-y-1 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/20"
-                            >
-                              <span className="block text-[8px] tracking-wider text-slate-400 uppercase">
-                                {stat.label}
-                              </span>
-                              <span className="block font-mono text-sm font-bold text-slate-700 dark:text-white">
-                                {stat.value}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* 6. Activities Timeline */}
-                      <div className="space-y-4 rounded-3xl border border-slate-100 bg-white p-6 text-left shadow-xs dark:border-slate-800 dark:bg-slate-900">
-                        <h3 className="flex items-center gap-1.5 border-b border-slate-50 pb-2.5 text-xs font-extrabold tracking-widest text-purple-600 uppercase dark:border-slate-800/40">
-                          <Activity className="h-4.5 w-4.5" />
-                          <span>Book Activity Timeline</span>
-                        </h3>
-                        <div className="relative ml-2.5 space-y-4 border-l border-slate-100 pl-6 dark:border-slate-800">
-                          {book.timeline.map((event, idx) => (
-                            <div key={idx} className="relative">
-                              <span className="absolute top-1 -left-[30px] h-2 w-2 rounded-full bg-purple-600 ring-4 ring-white dark:ring-slate-900" />
-                              <div>
-                                <p className="text-xs font-bold text-slate-700 dark:text-white">
-                                  {event.event}
-                                </p>
-                                <p className="mt-0.5 font-mono text-[9px] text-slate-400">
-                                  {event.date}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="notes-tab"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="space-y-4"
-                    >
-                      {/* Search box and create triggers */}
-                      <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-100 bg-white/60 p-4 shadow-xs backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/60">
-                        <div className="relative w-full max-w-xs shrink-0">
-                          <Search className="absolute top-2.5 left-3.5 h-4.5 w-4.5 text-slate-400" />
-                          <input
-                            type="text"
-                            placeholder="Search notes inside this book..."
-                            value={noteSearchQuery}
-                            onChange={(e) => setNoteSearchQuery(e.target.value)}
-                            className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 py-2 pr-4 pl-10 text-xs font-semibold text-slate-900 placeholder-slate-400 outline-hidden transition-all focus:border-purple-600 focus:bg-white dark:border-slate-800 dark:bg-slate-800/40 dark:text-white"
-                          />
-                        </div>
-
-                        <button
-                          onClick={() => handleOpenNoteModal()}
-                          className="flex h-9.5 items-center justify-center gap-1.5 rounded-2xl bg-purple-600 px-4 text-xs font-bold tracking-wider text-white uppercase shadow-sm transition-all hover:bg-purple-700"
+                    {/* 2. Synopsis Card */}
+                    <div className="space-y-3 rounded-3xl border border-slate-100 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                      <h3 className="flex items-center gap-1.5 border-b border-slate-50 pb-2.5 text-xs font-extrabold tracking-widest text-purple-600 uppercase dark:border-slate-800/40">
+                        <BookOpen className="h-4.5 w-4.5" />
+                        <span>Synopsis / About Book</span>
+                      </h3>
+                      <div className="space-y-3">
+                        <p
+                          className={`text-slate-650 dark:text-slate-350 font-sans text-xs leading-relaxed ${
+                            isDescCollapsed ? 'line-clamp-3' : ''
+                          }`}
                         >
-                          <Plus className="h-4.5 w-4.5" />
-                          Add Journal Note
+                          {book.description}
+                        </p>
+                        <button
+                          onClick={() => setIsDescCollapsed(!isDescCollapsed)}
+                          className="cursor-pointer text-[10px] font-bold tracking-wider text-purple-600 uppercase hover:text-purple-700"
+                        >
+                          {isDescCollapsed ? 'Read More' : 'Collapse'}
                         </button>
                       </div>
+                    </div>
 
-                      {/* Display Notes grouped by page */}
-                      {filteredNotes.length === 0 ? (
-                        <div className="text-slate-550 flex h-48 flex-col items-center justify-center gap-2 rounded-3xl border border-dashed border-slate-100 bg-white text-sm dark:border-slate-800 dark:bg-slate-900">
-                          <span>No notes recorded yet.</span>
-                          <span className="text-[10px] text-slate-400">
-                            Start adding insights using the editor or the "+ Add Journal Note"
-                            trigger.
+                    {/* 3. Book Details Information Grid */}
+                    <div className="space-y-4 rounded-3xl border border-slate-100 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                      <h3 className="border-b border-slate-50 pb-2.5 text-xs font-extrabold tracking-widest text-purple-600 uppercase dark:border-slate-800/40">
+                        Technical Specifications
+                      </h3>
+                      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                        {[
+                          { label: 'Language', value: book.language },
+                          { label: 'Publisher', value: book.publisher },
+                          { label: 'Pub Year', value: book.pubYear },
+                          { label: 'File Type', value: book.fileType },
+                          { label: 'File Size', value: book.fileSize },
+                          { label: 'Uploaded', value: book.uploadedDate },
+                        ].map((spec, idx) => (
+                          <div key={idx} className="space-y-1">
+                            <span className="block text-[8px] tracking-wider text-slate-400 uppercase">
+                              {spec.label}
+                            </span>
+                            <span className="dark:text-slate-350 block truncate text-xs font-bold text-slate-700">
+                              {spec.value}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Pill Tags */}
+                      <div className="flex flex-wrap gap-1.5 pt-2">
+                        {book.tags.map((tag, idx) => (
+                          <span
+                            key={idx}
+                            className="text-slate-655 dark:border-slate-850 inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-2.5 py-1 font-sans text-[10px] font-bold tracking-wider uppercase dark:bg-slate-800/50 dark:text-slate-400"
+                          >
+                            <Tag className="h-3 w-3 text-slate-400" />
+                            <span>{tag}</span>
                           </span>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          {filteredNotes.map((note) => (
-                            <div
-                              key={note.id}
-                              className="hover:border-purple-550/20 flex flex-col justify-between rounded-3xl border border-slate-100 bg-white p-5 text-left shadow-xs transition-all dark:border-slate-800 dark:bg-slate-900"
-                            >
-                              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-slate-50 pb-2.5 dark:border-slate-800/40">
-                                <div className="flex items-center gap-3">
-                                  {/* Clicking Page X opens reader directly */}
-                                  <Link
-                                    to={`${ROUTES.READER.replace(':id', book.id)}?page=${note.pageNumber}`}
-                                    className="rounded-xl bg-purple-50 px-3 py-1 text-xs font-extrabold text-purple-600 uppercase transition-colors hover:bg-purple-100 dark:bg-purple-950/20 dark:text-purple-400"
-                                  >
-                                    Page {note.pageNumber} ↗
-                                  </Link>
+                        ))}
+                      </div>
+                    </div>
 
-                                  {note.isBookmarked && (
-                                    <span className="inline-flex items-center gap-1 rounded-xl border border-amber-100 bg-amber-50 px-2 py-0.5 text-[8px] font-bold text-amber-600 uppercase dark:border-amber-900/20 dark:bg-amber-950/20">
-                                      <Bookmark className="h-3 w-3 fill-amber-500 text-amber-500" />
-                                      Bookmarked
-                                    </span>
-                                  )}
-                                </div>
+                    {/* 4. Reading Statistics Widget */}
+                    <div className="space-y-4 rounded-3xl border border-slate-100 bg-white p-6 text-left shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                      <h3 className="border-b border-slate-50 pb-2.5 text-xs font-extrabold tracking-widest text-purple-600 uppercase dark:border-slate-800/40">
+                        Reading Statistics
+                      </h3>
+                      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                        {[
+                          { label: 'Hours Read', value: `${book.stats.hoursRead}h` },
+                          { label: 'Pages Read', value: book.stats.pagesRead },
+                          { label: 'Sessions logged', value: book.stats.sessions },
+                          { label: 'Average session', value: book.stats.avgTime },
+                        ].map((stat, idx) => (
+                          <div
+                            key={idx}
+                            className="space-y-1 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/20"
+                          >
+                            <span className="block text-[8px] tracking-wider text-slate-400 uppercase">
+                              {stat.label}
+                            </span>
+                            <span className="block font-mono text-sm font-bold text-slate-700 dark:text-white">
+                              {stat.value}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
 
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => handleOpenNoteModal(note)}
-                                    className="hover:text-slate-655 rounded p-1 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
-                                    title="Edit Note"
-                                  >
-                                    <Edit2 className="h-3.5 w-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteNote(note.id)}
-                                    className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/20"
-                                    title="Delete Note"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
-                                </div>
+                    {/* 6. Activities Timeline */}
+                    <div className="space-y-4 rounded-3xl border border-slate-100 bg-white p-6 text-left shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                      <h3 className="flex items-center gap-1.5 border-b border-slate-50 pb-2.5 text-xs font-extrabold tracking-widest text-purple-600 uppercase dark:border-slate-800/40">
+                        <Activity className="h-4.5 w-4.5" />
+                        <span>Book Activity Timeline</span>
+                      </h3>
+                      <div className="relative ml-2.5 space-y-4 border-l border-slate-100 pl-6 dark:border-slate-800">
+                        {book.timeline.map((event, idx) => (
+                          <div key={idx} className="relative">
+                            <span className="absolute top-1 -left-[30px] h-2 w-2 rounded-full bg-purple-600 ring-4 ring-white dark:ring-slate-900" />
+                            <div>
+                              <p className="text-xs font-bold text-slate-700 dark:text-white">
+                                {event.event}
+                              </p>
+                              <p className="mt-0.5 font-mono text-[9px] text-slate-400">
+                                {event.date}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="notes-tab"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="space-y-4"
+                  >
+                    {/* Search box and create triggers */}
+                    <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-100 bg-white/60 p-4 shadow-xs backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/60">
+                      <div className="relative w-full max-w-xs shrink-0">
+                        <Search className="absolute top-2.5 left-3.5 h-4.5 w-4.5 text-slate-400" />
+                        <input
+                          type="text"
+                          placeholder="Search notes inside this book..."
+                          value={noteSearchQuery}
+                          onChange={(e) => setNoteSearchQuery(e.target.value)}
+                          className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 py-2 pr-4 pl-10 text-xs font-semibold text-slate-900 placeholder-slate-400 outline-hidden transition-all focus:border-purple-600 focus:bg-white dark:border-slate-800 dark:bg-slate-800/40 dark:text-white"
+                        />
+                      </div>
+
+                      <button
+                        onClick={() => handleOpenNoteModal()}
+                        className="flex h-9.5 items-center justify-center gap-1.5 rounded-2xl bg-purple-600 px-4 text-xs font-bold tracking-wider text-white uppercase shadow-sm transition-all hover:bg-purple-700"
+                      >
+                        <Plus className="h-4.5 w-4.5" />
+                        Add Journal Note
+                      </button>
+                    </div>
+
+                    {/* Display Notes grouped by page */}
+                    {filteredNotes.length === 0 ? (
+                      <div className="text-slate-550 flex h-48 flex-col items-center justify-center gap-2 rounded-3xl border border-dashed border-slate-100 bg-white text-sm dark:border-slate-800 dark:bg-slate-900">
+                        <span>No notes recorded yet.</span>
+                        <span className="text-[10px] text-slate-400">
+                          Start adding insights using the editor or the "+ Add Journal Note"
+                          trigger.
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {filteredNotes.map((note) => (
+                          <div
+                            key={note.id}
+                            className="hover:border-purple-550/20 flex flex-col justify-between rounded-3xl border border-slate-100 bg-white p-5 text-left shadow-xs transition-all dark:border-slate-800 dark:bg-slate-900"
+                          >
+                            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-slate-50 pb-2.5 dark:border-slate-800/40">
+                              <div className="flex items-center gap-3">
+                                {/* Clicking Page X opens reader directly */}
+                                <Link
+                                  to={`${ROUTES.READER.replace(':id', book.id)}?page=${note.pageNumber}`}
+                                  className="rounded-xl bg-purple-50 px-3 py-1 text-xs font-extrabold text-purple-600 uppercase transition-colors hover:bg-purple-100 dark:bg-purple-950/20 dark:text-purple-400"
+                                >
+                                  Page {note.pageNumber} ↗
+                                </Link>
+
+                                {note.isBookmarked && (
+                                  <span className="inline-flex items-center gap-1 rounded-xl border border-amber-100 bg-amber-50 px-2 py-0.5 text-[8px] font-bold text-amber-600 uppercase dark:border-amber-900/20 dark:bg-amber-950/20">
+                                    <Bookmark className="h-3 w-3 fill-amber-500 text-amber-500" />
+                                    Bookmarked
+                                  </span>
+                                )}
                               </div>
 
-                              <div className="space-y-3">
-                                {note.rating && (
-                                  <div className="flex gap-0.5 text-amber-400">
-                                    {Array.from({ length: 5 }).map((_, idx) => (
-                                      <Star
-                                        key={idx}
-                                        className={`h-3.5 w-3.5 ${
-                                          idx < note.rating!
-                                            ? 'fill-current'
-                                            : 'text-slate-200 dark:text-slate-800'
-                                        }`}
-                                      />
-                                    ))}
-                                  </div>
-                                )}
-
-                                {note.highlightedText && (
-                                  <div className="border-l-2 border-purple-400 bg-slate-50 py-1 pl-3.5 font-serif text-xs leading-relaxed text-slate-700 italic dark:bg-slate-800/40 dark:text-slate-300">
-                                    "{note.highlightedText}"
-                                  </div>
-                                )}
-
-                                <p className="text-xs leading-relaxed font-semibold text-slate-800 dark:text-slate-200">
-                                  {note.noteText || (
-                                    <em className="text-slate-400">
-                                      No notes written (bookmark only).
-                                    </em>
-                                  )}
-                                </p>
-
-                                {note.tags && note.tags.length > 0 && (
-                                  <div className="flex flex-wrap gap-1.5 border-t border-slate-50 pt-1.5 dark:border-slate-800/20">
-                                    {note.tags.map((tag) => (
-                                      <span
-                                        key={tag}
-                                        className="rounded bg-slate-50 px-2 py-0.5 text-[8px] font-bold tracking-wider text-slate-500 uppercase dark:bg-slate-800 dark:text-slate-400"
-                                      >
-                                        {tag}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleOpenNoteModal(note)}
+                                  className="hover:text-slate-655 rounded p-1 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                                  title="Edit Note"
+                                >
+                                  <Edit2 className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteNote(note.id)}
+                                  className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/20"
+                                  title="Delete Note"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
                               </div>
                             </div>
-                          ))}
-                        </div>
-                      )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+
+                            <div className="space-y-3">
+                              {note.rating && (
+                                <div className="flex gap-0.5 text-amber-400">
+                                  {Array.from({ length: 5 }).map((_, idx) => (
+                                    <Star
+                                      key={idx}
+                                      className={`h-3.5 w-3.5 ${
+                                        idx < note.rating!
+                                          ? 'fill-current'
+                                          : 'text-slate-200 dark:text-slate-800'
+                                      }`}
+                                    />
+                                  ))}
+                                </div>
+                              )}
+
+                              {note.highlightedText && (
+                                <div className="border-l-2 border-purple-400 bg-slate-50 py-1 pl-3.5 font-serif text-xs leading-relaxed text-slate-700 italic dark:bg-slate-800/40 dark:text-slate-300">
+                                  "{note.highlightedText}"
+                                </div>
+                              )}
+
+                              <p className="text-xs leading-relaxed font-semibold text-slate-800 dark:text-slate-200">
+                                {note.noteText || (
+                                  <em className="text-slate-400">
+                                    No notes written (bookmark only).
+                                  </em>
+                                )}
+                              </p>
+
+                              {note.tags && note.tags.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 border-t border-slate-50 pt-1.5 dark:border-slate-800/20">
+                                  {note.tags.map((tag) => (
+                                    <span
+                                      key={tag}
+                                      className="rounded bg-slate-50 px-2 py-0.5 text-[8px] font-bold tracking-wider text-slate-500 uppercase dark:bg-slate-800 dark:text-slate-400"
+                                    >
+                                      {tag}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+
+          {/* 8. Related Books Carousel horizontal */}
+          {relatedBooks.length > 0 && (
+            <div>
+              <h3 className="mb-4 text-sm font-bold tracking-wider text-slate-400 uppercase">
+                Related books
+              </h3>
+              <div className="flex scrollbar-thin gap-6 overflow-x-auto pb-4">
+                {relatedBooks.map((item) => (
+                  <Link
+                    key={item.id}
+                    to={`/books/${item.id}`}
+                    className="flex w-64 flex-shrink-0 cursor-pointer gap-4 rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-xs transition-all hover:border-purple-500/20 dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    <img
+                      src={
+                        item.coverPath ||
+                        'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=350&q=80'
+                      }
+                      alt={item.title}
+                      onError={handleImageError}
+                      className="aspect-[0.7/1] w-14 shrink-0 rounded border border-slate-200 object-cover shadow-xs dark:border-slate-800"
+                    />
+                    <div className="flex min-w-0 flex-col justify-between">
+                      <div>
+                        <span className="inline-block rounded bg-purple-50 px-1.5 py-0.5 text-[8px] leading-none font-bold tracking-wider text-purple-600 uppercase dark:bg-purple-950/20">
+                          {(() => {
+                            const itemCol = collections.find((c) => c.id === item.collectionId)
+                            return itemCol ? itemCol.name : 'Classics'
+                          })()}
+                        </span>
+                        <h4 className="mt-1 truncate text-xs font-bold text-slate-900 dark:text-white">
+                          {item.title}
+                        </h4>
+                        <p className="dark:text-slate-450 mt-0.5 truncate text-[10px] text-slate-500">
+                          By {item.author}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                        <span className="text-slate-655 text-[9px] font-bold dark:text-slate-400">
+                          4.8
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
               </div>
             </div>
-
-            {/* 8. Related Books Carousel horizontal */}
-            {relatedBooks.length > 0 && (
-              <div>
-                <h3 className="mb-4 text-sm font-bold tracking-wider text-slate-400 uppercase">
-                  Related books
-                </h3>
-                <div className="flex scrollbar-thin gap-6 overflow-x-auto pb-4">
-                  {relatedBooks.map((item) => (
-                    <Link
-                      key={item.id}
-                      to={`/books/${item.id}`}
-                      className="flex w-64 flex-shrink-0 cursor-pointer gap-4 rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-xs transition-all hover:border-purple-500/20 dark:border-slate-800 dark:bg-slate-900"
-                    >
-                      <img
-                        src={
-                          item.coverPath ||
-                          'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=350&q=80'
-                        }
-                        alt={item.title}
-                        onError={handleImageError}
-                        className="aspect-[0.7/1] w-14 shrink-0 rounded border border-slate-200 object-cover shadow-xs dark:border-slate-800"
-                      />
-                      <div className="flex min-w-0 flex-col justify-between">
-                        <div>
-                          <span className="inline-block rounded bg-purple-50 px-1.5 py-0.5 text-[8px] leading-none font-bold tracking-wider text-purple-600 uppercase dark:bg-purple-950/20">
-                            {(() => {
-                              const itemCol = collections.find((c) => c.id === item.collectionId)
-                              return itemCol ? itemCol.name : 'Classics'
-                            })()}
-                          </span>
-                          <h4 className="mt-1 truncate text-xs font-bold text-slate-900 dark:text-white">
-                            {item.title}
-                          </h4>
-                          <p className="dark:text-slate-450 mt-0.5 truncate text-[10px] text-slate-500">
-                            By {item.author}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                          <span className="text-slate-655 text-[9px] font-bold dark:text-slate-400">
-                            4.8
-                          </span>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
-          </motion.div>
-        )}
+          )}
+        </motion.div>
       </AnimatePresence>
 
       {/* Journal Note Edit / Create Modal dialog */}

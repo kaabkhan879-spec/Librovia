@@ -18,7 +18,6 @@ import {
   Users,
   Calendar,
   X,
-  Info,
   MessageSquare,
   Search,
 } from 'lucide-react'
@@ -28,8 +27,6 @@ export const DashboardPage: React.FC = () => {
   const { user } = useAuth()
   const [books, setBooks] = useState<Book[]>([])
   const [loading, setLoading] = useState(true)
-  const [isEmptyState, setIsEmptyState] = useState(false)
-  const [isSkeletonLoading, setIsSkeletonLoading] = useState(false)
   const [previewBook, setPreviewBook] = useState<Book | null>(null)
   const [collectionsList, setCollectionsList] = useState<Collection[]>([])
 
@@ -77,13 +74,6 @@ export const DashboardPage: React.FC = () => {
     } catch (err) {
       console.error(err)
     }
-  }
-
-  const handleSimulateLoader = () => {
-    setIsSkeletonLoading(true)
-    setTimeout(() => {
-      setIsSkeletonLoading(false)
-    }, 1500)
   }
 
   // --- TOP STATISTICS ---
@@ -225,30 +215,8 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-8 text-left select-none">
-      {/* Interactive Simulation tools */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-100 bg-white/80 p-4 shadow-xs backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/80">
-        <div className="text-text-sub flex items-center gap-2 text-xs font-semibold">
-          <Info className="h-4.5 w-4.5 shrink-0 text-purple-600" />
-          <span>Interactive UI Demos: Toggle empty states or skeleton layouts.</span>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={handleSimulateLoader}
-            className="dark:text-slate-350 dark:hover:bg-slate-850 cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/50"
-          >
-            Simulate Loading Skeletons
-          </button>
-          <button
-            onClick={() => setIsEmptyState(!isEmptyState)}
-            className={`cursor-pointer rounded-xl border px-3.5 py-1.5 text-xs font-bold transition-all ${isEmptyState ? 'border-purple-600 bg-purple-600 text-white' : 'dark:hover:bg-slate-850 border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300'} `}
-          >
-            {isEmptyState ? 'Show Real Dashboard' : 'Show Empty States'}
-          </button>
-        </div>
-      </div>
-
       <AnimatePresence mode="wait">
-        {isSkeletonLoading || loading ? (
+        {loading ? (
           <motion.div
             key="skeleton"
             initial={{ opacity: 0 }}
@@ -266,7 +234,7 @@ export const DashboardPage: React.FC = () => {
               </div>
             ))}
           </motion.div>
-        ) : isEmptyState || books.length === 0 ? (
+        ) : books.length === 0 ? (
           <motion.div
             key="empty"
             initial={{ opacity: 0, y: 15 }}

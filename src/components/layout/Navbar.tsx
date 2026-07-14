@@ -45,12 +45,6 @@ export const MarketingNavbar: React.FC = () => {
           >
             FAQ
           </a>
-          <Link
-            to={ROUTES.DESIGN_SYSTEM}
-            className="hover-underline hover:text-primary-600 text-text-sub text-xs font-bold tracking-wider uppercase"
-          >
-            UI Showcase
-          </Link>
         </nav>
 
         {/* Action Buttons */}

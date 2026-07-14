@@ -754,11 +754,11 @@ export const LandingPage: React.FC = () => {
                   Get Started Free
                 </Button>
               </Link>
-              <Link to={ROUTES.DESIGN_SYSTEM}>
-                <Button className="border border-indigo-300 bg-transparent text-white hover:bg-indigo-700">
+              <a href="#features">
+                <Button className="cursor-pointer border border-indigo-300 bg-transparent text-white hover:bg-indigo-700">
                   Explore Features
                 </Button>
-              </Link>
+              </a>
             </div>
           </div>
         </section>

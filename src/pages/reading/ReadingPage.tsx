@@ -4,15 +4,13 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { booksService, type Book } from '../../services/books'
 import { collectionsService, type Collection } from '../../services/collections'
 import { ROUTES } from '../../constants/routes'
-import { History, Info } from 'lucide-react'
+import { History } from 'lucide-react'
 import { Button } from '../../components/common/Button'
 
 export const ReadingPage: React.FC = () => {
   const [books, setBooks] = useState<Book[]>([])
   const [collectionsList, setCollectionsList] = useState<Collection[]>([])
   const [loading, setLoading] = useState(true)
-  const [isSkeletonLoading, setIsSkeletonLoading] = useState(false)
-  const [isEmptyState, setIsEmptyState] = useState(false)
 
   useEffect(() => {
     Promise.all([booksService.getBooks(), collectionsService.getCollections()]).then(
@@ -23,13 +21,6 @@ export const ReadingPage: React.FC = () => {
       }
     )
   }, [])
-
-  const handleSimulateLoader = () => {
-    setIsSkeletonLoading(true)
-    setTimeout(() => {
-      setIsSkeletonLoading(false)
-    }, 1500)
-  }
 
   const getCollectionName = (colId: string | undefined) => {
     const col = collectionsList.find((c) => c.id === colId)
@@ -62,28 +53,6 @@ export const ReadingPage: React.FC = () => {
 
   return (
     <div className="min-h-screen space-y-8 pb-20 text-left select-none">
-      {/* Simulation Tools Row */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-100 bg-white/80 p-4 shadow-xs backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/80">
-        <div className="text-text-sub flex items-center gap-2 text-xs font-semibold">
-          <Info className="h-4.5 w-4.5 shrink-0 text-purple-600" />
-          <span>Interactive UI Demos: Toggle empty states or skeleton layouts below.</span>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={handleSimulateLoader}
-            className="cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-800"
-          >
-            Simulate Loading Skeletons
-          </button>
-          <button
-            onClick={() => setIsEmptyState(!isEmptyState)}
-            className={`cursor-pointer rounded-xl border px-3.5 py-1.5 text-xs font-bold transition-all ${isEmptyState ? 'border-purple-600 bg-purple-600 text-white' : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-800'} `}
-          >
-            {isEmptyState ? 'Show Real History' : 'Show Empty States'}
-          </button>
-        </div>
-      </div>
-
       {/* Header section */}
       <div className="space-y-1">
         <h1 className="font-sans text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
@@ -95,7 +64,7 @@ export const ReadingPage: React.FC = () => {
       </div>
 
       <AnimatePresence mode="wait">
-        {isSkeletonLoading || loading ? (
+        {loading ? (
           <motion.div
             key="skeleton"
             initial={{ opacity: 0 }}
@@ -110,7 +79,7 @@ export const ReadingPage: React.FC = () => {
               />
             ))}
           </motion.div>
-        ) : isEmptyState || readingHistory.length === 0 ? (
+        ) : readingHistory.length === 0 ? (
           <motion.div
             key="empty"
             initial={{ opacity: 0, y: 15 }}
