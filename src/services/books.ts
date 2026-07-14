@@ -44,18 +44,30 @@ export const booksService = {
     } = await supabase.auth.getUser()
     if (!user) return []
 
-    const { data, error } = await supabase
+    const res = await supabase
       .from('books')
       .select('*, reading_progress(current_page, total_pages, last_read_at, is_completed)')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
+
+    let rows = res.data || []
+    let error = res.error
+
+    if (error && error.code === 'PGRST205') {
+      const fallbackRes = await supabase
+        .from('books')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+      rows = fallbackRes.data || []
+      error = fallbackRes.error
+    }
 
     if (error) {
       console.error('Error fetching books:', error)
       return []
     }
 
-    const rows = data || []
     if (rows.length === 0) return []
 
     // Extract paths for bulk signed URL generation
@@ -139,11 +151,20 @@ export const booksService = {
   },
 
   async getBookById(id: string): Promise<Book | null> {
-    const { data, error } = await supabase
+    const res = await supabase
       .from('books')
       .select('*, reading_progress(current_page, total_pages, last_read_at, is_completed)')
       .eq('id', id)
       .single()
+
+    let data = res.data
+    let error = res.error
+
+    if (error && error.code === 'PGRST205') {
+      const fallbackRes = await supabase.from('books').select('*').eq('id', id).single()
+      data = fallbackRes.data
+      error = fallbackRes.error
+    }
 
     if (error || !data) {
       console.error('Error fetching book by id:', error)
