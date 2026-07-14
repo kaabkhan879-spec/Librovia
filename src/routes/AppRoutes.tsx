@@ -24,6 +24,7 @@ import { FavoritesPage } from '../pages/favorites/FavoritesPage'
 import { CategoriesPage } from '../pages/categories/CategoriesPage'
 import { ProfilePage } from '../pages/profile/ProfilePage'
 import { SettingsPage } from '../pages/settings/SettingsPage'
+import { StoragePage } from '../pages/storage/StoragePage'
 import { DesignSystemShowcase } from '../pages/showcase/DesignSystemShowcase'
 
 export const AppRoutes: React.FC = () => {
@@ -53,6 +54,7 @@ export const AppRoutes: React.FC = () => {
           <Route path={ROUTES.CATEGORIES} element={<CategoriesPage />} />
           <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
           <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />
+          <Route path={ROUTES.STORAGE} element={<StoragePage />} />
         </Route>
       </Route>
 

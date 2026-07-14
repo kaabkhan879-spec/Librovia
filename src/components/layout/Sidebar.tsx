@@ -65,7 +65,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { name: 'Favorites', to: ROUTES.FAVORITES, icon: Star },
     { name: 'Reading History', to: ROUTES.DASHBOARD, icon: History, hash: '#history-section' },
     { name: 'Analytics', to: ROUTES.DASHBOARD, icon: BarChart3, hash: '#analytics-section' },
-    { name: 'Storage', to: ROUTES.DASHBOARD, icon: Cloud, hash: '#storage-section' },
+    { name: 'Storage', to: ROUTES.STORAGE, icon: Cloud },
     { name: 'Settings', to: ROUTES.SETTINGS, icon: Settings },
   ]
 
