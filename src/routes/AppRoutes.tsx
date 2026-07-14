@@ -25,6 +25,8 @@ import { CategoriesPage } from '../pages/categories/CategoriesPage'
 import { ProfilePage } from '../pages/profile/ProfilePage'
 import { SettingsPage } from '../pages/settings/SettingsPage'
 import { StoragePage } from '../pages/storage/StoragePage'
+import { ReadingPage } from '../pages/reading/ReadingPage'
+import { AnalyticsPage } from '../pages/analytics/AnalyticsPage'
 import { DesignSystemShowcase } from '../pages/showcase/DesignSystemShowcase'
 
 export const AppRoutes: React.FC = () => {
@@ -51,7 +53,9 @@ export const AppRoutes: React.FC = () => {
           <Route path={ROUTES.BOOK_DETAILS} element={<BookDetailsPage />} />
           <Route path={ROUTES.READER} element={<ReaderPage />} />
           <Route path={ROUTES.FAVORITES} element={<FavoritesPage />} />
-          <Route path={ROUTES.CATEGORIES} element={<CategoriesPage />} />
+          <Route path={ROUTES.COLLECTIONS} element={<CategoriesPage />} />
+          <Route path={ROUTES.READING} element={<ReadingPage />} />
+          <Route path={ROUTES.ANALYTICS} element={<AnalyticsPage />} />
           <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
           <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />
           <Route path={ROUTES.STORAGE} element={<StoragePage />} />

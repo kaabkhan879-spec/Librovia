@@ -748,7 +748,7 @@ export const LibraryPage: React.FC = () => {
               {collections.length === 0 ? (
                 <div className="border-border-base bg-bg-surface/30 text-text-sub rounded-2xl border border-dashed py-8 text-center text-xs">
                   No collections created yet. Go to{' '}
-                  <Link to={ROUTES.CATEGORIES} className="text-primary-600 hover:underline">
+                  <Link to={ROUTES.COLLECTIONS} className="text-primary-600 hover:underline">
                     Collections page
                   </Link>{' '}
                   to create one.
@@ -867,7 +867,7 @@ export const LibraryPage: React.FC = () => {
                     <p className="text-text-muted text-[10px] italic">
                       No collections created yet. Go to{' '}
                       <Link
-                        to={ROUTES.CATEGORIES}
+                        to={ROUTES.COLLECTIONS}
                         onClick={() => setSelectedBook(null)}
                         className="text-primary-600 hover:underline"
                       >

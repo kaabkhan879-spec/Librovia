@@ -61,10 +61,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navigation = [
     { name: 'Dashboard', to: ROUTES.DASHBOARD, icon: LayoutDashboard },
     { name: 'My Library', to: ROUTES.LIBRARY, icon: Library },
-    { name: 'Collections', to: ROUTES.CATEGORIES, icon: Folder },
+    { name: 'Collections', to: ROUTES.COLLECTIONS, icon: Folder },
     { name: 'Favorites', to: ROUTES.FAVORITES, icon: Star },
-    { name: 'Reading History', to: ROUTES.DASHBOARD, icon: History, hash: '#history-section' },
-    { name: 'Analytics', to: ROUTES.DASHBOARD, icon: BarChart3, hash: '#analytics-section' },
+    { name: 'Reading History', to: ROUTES.READING, icon: History },
+    { name: 'Analytics', to: ROUTES.ANALYTICS, icon: BarChart3 },
     { name: 'Storage', to: ROUTES.STORAGE, icon: Cloud },
     { name: 'Settings', to: ROUTES.SETTINGS, icon: Settings },
   ]
@@ -112,25 +112,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Sidebar Nav Links */}
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4 text-left">
           {navigation.map((item) => {
-            const hasHash = !!item.hash
             return (
               <NavLink
                 key={item.name}
-                to={hasHash ? ROUTES.DASHBOARD : item.to}
+                to={item.to}
                 end={item.to === ROUTES.DASHBOARD}
-                onClick={(e) => {
-                  if (hasHash && item.hash) {
-                    e.preventDefault()
-                    navigate(ROUTES.DASHBOARD)
-                    setTimeout(() => {
-                      const el = document.getElementById(item.hash!.substring(1))
-                      if (el) el.scrollIntoView({ behavior: 'smooth' })
-                    }, 100)
-                  }
-                }}
                 className={({ isActive }) =>
                   `group text-text-sub hover:bg-bg-app hover:text-text-main relative flex cursor-pointer items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold tracking-wider uppercase transition-all ${
-                    isActive && !hasHash
+                    isActive
                       ? 'bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400'
                       : ''
                   } `
@@ -141,7 +130,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <item.icon className="h-5 w-5 shrink-0" />
                     {!isCollapsed && <span>{item.name}</span>}
                     {/* Visual indicator bar on hover/active */}
-                    {isActive && !hasHash && (
+                    {isActive && (
                       <motion.div
                         layoutId="active-indicator"
                         className="bg-primary-600 absolute top-3 bottom-3 left-0 w-1 rounded-r-full"
