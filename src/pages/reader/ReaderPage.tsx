@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ROUTES } from '../../constants/routes'
 import {
@@ -10,34 +10,38 @@ import {
   ChevronRight,
   Bookmark,
   List,
-  Search,
   Sliders,
   Clock,
   Trash2,
   Maximize,
   Minimize,
   RotateCw,
+  MessageSquare,
+  Star,
+  X,
+  CheckCircle,
+  Edit2,
+  Plus,
 } from 'lucide-react'
 import { booksService, type Book } from '../../services/books'
+import { notesService, type Note } from '../../services/notes'
 import { Document, Page, pdfjs } from 'react-pdf'
 
 // Set react-pdf worker source to CDN worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
-
-interface Annotation {
-  id: string
-  page: number
-  text: string
-  color: 'yellow' | 'blue' | 'green' | 'pink'
-}
 
 interface Chapter {
   title: string
   page: number
 }
 
+const AVAILABLE_TAGS = ['Important', 'Motivation', 'Exam', 'Research', 'Favorite', 'Personal']
+
 export const ReaderPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
+  const [searchParams] = useSearchParams()
+  const pageParam = searchParams.get('page')
+
   const containerRef = useRef<HTMLDivElement>(null)
 
   // Database book models
@@ -66,30 +70,25 @@ export const ReaderPage: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [activeTab, setActiveTab] = useState<'toc' | 'thumbs' | 'bookmarks' | 'notes'>('toc')
   const [showSettings, setShowSettings] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
 
   // Text options (UI mockup elements)
   const [fontSize, setFontSize] = useState<'sm' | 'base' | 'lg' | 'xl'>('base')
   const [lineHeight, setLineHeight] = useState<'normal' | 'relaxed' | 'loose'>('relaxed')
   const [pageWidth, setPageWidth] = useState<'narrow' | 'medium' | 'wide'>('medium')
 
-  // Local interactive bookmarks & notes (not saved to Supabase yet as requested)
-  const [bookmarks, setBookmarks] = useState<number[]>([5, 12, 15])
-  const [highlights, setHighlights] = useState<Annotation[]>([
-    {
-      id: '1',
-      page: 15,
-      text: 'distill complex topics into simple behaviors that can be easily applied',
-      color: 'yellow',
-    },
-    {
-      id: '2',
-      page: 15,
-      text: 'distraction-free reading experience is comfortable for long reading sessions',
-      color: 'blue',
-    },
-  ])
-  const [noteInput, setNoteInput] = useState('')
+  // Reading Journal states
+  const [bookNotes, setBookNotes] = useState<Note[]>([])
+  const [isNotesModalOpen, setIsNotesModalOpen] = useState(false)
+  const [modalRating, setModalRating] = useState<number | undefined>(undefined)
+  const [modalNoteText, setModalNoteText] = useState('')
+  const [modalHighlightText, setModalHighlightText] = useState('')
+  const [modalBookmark, setModalBookmark] = useState(false)
+  const [modalTags, setModalTags] = useState<string[]>([])
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
+
+  // Toast notifications
+  const [showToast, setShowToast] = useState(false)
+  const [toastMessage, setToastMessage] = useState('')
 
   // Chapters Mockup list
   const chapters: Chapter[] = [
@@ -100,13 +99,25 @@ export const ReaderPage: React.FC = () => {
     { title: 'Chapter 4: The Man Who Didnt Look Right', page: 55 },
   ]
 
+  const showNotification = (msg: string) => {
+    setToastMessage(msg)
+    setShowToast(true)
+    setTimeout(() => setShowToast(false), 3000)
+  }
+
+  const fetchNotes = useCallback(async () => {
+    if (!id) return
+    try {
+      const data = await notesService.getNotesForBook(id)
+      setBookNotes(data)
+    } catch (err) {
+      console.error('Failed to load notes:', err)
+    }
+  }, [id])
+
   // Query Supabase for book path on mount
   useEffect(() => {
     if (!id) return
-    Promise.resolve().then(() => {
-      setLoading(true)
-      setErrorMsg(null)
-    })
 
     booksService
       .getBookById(id)
@@ -125,17 +136,22 @@ export const ReaderPage: React.FC = () => {
         }
 
         setRawBook(data)
-        const resumePage = data.currentPage && data.currentPage > 0 ? data.currentPage : 1
-        setPage(resumePage)
-        lastSavedPageRef.current = resumePage
+        const targetPage = pageParam
+          ? Number(pageParam)
+          : data.currentPage && data.currentPage > 0
+            ? data.currentPage
+            : 1
+        setPage(targetPage)
+        lastSavedPageRef.current = targetPage
         setLoading(false)
+        fetchNotes()
       })
       .catch((err) => {
         console.error(err)
         setErrorMsg('Failed to load secure PDF from Supabase storage.')
         setLoading(false)
       })
-  }, [id])
+  }, [id, pageParam, fetchNotes])
 
   // Synchronize reading progress with Supabase
   const lastSavedPageRef = useRef<number>(1)
@@ -212,7 +228,6 @@ export const ReaderPage: React.FC = () => {
   // Auto layout fitting scale calculation logic
   const adjustScale = useCallback(() => {
     if (!containerRef.current || !originalPageWidth || !originalPageHeight) return
-    // Padding offsets
     const containerWidth = containerRef.current.clientWidth - 48
     const containerHeight = containerRef.current.clientHeight - 48
 
@@ -318,56 +333,114 @@ export const ReaderPage: React.FC = () => {
     handleFullscreenToggle,
   ])
 
-  const toggleBookmark = () => {
-    if (bookmarks.includes(page)) {
-      setBookmarks((prev) => prev.filter((p) => p !== page))
-    } else {
-      setBookmarks((prev) => [...prev, page].sort((a, b) => a - b))
+  // Mouse Up selection highlight detector
+  const handleMouseUp = () => {
+    const selected = window.getSelection()?.toString()
+    if (selected && selected.trim()) {
+      setModalHighlightText(selected.trim())
+      setModalNoteText('')
+      setModalRating(undefined)
+      setModalTags([])
+      setModalBookmark(false)
+      setEditingNoteId(null)
+      setIsNotesModalOpen(true)
     }
   }
 
-  const addHighlight = (color: 'yellow' | 'blue' | 'green' | 'pink') => {
-    const textOptions = [
-      'An easy & proven way to build good habits & break bad ones.',
-      'Small improvements compound into massive long-term results.',
-      'You do not rise to the level of your goals. You fall to the level of your systems.',
-    ]
-
-    setHighlights((prev) => {
-      const selectedIndex = prev.length % textOptions.length
-      const randomText = textOptions[selectedIndex]
-      return [
-        ...prev,
-        {
-          id: Date.now().toString(),
-          page,
-          text: randomText,
-          color,
-        },
-      ]
-    })
+  // Toggle page bookmark status directly
+  const toggleBookmark = async () => {
+    const existing = bookNotes.find((n) => n.pageNumber === page)
+    try {
+      if (existing) {
+        const updated = await notesService.saveNote({
+          ...existing,
+          isBookmarked: !existing.isBookmarked,
+        })
+        setBookNotes((prev) => prev.map((n) => (n.id === existing.id ? updated : n)))
+        showNotification(updated.isBookmarked ? 'Page bookmarked! 🔖' : 'Bookmark removed!')
+      } else {
+        const created = await notesService.saveNote({
+          bookId: id!,
+          pageNumber: page,
+          noteText: '',
+          isBookmarked: true,
+          tags: [],
+        })
+        setBookNotes((prev) => [...prev, created])
+        showNotification('Page bookmarked! 🔖')
+      }
+    } catch (err) {
+      console.error(err)
+    }
   }
 
-  const deleteHighlight = (id: string) => {
-    setHighlights((prev) => prev.filter((h) => h.id !== id))
+  const handleOpenNoteModal = () => {
+    const existing = bookNotes.find((n) => n.pageNumber === page)
+    if (existing) {
+      setEditingNoteId(existing.id)
+      setModalRating(existing.rating)
+      setModalNoteText(existing.noteText)
+      setModalHighlightText(existing.highlightedText || '')
+      setModalBookmark(existing.isBookmarked)
+      setModalTags(existing.tags)
+    } else {
+      setEditingNoteId(null)
+      setModalRating(undefined)
+      setModalNoteText('')
+      setModalHighlightText('')
+      setModalBookmark(false)
+      setModalTags([])
+    }
+    setIsNotesModalOpen(true)
   }
 
-  const addNote = (e: React.FormEvent) => {
+  const handleSaveNote = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!noteInput.trim()) return
-    setHighlights((prev) => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        page,
-        text: `Note: ${noteInput.trim()}`,
-        color: 'yellow',
-      },
-    ])
-    setNoteInput('')
+    if (!id) return
+
+    try {
+      const payload = {
+        id: editingNoteId || undefined,
+        bookId: id,
+        pageNumber: page,
+        noteText: modalNoteText,
+        rating: modalRating,
+        highlightedText: modalHighlightText || undefined,
+        isBookmarked: modalBookmark,
+        tags: modalTags,
+      }
+
+      // Optimistic UI updates
+      const saved = await notesService.saveNote(payload)
+      if (editingNoteId) {
+        setBookNotes((prev) => prev.map((n) => (n.id === editingNoteId ? saved : n)))
+      } else {
+        setBookNotes((prev) => [...prev, saved])
+      }
+
+      setIsNotesModalOpen(false)
+      showNotification('Note synced to Supabase successfully! 📒')
+    } catch (err) {
+      console.error(err)
+    }
   }
 
-  // Ctrl + Mouse Wheel Zoom helper
+  const handleDeleteNote = async (noteId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!confirm('Are you sure you want to delete this note?')) return
+    try {
+      await notesService.deleteNote(noteId)
+      setBookNotes((prev) => prev.filter((n) => n.id !== noteId))
+      showNotification('Note deleted.')
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const handleToggleTag = (tag: string) => {
+    setModalTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]))
+  }
+
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     if (e.ctrlKey) {
       e.preventDefault()
@@ -387,6 +460,9 @@ export const ReaderPage: React.FC = () => {
     setOriginalPageWidth(p.width)
     setOriginalPageHeight(p.height)
   }
+
+  // Bookmarked pages selector helper
+  const bookmarkedPages = bookNotes.filter((n) => n.isBookmarked).map((n) => n.pageNumber)
 
   // Theme styling definitions
   const themeClasses = {
@@ -448,52 +524,37 @@ export const ReaderPage: React.FC = () => {
         <div className="flex items-center gap-3">
           <Link
             to={ROUTES.LIBRARY}
-            className="text-text-sub hover:bg-bg-app hover:text-text-main cursor-pointer rounded-lg p-2"
-            title="Back to Library"
+            className="text-text-sub hover:text-text-main cursor-pointer rounded-lg p-2"
           >
             <ArrowLeft className="h-4.5 w-4.5" />
           </Link>
-          <div className="text-left">
-            <h1 className="text-text-main max-w-[200px] truncate text-xs font-bold tracking-wider uppercase">
+          <div className="min-w-0">
+            <h1 className="text-text-main truncate text-xs font-extrabold tracking-wider uppercase">
               {rawBook.title}
             </h1>
-            <p className="text-text-muted text-[10px]">
-              By {rawBook.author} • Page {page} of {totalPages}
+            <p className="text-text-muted mt-0.5 truncate text-[9px] font-bold">
+              By {rawBook.author}
             </p>
           </div>
         </div>
 
-        {/* Center search bar (UI only) */}
-        <div className="relative mx-4 hidden max-w-xs flex-1 rounded-lg shadow-sm md:block">
-          <div className="text-text-muted pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
-            <Search className="h-3.5 w-3.5" />
-          </div>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search in book..."
-            className="border-border-base bg-bg-app text-text-main placeholder:text-text-muted focus:border-primary-500 focus:ring-primary-500/10 block w-full rounded-lg border px-8 py-1 text-xs focus:ring-2 focus:outline-none"
-          />
-        </div>
-
-        {/* Right side controls toolbar */}
+        {/* Right side page manipulations */}
         <div className="flex items-center gap-2">
-          {/* Zoom controls */}
-          <div className="border-border-base bg-bg-surface hidden items-center gap-1 rounded-lg border p-0.5 sm:flex">
+          {/* Zoom Buttons */}
+          <div className="border-border-base bg-bg-surface flex items-center rounded-lg border p-0.5">
             <button
               onClick={handleZoomOut}
-              className="text-text-sub hover:text-text-main cursor-pointer p-1"
+              className="text-text-sub hover:bg-bg-app hover:text-text-main cursor-pointer rounded p-1.5"
               title="Zoom Out"
             >
               <ZoomOut className="h-4 w-4" />
             </button>
-            <span className="w-12 text-center text-[10px] font-bold">
+            <span className="text-text-main min-w-12 px-1 text-center font-mono text-[10px] font-bold">
               {Math.round(scale * 100)}%
             </span>
             <button
               onClick={handleZoomIn}
-              className="text-text-sub hover:text-text-main cursor-pointer p-1"
+              className="text-text-sub hover:bg-bg-app hover:text-text-main cursor-pointer rounded p-1.5"
               title="Zoom In"
             >
               <ZoomIn className="h-4 w-4" />
@@ -512,7 +573,7 @@ export const ReaderPage: React.FC = () => {
             </button>
             <button
               onClick={() => setFitMode(fitMode === 'page' ? 'custom' : 'page')}
-              className={`cursor-pointer rounded px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase ml-1${
+              className={`ml-1 cursor-pointer rounded px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase ${
                 fitMode === 'page' ? 'bg-primary-600 text-white' : 'text-text-sub hover:bg-bg-app'
               }`}
             >
@@ -553,31 +614,20 @@ export const ReaderPage: React.FC = () => {
             ))}
           </div>
 
-          {/* Highlight Color Trigger buttons */}
-          <div className="border-border-base bg-bg-surface hidden items-center gap-1 rounded-lg border p-1 sm:flex">
-            {(['yellow', 'blue', 'green', 'pink'] as const).map((c) => {
-              const bgMap = {
-                yellow: 'bg-yellow-200',
-                blue: 'bg-sky-200',
-                green: 'bg-emerald-200',
-                pink: 'bg-pink-200',
-              }
-              return (
-                <button
-                  key={c}
-                  onClick={() => addHighlight(c)}
-                  className={`h-4.5 w-4.5 rounded-full ${bgMap[c]} cursor-pointer border border-black/10 hover:scale-110`}
-                  title={`Highlight in ${c}`}
-                />
-              )
-            })}
-          </div>
+          {/* Personal Journal Notes modal trigger */}
+          <button
+            onClick={handleOpenNoteModal}
+            className="cursor-pointer rounded-lg bg-purple-50 p-2 text-purple-600 hover:bg-purple-100 dark:bg-purple-950/20"
+            title="Write Study Journal Note"
+          >
+            <MessageSquare className="h-4.5 w-4.5" />
+          </button>
 
           {/* Bookmark page */}
           <button
             onClick={toggleBookmark}
             className={`cursor-pointer rounded-lg p-2 ${
-              bookmarks.includes(page)
+              bookmarkedPages.includes(page)
                 ? 'bg-amber-500/10 text-amber-500'
                 : 'text-text-sub hover:bg-bg-app'
             }`}
@@ -585,7 +635,7 @@ export const ReaderPage: React.FC = () => {
           >
             <Bookmark
               className="h-4.5 w-4.5"
-              fill={bookmarks.includes(page) ? 'currentColor' : 'none'}
+              fill={bookmarkedPages.includes(page) ? 'currentColor' : 'none'}
             />
           </button>
 
@@ -700,77 +750,125 @@ export const ReaderPage: React.FC = () => {
 
             {activeTab === 'bookmarks' && (
               <div className="space-y-2">
-                {bookmarks.length === 0 ? (
+                {bookNotes.filter((n) => n.isBookmarked).length === 0 ? (
                   <p className="text-text-muted py-6 text-center text-[10px]">
                     No bookmarks saved.
                   </p>
                 ) : (
-                  bookmarks.map((p) => (
-                    <button
-                      key={p}
-                      onClick={() => setPage(p)}
-                      className={`flex w-full cursor-pointer items-center gap-2 rounded-lg p-2 text-left text-xs ${
-                        p === page
-                          ? 'bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400 font-bold'
-                          : 'text-text-sub hover:bg-bg-app'
-                      } `}
-                    >
-                      <Bookmark className="h-3.5 w-3.5" fill="currentColor" />
-                      <span>Page {p} Bookmarked</span>
-                    </button>
-                  ))
+                  bookNotes
+                    .filter((n) => n.isBookmarked)
+                    .map((n) => (
+                      <button
+                        key={n.id}
+                        onClick={() => setPage(n.pageNumber)}
+                        className={`flex w-full cursor-pointer items-center gap-2 rounded-lg p-2 text-left text-xs ${
+                          n.pageNumber === page
+                            ? 'bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400 font-bold'
+                            : 'text-text-sub hover:bg-bg-app'
+                        } `}
+                      >
+                        <Bookmark className="h-3.5 w-3.5 text-amber-500" fill="currentColor" />
+                        <div className="min-w-0 flex-1">
+                          <span className="block font-bold">Page {n.pageNumber}</span>
+                          {n.noteText && (
+                            <p className="text-text-muted truncate text-[10px] font-normal">
+                              {n.noteText}
+                            </p>
+                          )}
+                        </div>
+                      </button>
+                    ))
                 )}
               </div>
             )}
 
             {activeTab === 'notes' && (
               <div className="space-y-4">
-                {/* Note create form */}
-                <form onSubmit={addNote} className="space-y-2">
-                  <input
-                    type="text"
-                    value={noteInput}
-                    onChange={(e) => setNoteInput(e.target.value)}
-                    placeholder="Type note and click Add..."
-                    className="border-border-base bg-bg-app text-text-main placeholder:text-text-muted focus:border-primary-500 w-full rounded-lg border px-3 py-1.5 text-xs focus:outline-none"
-                  />
-                  <button
-                    type="submit"
-                    className="bg-primary-600 hover:bg-primary-700 flex h-8 w-full cursor-pointer items-center justify-center rounded-lg text-xs font-bold tracking-wider text-white uppercase"
-                  >
-                    Add Page Note
-                  </button>
-                </form>
+                <button
+                  onClick={handleOpenNoteModal}
+                  className="flex h-8 w-full cursor-pointer items-center justify-center gap-1 rounded-lg bg-purple-600 text-xs font-bold tracking-wider text-white uppercase shadow-sm hover:bg-purple-700"
+                >
+                  <Plus className="h-4.5 w-4.5" />
+                  Add New Note (p. {page})
+                </button>
 
                 {/* Annotation items list */}
                 <div className="border-border-light space-y-2 border-t pt-2">
-                  {highlights.map((h) => {
-                    const colorClasses = {
-                      yellow:
-                        'bg-yellow-100 dark:bg-yellow-500/10 text-yellow-800 dark:text-yellow-400 border-yellow-200',
-                      blue: 'bg-sky-100 dark:bg-sky-500/10 text-sky-800 dark:text-sky-400 border-sky-200',
-                      green:
-                        'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border-emerald-200',
-                      pink: 'bg-pink-100 dark:bg-pink-500/10 text-pink-800 dark:text-pink-400 border-pink-200',
-                    }
-                    return (
+                  {bookNotes.length === 0 ? (
+                    <p className="text-text-muted py-6 text-center text-[10px]">
+                      No personal study notes.
+                    </p>
+                  ) : (
+                    bookNotes.map((n) => (
                       <div
-                        key={h.id}
-                        className={`space-y-1.5 rounded-lg border p-2.5 text-left text-xs ${colorClasses[h.color]}`}
+                        key={n.id}
+                        onClick={() => setPage(n.pageNumber)}
+                        className={`cursor-pointer space-y-2 rounded-2xl border border-slate-100 bg-white p-3 text-left text-xs shadow-xs transition-colors hover:border-purple-500/35 dark:border-slate-800 dark:bg-slate-900 ${
+                          n.pageNumber === page
+                            ? 'border-purple-500/40 ring-1 ring-purple-500/10'
+                            : ''
+                        }`}
                       >
-                        <p className="font-serif leading-relaxed italic">"{h.text}"</p>
-                        <div className="text-text-muted mt-1.5 flex items-center justify-between border-t border-black/5 pt-1.5 font-sans text-[9px] font-bold">
-                          <span>Page {h.page}</span>
-                          <button
-                            onClick={() => deleteHighlight(h.id)}
-                            className="cursor-pointer hover:text-red-500"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
+                        {n.rating && (
+                          <div className="flex gap-0.5 text-amber-400">
+                            {Array.from({ length: n.rating }).map((_, idx) => (
+                              <Star key={idx} className="h-3 w-3 fill-current" />
+                            ))}
+                          </div>
+                        )}
+                        {n.highlightedText && (
+                          <p className="border-l-2 border-purple-400 bg-purple-50/50 pl-2 font-serif text-[10px] leading-relaxed text-purple-700 italic dark:bg-purple-950/20 dark:text-purple-300">
+                            "{n.highlightedText}"
+                          </p>
+                        )}
+                        {n.noteText && (
+                          <p className="leading-relaxed font-semibold text-slate-700 dark:text-slate-300">
+                            {n.noteText}
+                          </p>
+                        )}
+
+                        {n.tags && n.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {n.tags.map((tag) => (
+                              <span
+                                key={tag}
+                                className="rounded bg-slate-50 px-1 py-0.5 text-[8px] font-bold text-slate-500 uppercase dark:bg-slate-800 dark:text-slate-400"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="text-text-muted mt-1.5 flex items-center justify-between border-t border-slate-50 pt-1.5 font-sans text-[9px] font-bold dark:border-slate-800/40">
+                          <span>Page {n.pageNumber}</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setEditingNoteId(n.id)
+                                setModalRating(n.rating)
+                                setModalNoteText(n.noteText)
+                                setModalHighlightText(n.highlightedText || '')
+                                setModalBookmark(n.isBookmarked)
+                                setModalTags(n.tags)
+                                setIsNotesModalOpen(true)
+                              }}
+                              className="text-slate-400 hover:text-slate-600 dark:hover:text-white"
+                            >
+                              <Edit2 className="h-3 w-3" />
+                            </button>
+                            <button
+                              onClick={(e) => handleDeleteNote(n.id, e)}
+                              className="text-slate-400 hover:text-red-500"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    )
-                  })}
+                    ))
+                  )}
                 </div>
               </div>
             )}
@@ -887,6 +985,7 @@ export const ReaderPage: React.FC = () => {
               themeClasses[theme]
             } ${widthClasses[pageWidth]}`}
             style={{ transform: `scale(${scale})` }}
+            onMouseUp={handleMouseUp}
           >
             <Document
               file={rawBook.filePath}
@@ -906,7 +1005,7 @@ export const ReaderPage: React.FC = () => {
                 pageNumber={page}
                 rotate={rotation}
                 onLoadSuccess={onPageLoadSuccess}
-                renderTextLayer={false}
+                renderTextLayer={true}
                 renderAnnotationLayer={false}
                 className="overflow-hidden rounded-2xl"
                 loading={
@@ -971,6 +1070,168 @@ export const ReaderPage: React.FC = () => {
           {page} / {totalPages} ({Math.round((page / totalPages) * 100)}%)
         </span>
       </footer>
+
+      {/* Reading Journal study Note Modal Popup */}
+      <AnimatePresence>
+        {isNotesModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-999 flex items-center justify-center bg-slate-950/45 p-4 text-left backdrop-blur-xs"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 10 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 10 }}
+              className="w-full max-w-md rounded-3xl border border-slate-100 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900"
+            >
+              <div className="mb-4.5 flex items-center justify-between border-b border-slate-50 pb-2.5 dark:border-slate-800/40">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5 text-purple-600" />
+                  <h3 className="text-sm font-bold tracking-wider text-slate-900 uppercase dark:text-white">
+                    {editingNoteId ? 'Edit Study Note' : 'Add Study Note'} (Page {page})
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setIsNotesModalOpen(false)}
+                  className="hover:text-slate-650 cursor-pointer rounded-lg p-1 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                >
+                  <X className="h-4.5 w-4.5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveNote} className="space-y-4">
+                {/* Highlight text input */}
+                <div className="space-y-1">
+                  <label className="block text-[9px] font-bold tracking-widest text-slate-400 uppercase">
+                    Highlighted Text (Optional)
+                  </label>
+                  <textarea
+                    value={modalHighlightText}
+                    onChange={(e) => setModalHighlightText(e.target.value)}
+                    placeholder="Highlight text will show here. Drag mouse on page to capture."
+                    className="min-h-16 w-full rounded-2xl border border-slate-200 bg-slate-50/50 p-3 text-xs text-slate-900 placeholder-slate-400 outline-hidden transition-all focus:border-purple-600 focus:bg-white dark:border-slate-800 dark:bg-slate-800/40 dark:text-white"
+                  />
+                </div>
+
+                {/* Rating Input */}
+                <div className="space-y-1">
+                  <span className="block text-[9px] font-bold tracking-widest text-slate-400 uppercase">
+                    Page Rating (Optional)
+                  </span>
+                  <div className="flex gap-1.5 pt-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setModalRating(modalRating === star ? undefined : star)}
+                        className="cursor-pointer text-slate-300 transition-all hover:scale-110 hover:text-amber-400"
+                      >
+                        <Star
+                          className={`h-6 w-6 ${
+                            modalRating && modalRating >= star
+                              ? 'fill-amber-400 text-amber-400'
+                              : ''
+                          }`}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Notes Input */}
+                <div className="space-y-1">
+                  <label className="block text-[9px] font-bold tracking-widest text-slate-400 uppercase">
+                    Personal Thoughts & Notes
+                  </label>
+                  <textarea
+                    required
+                    value={modalNoteText}
+                    onChange={(e) => setModalNoteText(e.target.value)}
+                    placeholder="Add your reading insights or annotations..."
+                    className="min-h-24 w-full rounded-2xl border border-slate-200 bg-slate-50/50 p-3 text-xs text-slate-900 placeholder-slate-400 outline-hidden transition-all focus:border-purple-600 focus:bg-white dark:border-slate-800 dark:bg-slate-800/40 dark:text-white"
+                  />
+                </div>
+
+                {/* Tags selection */}
+                <div className="space-y-1.5">
+                  <span className="block text-[9px] font-bold tracking-widest text-slate-400 uppercase">
+                    Tags
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {AVAILABLE_TAGS.map((tag) => {
+                      const active = modalTags.includes(tag)
+                      return (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => handleToggleTag(tag)}
+                          className={`cursor-pointer rounded-xl border px-3 py-1 text-[9px] font-bold uppercase transition-all ${
+                            active
+                              ? 'border-purple-600 bg-purple-600 text-white'
+                              : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400'
+                          }`}
+                        >
+                          {tag}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Bookmark Toggle */}
+                <div className="flex items-center gap-2 pt-2">
+                  <input
+                    type="checkbox"
+                    id="modal-bookmark"
+                    checked={modalBookmark}
+                    onChange={(e) => setModalBookmark(e.target.checked)}
+                    className="h-4 w-4 rounded-sm border-slate-300 text-purple-600 accent-purple-600 focus:ring-purple-500"
+                  />
+                  <label
+                    htmlFor="modal-bookmark"
+                    className="cursor-pointer text-xs font-bold text-slate-600 dark:text-slate-300"
+                  >
+                    Bookmark this page
+                  </label>
+                </div>
+
+                <div className="flex justify-end gap-2 border-t border-slate-50 pt-3 dark:border-slate-800/40">
+                  <button
+                    type="button"
+                    onClick={() => setIsNotesModalOpen(false)}
+                    className="cursor-pointer rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold tracking-wider text-slate-600 uppercase transition-colors hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800/50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="cursor-pointer rounded-xl bg-purple-600 px-4.5 py-2 text-xs font-bold tracking-wider text-white uppercase shadow-sm transition-colors hover:bg-purple-700"
+                  >
+                    Sync Note
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Success/Action Toast Notification */}
+      <AnimatePresence>
+        {showToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 50, scale: 0.95 }}
+            className="fixed right-6 bottom-6 z-999 flex items-center gap-2 rounded-2xl border border-emerald-100 bg-white px-4 py-3 text-xs font-bold text-slate-800 shadow-2xl dark:border-emerald-500/10 dark:bg-slate-900 dark:text-white"
+          >
+            <CheckCircle className="h-4.5 w-4.5 fill-emerald-500/10 text-emerald-500" />
+            <span>{toastMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

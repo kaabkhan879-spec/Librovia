@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ROUTES } from '../../constants/routes'
 import { booksService, type Book } from '../../services/books'
 import { collectionsService, type Collection } from '../../services/collections'
+import { notesService, type Note } from '../../services/notes'
 import { useAuth } from '../../context/AuthContext'
 import {
   BookOpen,
@@ -18,6 +19,8 @@ import {
   Calendar,
   X,
   Info,
+  MessageSquare,
+  Search,
 } from 'lucide-react'
 import { Button } from '../../components/common/Button'
 
@@ -30,23 +33,38 @@ export const DashboardPage: React.FC = () => {
   const [previewBook, setPreviewBook] = useState<Book | null>(null)
   const [collectionsList, setCollectionsList] = useState<Collection[]>([])
 
+  // Journal statistics & search state
+  const [allNotes, setAllNotes] = useState<Note[]>([])
+  const [globalSearchQuery, setGlobalSearchQuery] = useState('')
+
   const fetchBooks = () => {
-    Promise.all([booksService.getBooks(), collectionsService.getCollections()]).then(
-      ([booksData, colsData]) => {
-        setBooks(booksData)
-        setCollectionsList(colsData)
-        setLoading(false)
-      }
-    )
+    Promise.all([
+      booksService.getBooks(),
+      collectionsService.getCollections(),
+      notesService.getAllNotes(),
+    ]).then(([booksData, colsData, notesData]) => {
+      setBooks(booksData)
+      setCollectionsList(colsData)
+      setAllNotes(notesData)
+      setLoading(false)
+    })
   }
 
   useEffect(() => {
     fetchBooks()
   }, [])
 
-  const getCollectionName = (colId: string | undefined) => {
-    const col = collectionsList.find((c) => c.id === colId)
-    return col ? col.name : 'Classics'
+  const getCollectionName = useCallback(
+    (colId: string | undefined) => {
+      const col = collectionsList.find((c) => c.id === colId)
+      return col ? col.name : 'Classics'
+    },
+    [collectionsList]
+  )
+
+  const getBookTitle = (bookId: string) => {
+    const found = books.find((b) => b.id === bookId)
+    return found ? found.title : 'Book Title'
   }
 
   const toggleStar = async (id: string) => {
@@ -75,6 +93,17 @@ export const DashboardPage: React.FC = () => {
   }, [books])
   const totalCollections = collectionsList.length
 
+  // --- JOURNAL STATISTICS ---
+  const notesCount = useMemo(
+    () => allNotes.filter((n) => n.noteText && n.noteText.trim()).length,
+    [allNotes]
+  )
+  const highlightsCount = useMemo(
+    () => allNotes.filter((n) => n.highlightedText && n.highlightedText.trim()).length,
+    [allNotes]
+  )
+  const bookmarksCount = useMemo(() => allNotes.filter((n) => n.isBookmarked).length, [allNotes])
+
   // --- CONTINUE READING ---
   const inProgressBooks = useMemo(() => {
     return books.filter((b) => b.progress > 0 && b.progress < 100)
@@ -98,62 +127,34 @@ export const DashboardPage: React.FC = () => {
 
   // --- DYNAMIC RECENT ACTIVITY LOGS ---
   const recentActivities = useMemo(() => {
-    const list: {
-      id: string
-      type: 'upload' | 'collection' | 'favorite' | 'resume'
-      title: string
-      desc: string
-      time: Date
-    }[] = []
+    const list: { id: string; type: string; title: string; desc: string; time: Date }[] = []
 
-    books.forEach((b) => {
+    // Map uploads
+    books.slice(0, 5).forEach((b) => {
       list.push({
         id: `upload-${b.id}`,
         type: 'upload',
-        title: 'Book uploaded',
-        desc: `"${b.title}" was added to library`,
+        title: 'New Book Cabinet Upload',
+        desc: `"${b.title}" added to ${getCollectionName(b.collectionId)}`,
         time: new Date(b.createdAt),
       })
     })
 
-    collectionsList.forEach((c) => {
-      if (c.createdAt) {
-        list.push({
-          id: `col-${c.id}`,
-          type: 'collection',
-          title: 'Collection created',
-          desc: `"${c.name}" shelf was created`,
-          time: new Date(c.createdAt),
-        })
-      }
-    })
-
-    books.forEach((b) => {
-      if (b.isFavorite) {
-        list.push({
-          id: `fav-${b.id}`,
-          type: 'favorite',
-          title: 'Book added to favorites',
-          desc: `Starred "${b.title}"`,
-          time: new Date(b.updatedAt || b.createdAt),
-        })
-      }
-    })
-
+    // Map in-progress books
     books.forEach((b) => {
       if (b.progress > 0) {
         list.push({
-          id: `resume-${b.id}-${b.progress}`,
-          type: 'resume',
-          title: 'Reading resumed',
-          desc: `Read "${b.title}" to ${b.progress}%`,
+          id: `progress-${b.id}`,
+          type: 'progress',
+          title: 'Reading Progress Logged',
+          desc: `Reached page ${b.currentPage} (${b.progress}%) of "${b.title}"`,
           time: new Date(b.lastReadAt || b.updatedAt || b.createdAt),
         })
       }
     })
 
     return list.sort((a, b) => b.time.getTime() - a.time.getTime()).slice(0, 5)
-  }, [books, collectionsList])
+  }, [books, getCollectionName])
 
   // --- HERO GOAL CALCULATIONS ---
   const totalPagesRead = useMemo(() => {
@@ -198,6 +199,19 @@ export const DashboardPage: React.FC = () => {
     },
   ]
 
+  // Global search filtering notes
+  const filteredGlobalNotes = useMemo(() => {
+    if (!globalSearchQuery.trim()) return []
+    const query = globalSearchQuery.toLowerCase()
+    return allNotes.filter((n) => {
+      return (
+        n.noteText.toLowerCase().includes(query) ||
+        (n.highlightedText && n.highlightedText.toLowerCase().includes(query)) ||
+        n.tags.some((t) => t.toLowerCase().includes(query))
+      )
+    })
+  }, [allNotes, globalSearchQuery])
+
   // Animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -211,6 +225,7 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-8 text-left select-none">
+      {/* Interactive Simulation tools */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-100 bg-white/80 p-4 shadow-xs backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/80">
         <div className="text-text-sub flex items-center gap-2 text-xs font-semibold">
           <Info className="h-4.5 w-4.5 shrink-0 text-purple-600" />
@@ -219,13 +234,13 @@ export const DashboardPage: React.FC = () => {
         <div className="flex gap-2">
           <button
             onClick={handleSimulateLoader}
-            className="cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="dark:text-slate-350 dark:hover:bg-slate-850 cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/50"
           >
             Simulate Loading Skeletons
           </button>
           <button
             onClick={() => setIsEmptyState(!isEmptyState)}
-            className={`cursor-pointer rounded-xl border px-3.5 py-1.5 text-xs font-bold transition-all ${isEmptyState ? 'border-purple-600 bg-purple-600 text-white' : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-800'} `}
+            className={`cursor-pointer rounded-xl border px-3.5 py-1.5 text-xs font-bold transition-all ${isEmptyState ? 'border-purple-600 bg-purple-600 text-white' : 'dark:hover:bg-slate-850 border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300'} `}
           >
             {isEmptyState ? 'Show Real Dashboard' : 'Show Empty States'}
           </button>
@@ -356,6 +371,7 @@ export const DashboardPage: React.FC = () => {
 
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
               <div className="space-y-8 lg:col-span-2">
+                {/* Continue reading shelf */}
                 <motion.div variants={itemVariants} className="space-y-4">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-bold tracking-wider text-slate-800 uppercase dark:text-white">
@@ -422,6 +438,7 @@ export const DashboardPage: React.FC = () => {
                   )}
                 </motion.div>
 
+                {/* Recently Added Books */}
                 <motion.div variants={itemVariants} className="space-y-4">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-bold tracking-wider text-slate-800 uppercase dark:text-white">
@@ -500,6 +517,7 @@ export const DashboardPage: React.FC = () => {
                   </div>
                 </motion.div>
 
+                {/* Favorite Books */}
                 <motion.div variants={itemVariants} className="space-y-4">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-bold tracking-wider text-slate-800 uppercase dark:text-white">
@@ -582,7 +600,120 @@ export const DashboardPage: React.FC = () => {
                 </motion.div>
               </div>
 
-              <div>
+              {/* Right Sidebar Widgets */}
+              <div className="space-y-8">
+                {/* Journal widget & Global Notes Search */}
+                <motion.div variants={itemVariants} className="space-y-4">
+                  <h3 className="flex items-center gap-1 text-left text-sm font-bold tracking-wider text-slate-800 uppercase dark:text-white">
+                    <MessageSquare className="text-purple-650 h-4.5 w-4.5" />
+                    <span>📒 Personal Notes</span>
+                  </h3>
+
+                  <div className="space-y-4 rounded-3xl border border-slate-100 bg-white p-5 text-left shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                    {/* Metrics row */}
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="rounded-2xl bg-purple-50/50 p-2 dark:bg-purple-950/20">
+                        <span className="block text-[8px] font-bold text-slate-400 uppercase">
+                          Notes
+                        </span>
+                        <span className="font-mono text-sm font-extrabold text-purple-600">
+                          {notesCount}
+                        </span>
+                      </div>
+                      <div className="rounded-2xl bg-sky-50/50 p-2 dark:bg-sky-950/20">
+                        <span className="block text-[8px] font-bold text-slate-400 uppercase">
+                          Clips
+                        </span>
+                        <span className="font-mono text-sm font-extrabold text-sky-600">
+                          {highlightsCount}
+                        </span>
+                      </div>
+                      <div className="rounded-2xl bg-amber-50/50 p-2 dark:bg-amber-950/20">
+                        <span className="block text-[8px] font-bold text-slate-400 uppercase">
+                          Saves
+                        </span>
+                        <span className="font-mono text-sm font-extrabold text-amber-600">
+                          {bookmarksCount}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Global Search Bar */}
+                    <div className="relative">
+                      <Search className="absolute top-2.5 left-3 h-4 w-4 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Search all notes (e.g. AI)..."
+                        value={globalSearchQuery}
+                        onChange={(e) => setGlobalSearchQuery(e.target.value)}
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 py-2 pr-4 pl-9 text-xs font-semibold text-slate-900 placeholder-slate-400 outline-hidden transition-all focus:border-purple-600 focus:bg-white dark:border-slate-800 dark:bg-slate-800/40 dark:text-white"
+                      />
+                    </div>
+
+                    {/* Dynamic search results list or recent notes list */}
+                    <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+                      {globalSearchQuery.trim() ? (
+                        filteredGlobalNotes.length === 0 ? (
+                          <p className="py-4 text-center text-[10px] text-slate-400">
+                            No matching notes found for "{globalSearchQuery}".
+                          </p>
+                        ) : (
+                          filteredGlobalNotes.map((note) => (
+                            <Link
+                              key={note.id}
+                              to={`${ROUTES.READER.replace(':id', note.bookId)}?page=${note.pageNumber}`}
+                              className="block space-y-1.5 rounded-2xl border border-slate-100 bg-slate-50/30 p-3 transition-all hover:border-purple-300 hover:bg-white dark:border-slate-800 dark:hover:border-purple-900"
+                            >
+                              <div className="flex items-center justify-between text-[8px] font-bold text-purple-600 uppercase">
+                                <span className="max-w-[120px] truncate">
+                                  {getBookTitle(note.bookId)}
+                                </span>
+                                <span>Page {note.pageNumber} ↗</span>
+                              </div>
+                              {note.highlightedText && (
+                                <p className="line-clamp-2 border-l-2 border-purple-400 bg-slate-50 pl-2 text-[10px] italic dark:bg-slate-800">
+                                  "{note.highlightedText}"
+                                </p>
+                              )}
+                              <p className="line-clamp-2 text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                                {note.noteText}
+                              </p>
+                            </Link>
+                          ))
+                        )
+                      ) : allNotes.length === 0 ? (
+                        <p className="text-slate-450 py-6 text-center text-[10px]">
+                          No notes written. Open a book to record insights!
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          <span className="block text-[9px] font-extrabold tracking-wider text-slate-400 uppercase">
+                            Recent Thoughts
+                          </span>
+                          {allNotes.slice(0, 3).map((note) => (
+                            <Link
+                              key={note.id}
+                              to={`${ROUTES.READER.replace(':id', note.bookId)}?page=${note.pageNumber}`}
+                              className="dark:border-slate-850 block space-y-1.5 rounded-2xl border border-slate-50 bg-white p-3 shadow-xs transition-all hover:border-purple-300/30 hover:bg-slate-50/40 dark:hover:border-purple-900/40"
+                            >
+                              <div className="flex items-center justify-between text-[8px] font-bold text-purple-600 uppercase">
+                                <span className="max-w-[120px] truncate">
+                                  {getBookTitle(note.bookId)}
+                                </span>
+                                <span>Page {note.pageNumber} ↗</span>
+                              </div>
+                              <p className="dark:text-slate-350 truncate text-[10px] font-semibold text-slate-700">
+                                {note.noteText || <em className="text-slate-400">Bookmark clip</em>}
+                              </p>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+
+                {/* Activity Feed logs */}
                 <motion.div variants={itemVariants} className="space-y-4">
                   <h3 className="text-left text-sm font-bold tracking-wider text-slate-800 uppercase dark:text-white">
                     Recent Activity
@@ -643,6 +774,7 @@ export const DashboardPage: React.FC = () => {
         )}
       </AnimatePresence>
 
+      {/* Quick Details modal box */}
       <AnimatePresence>
         {previewBook && (
           <motion.div
@@ -663,7 +795,7 @@ export const DashboardPage: React.FC = () => {
                 </h4>
                 <button
                   onClick={() => setPreviewBook(null)}
-                  className="cursor-pointer rounded-lg p-1 text-slate-400 hover:bg-slate-50 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-white"
+                  className="hover:text-slate-650 cursor-pointer rounded-lg p-1 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 dark:hover:text-white"
                 >
                   <X className="h-4.5 w-4.5" />
                 </button>
