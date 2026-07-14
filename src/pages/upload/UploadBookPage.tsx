@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ROUTES } from '../../constants/routes'
 import { booksService } from '../../services/books'
+import { notificationsService } from '../../services/notifications'
 import { UploadCloud, FileText, X, Plus, Star, CheckCircle, Lock, Tag } from 'lucide-react'
 import { Button } from '../../components/common/Button'
 import { formatBytes } from '../../utils/helpers'
@@ -205,6 +206,13 @@ export const UploadBookPage: React.FC = () => {
       setProgressLabel('Indexing text elements & generating shelf reference...')
       setUploadProgress(100)
       setStatus('success')
+      notificationsService
+        .addNotification(
+          'upload',
+          'Book Uploaded Successfully 📚',
+          `"${title.trim()}" has been uploaded to your library.`
+        )
+        .catch((e) => console.error(e))
     } catch (err: unknown) {
       console.error(err)
       setStatus('idle')

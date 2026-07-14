@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import { booksService, type Book } from '../../services/books'
 import { notesService, type Note } from '../../services/notes'
+import { notificationsService } from '../../services/notifications'
 import { Document, Page, pdfjs } from 'react-pdf'
 
 // Set react-pdf worker source to CDN worker
@@ -255,8 +256,19 @@ export const ReaderPage: React.FC = () => {
       booksService.updateReadingProgress(id, targetPage, total, seconds).catch((err) => {
         console.error('Failed to sync progress:', err)
       })
+
+      // Reading Goal Achievement Trigger
+      if (targetPage >= total && rawBook && rawBook.progress < 100) {
+        notificationsService
+          .addNotification(
+            'goal',
+            'Reading Goal Achieved 🏆',
+            `Congratulations! You have completed reading "${rawBook.title}".`
+          )
+          .catch((e) => console.error(e))
+      }
     },
-    [id]
+    [id, rawBook]
   )
 
   // Periodic autosave every 30 seconds
@@ -475,6 +487,13 @@ export const ReaderPage: React.FC = () => {
         })
         setBookNotes((prev) => prev.map((n) => (n.id === existing.id ? updated : n)))
         showNotification(updated.isBookmarked ? 'Page bookmarked! 🔖' : 'Bookmark removed!')
+        notificationsService
+          .addNotification(
+            'note',
+            updated.isBookmarked ? 'Page Bookmarked 🔖' : 'Bookmark Removed 🔖',
+            `Page ${page} of "${rawBook?.title || 'Book'}" has been ${updated.isBookmarked ? 'bookmarked' : 'unbookmarked'}.`
+          )
+          .catch((e) => console.error(e))
       } else {
         const created = await notesService.saveNote({
           bookId: id!,
@@ -485,6 +504,13 @@ export const ReaderPage: React.FC = () => {
         })
         setBookNotes((prev) => [...prev, created])
         showNotification('Page bookmarked! 🔖')
+        notificationsService
+          .addNotification(
+            'note',
+            'Page Bookmarked 🔖',
+            `Page ${page} of "${rawBook?.title || 'Book'}" has been bookmarked.`
+          )
+          .catch((e) => console.error(e))
       }
     } catch (err) {
       console.error(err)
@@ -653,6 +679,15 @@ export const ReaderPage: React.FC = () => {
       setModalNoteTitle('')
       window.getSelection()?.removeAllRanges()
       showNotification(editingNoteId ? 'Annotation synced! 💬' : 'Sticky Note placed! 💬')
+      notificationsService
+        .addNotification(
+          'note',
+          editingNoteId ? 'Annotation Synced 💬' : 'Annotation Saved 💬',
+          editingNoteId
+            ? `Annotation on page ${page} of "${rawBook?.title || 'Book'}" has been updated.`
+            : `A new annotation has been added on page ${page} of "${rawBook?.title || 'Book'}".`
+        )
+        .catch((e) => console.error(e))
     } catch (err) {
       console.error(err)
     }
@@ -665,6 +700,13 @@ export const ReaderPage: React.FC = () => {
       await notesService.deleteNote(noteId)
       setBookNotes((prev) => prev.filter((n) => n.id !== noteId))
       showNotification('Note deleted.')
+      notificationsService
+        .addNotification(
+          'note',
+          'Annotation Deleted 🗑️',
+          `An annotation on page ${page} of "${rawBook?.title || 'Book'}" has been deleted.`
+        )
+        .catch((e) => console.error(e))
     } catch (err) {
       console.error(err)
     }

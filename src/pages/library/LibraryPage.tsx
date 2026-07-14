@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ROUTES } from '../../constants/routes'
 import { booksService, type Book } from '../../services/books'
 import { collectionsService, type Collection } from '../../services/collections'
+import { notificationsService } from '../../services/notifications'
 import {
   BookOpen,
   Search,
@@ -94,12 +95,21 @@ export const LibraryPage: React.FC = () => {
 
   const handleDeleteBook = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
+    const bookToDelete = books.find((b) => b.id === id)
+    const title = bookToDelete ? bookToDelete.title : 'Book'
     if (!confirm('Are you sure you want to delete this book? This will permanently remove it.'))
       return
     try {
       await booksService.deleteBook(id)
       fetchBooksAndCollections()
       setActiveMenuBookId(null)
+      notificationsService
+        .addNotification(
+          'delete',
+          'Book Removed 🗑️',
+          `"${title}" has been deleted from your library.`
+        )
+        .catch((e) => console.error(e))
     } catch (err) {
       console.error(err)
     }

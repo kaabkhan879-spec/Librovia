@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { booksService, type Book } from '../../services/books'
 import { collectionsService, type Collection } from '../../services/collections'
+import { notificationsService } from '../../services/notifications'
 import { ROUTES } from '../../constants/routes'
 import {
   BookOpen,
@@ -82,6 +83,13 @@ export const CategoriesPage: React.FC = () => {
     if (!newColName.trim()) return
     try {
       await collectionsService.createCollection(newColName.trim())
+      notificationsService
+        .addNotification(
+          'collection',
+          'Collection Created 📁',
+          `Shelf "${newColName.trim()}" is now ready.`
+        )
+        .catch((e) => console.error(e))
       setNewColName('')
       setShowCreateModal(false)
       setRefreshTrigger((prev) => prev + 1)
