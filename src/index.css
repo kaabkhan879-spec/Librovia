@@ -15,6 +15,8 @@
 
   --color-sec-50: var(--sec-50);
   --color-sec-100: var(--sec-100);
+  --color-sec-500: var(--sec-500);
+  --color-sec-600: var(--sec-600);
   --color-sec-800: var(--sec-800);
   --color-sec-900: var(--sec-900);
 
@@ -44,7 +46,9 @@
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
-  --radius-xl: 24px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-3xl: 28px;
   --radius-full: 9999px;
 
   /* Shadows (Notion/Linear low-opacity style) */
@@ -57,12 +61,14 @@
 :root {
   --primary-50: #f5f3ff;
   --primary-100: #ede9fe;
-  --primary-500: #6366f1;
-  --primary-600: #4f46e5;
-  --primary-700: #4338ca;
+  --primary-500: #7c3aed;
+  --primary-600: #6d28d9;
+  --primary-700: #5b21b6;
 
-  --sec-50: #f8fafc;
-  --sec-100: #f1f5f9;
+  --sec-50: #fdf4ff;
+  --sec-100: #fae8ff;
+  --sec-500: #a855f7;
+  --sec-600: #9333ea;
   --sec-800: #1e293b;
   --sec-900: #0f172a;
 
@@ -78,13 +84,13 @@
   --error-50: #fef2f2;
   --error-500: #ef4444;
 
-  --bg-app: #fcfcfd;
+  --bg-app: #f6f8fc;
   --bg-surface: #ffffff;
   --border-base: #e2e8f0;
   --border-light: #f1f5f9;
 
   --text-main: #0f172a;
-  --text-sub: #475569;
+  --text-sub: #64748b;
   --text-muted: #94a3b8;
 }
 

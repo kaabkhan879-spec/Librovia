@@ -39,7 +39,7 @@ export const AppLayout: React.FC = () => {
   }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-50">
+    <div className="bg-bg-app flex h-screen w-screen overflow-hidden">
       {/* Sidebar navigation */}
       <Sidebar
         isOpen={sidebarOpen}
