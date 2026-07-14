@@ -18,6 +18,8 @@ export interface Book {
   currentPage: number
   totalPages: number
   lastReadAt?: string
+  startedAt?: string
+  readingTime?: number
 }
 
 export interface ReadingProgress {
@@ -27,6 +29,8 @@ export interface ReadingProgress {
   totalPages: number
   lastReadAt: string
   isCompleted: boolean
+  startedAt?: string
+  readingTime?: number // total elapsed time in seconds
 }
 
 // Local helper to extract relative storage paths from public or authenticated URLs
@@ -38,51 +42,90 @@ function getPathFromUrl(url: string | undefined | null, bucket: string): string 
 }
 
 export const booksService = {
+  // Test if Supabase reading_progress table is available
+  async isProgressAvailable(): Promise<boolean> {
+    try {
+      const { error } = await supabase.from('reading_progress').select('id').limit(1)
+      if (error && (error.code === 'PGRST205' || error.code === '42P01')) {
+        return false
+      }
+      return !error
+    } catch {
+      return false
+    }
+  },
+
+  getLocalProgressList(userId: string): ReadingProgress[] {
+    const str = localStorage.getItem('librovia-fallback-progress') || '[]'
+    try {
+      const parsed = JSON.parse(str) as Array<ReadingProgress & { userId: string }>
+      return parsed.filter((p) => p.userId === userId)
+    } catch {
+      return []
+    }
+  },
+
+  saveLocalProgress(progress: ReadingProgress & { userId: string }) {
+    const str = localStorage.getItem('librovia-fallback-progress') || '[]'
+    const all = (() => {
+      try {
+        return JSON.parse(str) as Array<ReadingProgress & { userId: string }>
+      } catch {
+        return []
+      }
+    })()
+    const idx = all.findIndex((x) => x.bookId === progress.bookId && x.userId === progress.userId)
+    if (idx !== -1) {
+      all[idx] = { ...all[idx], ...progress }
+    } else {
+      all.push(progress)
+    }
+    localStorage.setItem('librovia-fallback-progress', JSON.stringify(all))
+  },
+
   async getBooks(): Promise<Book[]> {
     const {
       data: { user },
     } = await supabase.auth.getUser()
     if (!user) return []
 
-    const res = await supabase
-      .from('books')
-      .select('*, reading_progress(current_page, total_pages, last_read_at, is_completed)')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
+    const rpAvailable = await this.isProgressAvailable()
 
-    let rows = res.data || []
-    let error = res.error
-
-    if (error) {
-      const fallbackRes = await supabase
-        .from('books')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-      rows = fallbackRes.data || []
-      error = fallbackRes.error
-    }
+    const { data: rows, error } = rpAvailable
+      ? await supabase
+          .from('books')
+          .select(
+            '*, reading_progress(current_page, total_pages, last_read_at, is_completed, started_at, reading_time)'
+          )
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+      : await supabase
+          .from('books')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
 
     if (error) {
       console.error('Error fetching books:', error)
       return []
     }
 
-    if (rows.length === 0) return []
+    const booksList = rows || []
+    if (booksList.length === 0) return []
 
     // Extract paths for bulk signed URL generation
-    const bookPaths = rows.map((r) => getPathFromUrl(r.file_url, 'books')).filter(Boolean)
-    const coverPaths = rows.map((r) => getPathFromUrl(r.cover_url, 'covers')).filter(Boolean)
+    const bookPaths = booksList.map((r) => getPathFromUrl(r.file_url, 'books')).filter(Boolean)
+    const coverPaths = booksList.map((r) => getPathFromUrl(r.cover_url, 'covers')).filter(Boolean)
 
     const signedBookUrls: Record<string, string> = {}
     const signedCoverUrls: Record<string, string> = {}
 
     // Bulk sign book URLs (1 hour expiration)
     if (bookPaths.length > 0) {
-      const { data: signedBooks, error: err1 } = await supabase.storage
+      const { data: signedBooks } = await supabase.storage
         .from('books')
         .createSignedUrls(bookPaths, 3600)
-      if (!err1 && signedBooks) {
+      if (signedBooks) {
         signedBooks.forEach((s) => {
           if (s.signedUrl && s.path) signedBookUrls[s.path] = s.signedUrl
         })
@@ -91,10 +134,10 @@ export const booksService = {
 
     // Bulk sign cover URLs (1 hour expiration)
     if (coverPaths.length > 0) {
-      const { data: signedCovers, error: err2 } = await supabase.storage
+      const { data: signedCovers } = await supabase.storage
         .from('covers')
         .createSignedUrls(coverPaths, 3600)
-      if (!err2 && signedCovers) {
+      if (signedCovers) {
         signedCovers.forEach((s) => {
           if (s.signedUrl && s.path) signedCoverUrls[s.path] = s.signedUrl
         })
@@ -117,14 +160,35 @@ export const booksService = {
       hasFavsTable = false
     }
 
-    const books = rows.map((row) => {
+    // Retrieve local progress fallback list if not live
+    const localList = !rpAvailable ? this.getLocalProgressList(user.id) : []
+
+    const books = booksList.map((row) => {
       const bookPath = getPathFromUrl(row.file_url, 'books')
       const coverPath = getPathFromUrl(row.cover_url, 'covers')
 
-      const rpArray = row.reading_progress
-      const rp = Array.isArray(rpArray) ? rpArray[0] : rpArray
-      const currentPage = rp?.current_page || 1
-      const totalPages = rp?.total_pages || row.pages || 320
+      let rp:
+        | Partial<
+            ReadingProgress & {
+              current_page?: number
+              total_pages?: number
+              started_at?: string
+              reading_time?: number
+              last_read_at?: string
+            }
+          >
+        | null
+        | undefined
+      if (rpAvailable) {
+        const rpArray = row.reading_progress
+        rp = Array.isArray(rpArray) ? rpArray[0] : rpArray
+      } else {
+        rp = localList.find((p) => p.bookId === row.id)
+      }
+
+      const currentPage = rp?.currentPage !== undefined ? rp.currentPage : rp?.current_page || 1
+      const totalPages =
+        rp?.totalPages !== undefined ? rp.totalPages : rp?.total_pages || row.pages || 320
       const progressPct = totalPages > 0 ? Math.round((currentPage / totalPages) * 100) : 0
 
       const isFav = hasFavsTable ? favBookIds.includes(row.id) : row.is_favorite
@@ -145,7 +209,9 @@ export const booksService = {
         progress: progressPct,
         currentPage: currentPage,
         totalPages: totalPages,
-        lastReadAt: rp?.last_read_at,
+        lastReadAt: rp?.lastReadAt || rp?.last_read_at,
+        startedAt: rp?.startedAt || rp?.started_at,
+        readingTime: rp?.readingTime !== undefined ? rp.readingTime : rp?.reading_time,
       }
     })
 
@@ -162,20 +228,22 @@ export const booksService = {
   },
 
   async getBookById(id: string): Promise<Book | null> {
-    const res = await supabase
-      .from('books')
-      .select('*, reading_progress(current_page, total_pages, last_read_at, is_completed)')
-      .eq('id', id)
-      .single()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return null
 
-    let data = res.data
-    let error = res.error
+    const rpAvailable = await this.isProgressAvailable()
 
-    if (error) {
-      const fallbackRes = await supabase.from('books').select('*').eq('id', id).single()
-      data = fallbackRes.data
-      error = fallbackRes.error
-    }
+    const { data, error } = rpAvailable
+      ? await supabase
+          .from('books')
+          .select(
+            '*, reading_progress(current_page, total_pages, last_read_at, is_completed, started_at, reading_time)'
+          )
+          .eq('id', id)
+          .single()
+      : await supabase.from('books').select('*').eq('id', id).single()
 
     if (error || !data) {
       console.error('Error fetching book by id:', error)
@@ -202,10 +270,28 @@ export const booksService = {
       if (signedCover?.signedUrl) coverUrl = signedCover.signedUrl
     }
 
-    const rpArray = data.reading_progress
-    const rp = Array.isArray(rpArray) ? rpArray[0] : rpArray
-    const currentPage = rp?.current_page || 1
-    const totalPages = rp?.total_pages || data.pages || 320
+    let rp:
+      | Partial<
+          ReadingProgress & {
+            current_page?: number
+            total_pages?: number
+            started_at?: string
+            reading_time?: number
+            last_read_at?: string
+          }
+        >
+      | null
+      | undefined
+    if (rpAvailable) {
+      const rpArray = data.reading_progress
+      rp = Array.isArray(rpArray) ? rpArray[0] : rpArray
+    } else {
+      rp = this.getLocalProgressList(user.id).find((p) => p.bookId === id)
+    }
+
+    const currentPage = rp?.currentPage !== undefined ? rp.currentPage : rp?.current_page || 1
+    const totalPages =
+      rp?.totalPages !== undefined ? rp.totalPages : rp?.total_pages || data.pages || 320
     const progressPct = totalPages > 0 ? Math.round((currentPage / totalPages) * 100) : 0
 
     let isFav = data.is_favorite
@@ -239,7 +325,9 @@ export const booksService = {
       progress: progressPct,
       currentPage: currentPage,
       totalPages: totalPages,
-      lastReadAt: rp?.last_read_at,
+      lastReadAt: rp?.lastReadAt || rp?.last_read_at,
+      startedAt: rp?.startedAt || rp?.started_at,
+      readingTime: rp?.readingTime !== undefined ? rp.readingTime : rp?.reading_time,
     }
   },
 
@@ -264,23 +352,19 @@ export const booksService = {
     } = await supabase.auth.getUser()
     if (!user) throw new Error('User not authenticated')
 
-    // 1. Upload Book file to storage using storageService helper
     const bookPath = await storageService.uploadBook(file)
 
-    // 2. Upload Cover file to storage using storageService helper
     let coverPath = ''
     if (coverFile) {
       coverPath = await storageService.uploadCover(coverFile)
     }
 
-    // Resolve storage public/authenticated URLs for insert reference
     const fileUrl = supabase.storage.from('books').getPublicUrl(bookPath).data.publicUrl
 
     const coverUrl = coverPath
       ? supabase.storage.from('covers').getPublicUrl(coverPath).data.publicUrl
       : 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=300&q=80'
 
-    // 3. Save Book record in database table
     const { data, error } = await supabase
       .from('books')
       .insert({
@@ -324,7 +408,6 @@ export const booksService = {
   },
 
   async deleteBook(id: string): Promise<void> {
-    // 1. Fetch book first to extract exact bucket file paths
     const { data: book } = await supabase
       .from('books')
       .select('file_url, cover_url')
@@ -348,7 +431,6 @@ export const booksService = {
       }
     }
 
-    // 2. Delete database record
     const { error } = await supabase.from('books').delete().eq('id', id)
     if (error) throw error
   },
@@ -397,7 +479,6 @@ export const booksService = {
         if (error) throw error
       }
 
-      // Also update books table is_favorite for safety
       const { data: book } = await supabase
         .from('books')
         .select('is_favorite')
@@ -426,7 +507,8 @@ export const booksService = {
   async updateReadingProgress(
     bookId: string,
     page: number,
-    totalPages: number
+    totalPages: number,
+    additionalSeconds?: number
   ): Promise<ReadingProgress> {
     const {
       data: { user },
@@ -434,40 +516,80 @@ export const booksService = {
     if (!user) throw new Error('User not authenticated')
 
     const isCompleted = page === totalPages
+    const rpAvailable = await this.isProgressAvailable()
+    const now = new Date().toISOString()
 
-    const { data, error } = await supabase
-      .from('reading_progress')
-      .upsert(
-        {
+    const currentProgress = await this.getReadingProgress(bookId)
+    const startedAt = currentProgress?.startedAt || now
+    const currentReadingTime = currentProgress?.readingTime || 0
+    const newReadingTime = currentReadingTime + (additionalSeconds || 0)
+
+    if (rpAvailable) {
+      try {
+        const payload = {
           user_id: user.id,
           book_id: bookId,
           current_page: page,
           total_pages: totalPages,
           is_completed: isCompleted,
-          last_read_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id,book_id' }
-      )
-      .select()
-      .single()
+          last_read_at: now,
+          started_at: startedAt,
+          reading_time: newReadingTime,
+        }
 
-    if (error) throw error
+        const { data, error } = await supabase
+          .from('reading_progress')
+          .upsert(payload, { onConflict: 'user_id,book_id' })
+          .select()
+          .single()
 
-    // Update book timestamp to record activity update
-    await supabase
-      .from('books')
-      .update({
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', bookId)
+        if (error) throw error
+
+        await supabase
+          .from('books')
+          .update({
+            updated_at: now,
+          })
+          .eq('id', bookId)
+
+        return {
+          id: data.id,
+          bookId: data.book_id,
+          currentPage: data.current_page,
+          totalPages: data.total_pages || totalPages,
+          lastReadAt: data.last_read_at,
+          isCompleted: data.is_completed,
+          startedAt: data.started_at,
+          readingTime: data.reading_time,
+        }
+      } catch (err) {
+        console.error('Error upserting progress in Supabase, saving locally:', err)
+      }
+    }
+
+    // Local Storage Fallback
+    const localPayload = {
+      id: currentProgress?.id || crypto.randomUUID(),
+      userId: user.id,
+      bookId: bookId,
+      currentPage: page,
+      totalPages: totalPages,
+      lastReadAt: now,
+      isCompleted: isCompleted,
+      startedAt: startedAt,
+      readingTime: newReadingTime,
+    }
+    this.saveLocalProgress(localPayload)
 
     return {
-      id: data.id,
-      bookId: data.book_id,
-      currentPage: data.current_page,
-      totalPages: data.total_pages || totalPages,
-      lastReadAt: data.last_read_at,
-      isCompleted: data.is_completed,
+      id: localPayload.id,
+      bookId: localPayload.bookId,
+      currentPage: localPayload.currentPage,
+      totalPages: localPayload.totalPages,
+      lastReadAt: localPayload.lastReadAt,
+      isCompleted: localPayload.isCompleted,
+      startedAt: localPayload.startedAt,
+      readingTime: localPayload.readingTime,
     }
   },
 
@@ -477,23 +599,32 @@ export const booksService = {
     } = await supabase.auth.getUser()
     if (!user) return null
 
-    const { data, error } = await supabase
-      .from('reading_progress')
-      .select('*')
-      .eq('book_id', bookId)
-      .eq('user_id', user.id)
-      .single()
+    const rpAvailable = await this.isProgressAvailable()
+    if (rpAvailable) {
+      const { data, error } = await supabase
+        .from('reading_progress')
+        .select('*')
+        .eq('book_id', bookId)
+        .eq('user_id', user.id)
+        .single()
 
-    if (error || !data) return null
-
-    return {
-      id: data.id,
-      bookId: data.book_id,
-      currentPage: data.current_page || 1,
-      totalPages: data.total_pages || 320,
-      lastReadAt: data.last_read_at,
-      isCompleted: data.is_completed,
+      if (!error && data) {
+        return {
+          id: data.id,
+          bookId: data.book_id,
+          currentPage: data.current_page || 1,
+          totalPages: data.total_pages || 320,
+          lastReadAt: data.last_read_at,
+          isCompleted: data.is_completed,
+          startedAt: data.started_at,
+          readingTime: data.reading_time || 0,
+        }
+      }
     }
+
+    // Fallback to local storage
+    const local = this.getLocalProgressList(user.id).find((x) => x.bookId === bookId)
+    return local || null
   },
 
   async migrateLegacyBooks(books: Book[]): Promise<void> {

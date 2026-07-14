@@ -36,14 +36,26 @@ export const AnalyticsPage: React.FC = () => {
     return books.reduce((acc, b) => acc + (b.progress > 0 ? b.currentPage : 0), 0)
   }, [books])
 
+  const totalReadingSeconds = useMemo(() => {
+    return books.reduce((acc, b) => acc + (b.readingTime || 0), 0)
+  }, [books])
+
   const readingTimeStr = useMemo(() => {
+    if (totalReadingSeconds > 0) {
+      const mins = Math.floor(totalReadingSeconds / 60)
+      if (mins >= 60) {
+        const hrs = Math.round((totalReadingSeconds / 3600) * 10) / 10
+        return `${hrs} hrs`
+      }
+      return `${mins || 1} mins`
+    }
     const minutes = totalPagesRead * 2 // 2 mins per page
     if (minutes >= 60) {
       const hours = Math.round((minutes / 60) * 10) / 10
       return `${hours} hrs`
     }
     return `${minutes} mins`
-  }, [totalPagesRead])
+  }, [totalReadingSeconds, totalPagesRead])
 
   const analyticsStats = [
     {

@@ -166,6 +166,13 @@ export const ReaderPage: React.FC = () => {
         lastSavedPageRef.current = targetPage
         setLoading(false)
         fetchNotes()
+
+        // Pre-create reading log on first open
+        booksService
+          .updateReadingProgress(data.id, targetPage, data.totalPages || 320, 0)
+          .catch((err) => {
+            console.error('Failed to initialize reading progress log:', err)
+          })
       })
       .catch((err) => {
         console.error(err)
@@ -224,10 +231,43 @@ export const ReaderPage: React.FC = () => {
   const currentPageRef = useRef<number>(page)
   const totalPagesRef = useRef<number>(totalPages)
 
+  // Active reading timer
+  const activeSecondsRef = useRef<number>(0)
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      activeSecondsRef.current += 1
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [])
+
   useEffect(() => {
     currentPageRef.current = page
     totalPagesRef.current = totalPages
   }, [page, totalPages])
+
+  const syncProgress = useCallback(
+    (targetPage: number) => {
+      if (!id) return
+      const total = totalPagesRef.current || 320
+      const seconds = activeSecondsRef.current
+      activeSecondsRef.current = 0
+      booksService.updateReadingProgress(id, targetPage, total, seconds).catch((err) => {
+        console.error('Failed to sync progress:', err)
+      })
+    },
+    [id]
+  )
+
+  // Periodic autosave every 30 seconds
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (id && page) {
+        syncProgress(page)
+      }
+    }, 30000)
+    return () => clearInterval(timer)
+  }, [id, page, syncProgress])
 
   // Debounced autosave on page changes
   useEffect(() => {
@@ -236,27 +276,23 @@ export const ReaderPage: React.FC = () => {
 
     const timer = setTimeout(() => {
       lastSavedPageRef.current = page
-      if (id) {
-        booksService.updateReadingProgress(id, page, totalPages).catch((err) => {
-          console.error('Failed to sync progress to Supabase:', err)
-        })
-      }
+      syncProgress(page)
     }, 2000)
 
     return () => clearTimeout(timer)
-  }, [page, totalPages, loading, rawBook, id])
+  }, [page, totalPages, loading, rawBook, syncProgress])
 
   // Save immediately on unmount/unload
   useEffect(() => {
     return () => {
       if (id) {
         const lastPage = currentPageRef.current
-        const total = totalPagesRef.current
-        if (lastPage !== lastSavedPageRef.current) {
-          booksService.updateReadingProgress(id, lastPage, total).catch((err) => {
-            console.error('Failed to save progress on unmount:', err)
-          })
-        }
+        const total = totalPagesRef.current || 320
+        const seconds = activeSecondsRef.current
+        activeSecondsRef.current = 0
+        booksService.updateReadingProgress(id, lastPage, total, seconds).catch((err) => {
+          console.error('Failed to save progress on unmount:', err)
+        })
       }
     }
   }, [id])
@@ -265,12 +301,12 @@ export const ReaderPage: React.FC = () => {
     const handleBeforeUnload = () => {
       if (id) {
         const lastPage = currentPageRef.current
-        const total = totalPagesRef.current
-        if (lastPage !== lastSavedPageRef.current) {
-          booksService.updateReadingProgress(id, lastPage, total).catch((err) => {
-            console.error('Failed to save progress on unload:', err)
-          })
-        }
+        const total = totalPagesRef.current || 320
+        const seconds = activeSecondsRef.current
+        activeSecondsRef.current = 0
+        booksService.updateReadingProgress(id, lastPage, total, seconds).catch((err) => {
+          console.error('Failed to save progress on unload:', err)
+        })
       }
     }
     window.addEventListener('beforeunload', handleBeforeUnload)

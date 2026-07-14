@@ -36,13 +36,13 @@ export const ReadingPage: React.FC = () => {
     return col ? col.name : 'Classics'
   }
 
-  // Filter books that have been read/opened (progress > 0)
+  // Filter books that have been read/opened (lastReadAt exists)
   const readingHistory = useMemo(() => {
     return books
-      .filter((b) => b.progress > 0)
+      .filter((b) => b.lastReadAt !== undefined)
       .sort((a, b) => {
-        const timeA = new Date(a.lastReadAt || a.updatedAt || a.createdAt).getTime()
-        const timeB = new Date(b.lastReadAt || b.updatedAt || b.createdAt).getTime()
+        const timeA = new Date(a.lastReadAt!).getTime()
+        const timeB = new Date(b.lastReadAt!).getTime()
         return timeB - timeA
       })
   }, [books])
@@ -178,10 +178,27 @@ export const ReadingPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex shrink-0 flex-col items-end justify-between border-l border-slate-50 pl-4 dark:border-slate-800/40">
-                  <span className="block text-[8px] font-semibold text-slate-400 uppercase">
-                    Last read
-                  </span>
+                <div className="flex shrink-0 flex-col items-end justify-between border-l border-slate-50 pl-4 text-right dark:border-slate-800/40">
+                  <div>
+                    <span className="block text-[8px] font-semibold text-slate-400 uppercase">
+                      Last read
+                    </span>
+                    <span className="text-slate-655 dark:text-slate-350 mt-0.5 block text-[9px] font-bold">
+                      {book.lastReadAt
+                        ? new Date(book.lastReadAt).toLocaleDateString(undefined, {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                        : 'Not started'}
+                    </span>
+                    {book.readingTime !== undefined && book.readingTime > 0 && (
+                      <p className="mt-1 text-[9px] font-bold text-purple-600">
+                        ⏱ {Math.round(book.readingTime / 60) || 1} min read
+                      </p>
+                    )}
+                  </div>
                   <div className="mt-auto flex gap-1.5">
                     <Link to={ROUTES.READER.replace(':id', book.id)}>
                       <button
