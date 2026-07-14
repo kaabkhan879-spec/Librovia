@@ -34,6 +34,7 @@ export const LibraryPage: React.FC = () => {
   const [selectedCollectionId, setSelectedCollectionId] = useState<string>('all')
   const [selectedAuthor, setSelectedAuthor] = useState<string>('all')
   const [sortBy, setSortBy] = useState<SortType>('newest')
+  const [activeTab, setActiveTab] = useState<'all' | 'favorites' | 'recent'>('all')
 
   // Context Menu & Modal States
   const [activeMenuBookId, setActiveMenuBookId] = useState<string | null>(null)
@@ -156,8 +157,15 @@ export const LibraryPage: React.FC = () => {
 
   // Filter & Sort Logic
   const filteredBooks = useMemo(() => {
-    const result = books.filter((book) => {
-      // 1. Search Query
+    let result = [...books]
+
+    // 1. Tab Filter
+    if (activeTab === 'favorites') {
+      result = result.filter((b) => b.isFavorite)
+    }
+
+    result = result.filter((book) => {
+      // 2. Search Query
       const categoryName = getCollectionName(book.collectionId)
       const matchesSearch =
         book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -166,12 +174,12 @@ export const LibraryPage: React.FC = () => {
 
       if (!matchesSearch) return false
 
-      // 2. Collection Filter
+      // 3. Collection Filter
       if (selectedCollectionId !== 'all') {
         if (book.collectionId !== selectedCollectionId) return false
       }
 
-      // 3. Author Filter
+      // 4. Author Filter
       if (selectedAuthor !== 'all') {
         if (book.author !== selectedAuthor) return false
       }
@@ -179,8 +187,11 @@ export const LibraryPage: React.FC = () => {
       return true
     })
 
-    // 4. Sorting
+    // 5. Sorting
     return result.sort((a, b) => {
+      if (activeTab === 'recent') {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      }
       if (sortBy === 'a-z') return a.title.localeCompare(b.title)
       if (sortBy === 'oldest')
         return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
@@ -193,7 +204,15 @@ export const LibraryPage: React.FC = () => {
       }
       return 0
     })
-  }, [books, searchQuery, selectedCollectionId, selectedAuthor, sortBy, getCollectionName])
+  }, [
+    books,
+    searchQuery,
+    selectedCollectionId,
+    selectedAuthor,
+    sortBy,
+    activeTab,
+    getCollectionName,
+  ])
 
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     e.currentTarget.src =
@@ -210,6 +229,40 @@ export const LibraryPage: React.FC = () => {
         <p className="text-sm font-semibold tracking-wider text-slate-500 dark:text-slate-400">
           Manage, organize and access all your books.
         </p>
+      </div>
+
+      {/* Tab Selectors */}
+      <div className="border-border-base flex gap-2 border-b pb-1">
+        <button
+          onClick={() => setActiveTab('all')}
+          className={`cursor-pointer border-b-2 px-4 py-2 text-xs font-bold tracking-wider uppercase transition-all ${
+            activeTab === 'all'
+              ? 'border-purple-650 text-purple-650'
+              : 'border-transparent text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          All Books
+        </button>
+        <button
+          onClick={() => setActiveTab('favorites')}
+          className={`cursor-pointer border-b-2 px-4 py-2 text-xs font-bold tracking-wider uppercase transition-all ${
+            activeTab === 'favorites'
+              ? 'border-purple-650 text-purple-650'
+              : 'border-transparent text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          Favorites ⭐
+        </button>
+        <button
+          onClick={() => setActiveTab('recent')}
+          className={`cursor-pointer border-b-2 px-4 py-2 text-xs font-bold tracking-wider uppercase transition-all ${
+            activeTab === 'recent'
+              ? 'border-purple-650 text-purple-650'
+              : 'border-transparent text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          Recently Uploaded 📅
+        </button>
       </div>
 
       <AnimatePresence mode="wait">
