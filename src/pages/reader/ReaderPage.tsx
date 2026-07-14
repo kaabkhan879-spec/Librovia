@@ -22,6 +22,7 @@ import {
   CheckCircle,
   Edit2,
   Plus,
+  Copy,
 } from 'lucide-react'
 import { booksService, type Book } from '../../services/books'
 import { notesService, type Note } from '../../services/notes'
@@ -68,6 +69,7 @@ export const ReaderPage: React.FC = () => {
   })
 
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [rightSidebarOpen, setRightSidebarOpen] = useState(true)
   const [activeTab, setActiveTab] = useState<'toc' | 'thumbs' | 'bookmarks' | 'notes'>('toc')
   const [showSettings, setShowSettings] = useState(false)
 
@@ -85,6 +87,16 @@ export const ReaderPage: React.FC = () => {
   const [modalBookmark, setModalBookmark] = useState(false)
   const [modalTags, setModalTags] = useState<string[]>([])
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
+
+  // Selection Floating Toolbar State
+  const [floatingToolbarPos, setFloatingToolbarPos] = useState<{
+    top: number
+    left: number
+  } | null>(null)
+
+  // Hover preview state
+  const [hoveredNote, setHoveredNote] = useState<Note | null>(null)
+  const [hoveredNotePos, setHoveredNotePos] = useState<{ top: number; left: number } | null>(null)
 
   // Toast notifications
   const [showToast, setShowToast] = useState(false)
@@ -153,6 +165,51 @@ export const ReaderPage: React.FC = () => {
       })
   }, [id, pageParam, fetchNotes])
 
+  // Auto highlight overlay DOM injector
+  const injectHighlights = useCallback(() => {
+    if (!id || !page) return
+    const pageNotes = bookNotes.filter((n) => n.pageNumber === page)
+    const textLayer = containerRef.current?.querySelector('.react-pdf__Page__textLayer')
+    if (!textLayer) return
+
+    const spans = textLayer.getElementsByTagName('span')
+    for (let i = 0; i < spans.length; i++) {
+      const span = spans[i]
+      const text = span.textContent || ''
+      if (span.querySelector('mark')) continue // Already injected
+
+      for (const note of pageNotes) {
+        const hl = note.highlightedText
+        if (hl && text.toLowerCase().includes(hl.toLowerCase())) {
+          const escapedHl = hl.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')
+          const regex = new RegExp(`(${escapedHl})`, 'gi')
+
+          span.innerHTML = text.replace(regex, (match) => {
+            const hasTextNote = note.noteText && note.noteText.trim()
+            const noteBubble = hasTextNote
+              ? `<span class="ml-1 text-[10px] text-purple-650 align-super select-none inline-flex cursor-pointer">💬</span>`
+              : ''
+            return `<mark class="bg-yellow-200/90 hover:bg-yellow-300 dark:bg-yellow-500/20 dark:hover:bg-yellow-500/30 border-b border-yellow-400 rounded-xs cursor-pointer inline relative transition-all" data-note-id="${note.id}">${match}${noteBubble}</mark>`
+          })
+          break
+        }
+      }
+    }
+  }, [bookNotes, page, id])
+
+  // Run highlight injector when page or notes update
+  useEffect(() => {
+    let active = true
+    const timer = setTimeout(() => {
+      if (active) injectHighlights()
+    }, 300) // 300ms delay to let textLayer mount in react-pdf
+
+    return () => {
+      active = false
+      clearTimeout(timer)
+    }
+  }, [page, bookNotes, injectHighlights])
+
   // Synchronize reading progress with Supabase
   const lastSavedPageRef = useRef<number>(1)
   const currentPageRef = useRef<number>(page)
@@ -215,6 +272,18 @@ export const ReaderPage: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('librovia-reader-theme', theme)
   }, [theme])
+
+  // Close selection toolbar when selection disappears
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      const selection = window.getSelection()
+      if (!selection || selection.isCollapsed || !selection.toString().trim()) {
+        setFloatingToolbarPos(null)
+      }
+    }
+    document.addEventListener('selectionchange', handleSelectionChange)
+    return () => document.removeEventListener('selectionchange', handleSelectionChange)
+  }, [])
 
   // Fullscreen event listener sync
   useEffect(() => {
@@ -333,18 +402,21 @@ export const ReaderPage: React.FC = () => {
     handleFullscreenToggle,
   ])
 
-  // Mouse Up selection highlight detector
-  const handleMouseUp = () => {
-    const selected = window.getSelection()?.toString()
-    if (selected && selected.trim()) {
-      setModalHighlightText(selected.trim())
-      setModalNoteText('')
-      setModalRating(undefined)
-      setModalTags([])
-      setModalBookmark(false)
-      setEditingNoteId(null)
-      setIsNotesModalOpen(true)
+  // Mouse Up selection toolbar positioner
+  const handleTextSelection = () => {
+    const selection = window.getSelection()
+    if (!selection || selection.isCollapsed || !selection.toString().trim()) {
+      setFloatingToolbarPos(null)
+      return
     }
+
+    const range = selection.getRangeAt(0)
+    const rect = range.getBoundingClientRect()
+    setFloatingToolbarPos({
+      top: rect.top + window.scrollY - 55,
+      left: rect.left + window.scrollX + rect.width / 2 - 80,
+    })
+    setModalHighlightText(selection.toString().trim())
   }
 
   // Toggle page bookmark status directly
@@ -394,6 +466,37 @@ export const ReaderPage: React.FC = () => {
     setIsNotesModalOpen(true)
   }
 
+  // Quick Highlights creation
+  const handleQuickHighlight = async () => {
+    if (!id || !modalHighlightText.trim()) return
+    try {
+      const payload = {
+        bookId: id,
+        pageNumber: page,
+        noteText: '',
+        rating: undefined,
+        highlightedText: modalHighlightText.trim(),
+        isBookmarked: false,
+        tags: [],
+      }
+      const saved = await notesService.saveNote(payload)
+      setBookNotes((prev) => [...prev, saved])
+      window.getSelection()?.removeAllRanges()
+      setFloatingToolbarPos(null)
+      showNotification('Text highlighted! 🖍')
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const handleQuickCopy = () => {
+    if (!modalHighlightText.trim()) return
+    navigator.clipboard.writeText(modalHighlightText)
+    window.getSelection()?.removeAllRanges()
+    setFloatingToolbarPos(null)
+    showNotification('Text copied! 📋')
+  }
+
   const handleSaveNote = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!id) return
@@ -410,7 +513,6 @@ export const ReaderPage: React.FC = () => {
         tags: modalTags,
       }
 
-      // Optimistic UI updates
       const saved = await notesService.saveNote(payload)
       if (editingNoteId) {
         setBookNotes((prev) => prev.map((n) => (n.id === editingNoteId ? saved : n)))
@@ -419,7 +521,8 @@ export const ReaderPage: React.FC = () => {
       }
 
       setIsNotesModalOpen(false)
-      showNotification('Note synced to Supabase successfully! 📒')
+      window.getSelection()?.removeAllRanges()
+      showNotification('Note synced to Supabase! 📒')
     } catch (err) {
       console.error(err)
     }
@@ -439,6 +542,52 @@ export const ReaderPage: React.FC = () => {
 
   const handleToggleTag = (tag: string) => {
     setModalTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]))
+  }
+
+  // Click handler on document container for event delegation
+  const handleContainerClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement
+    const mark = target.closest('mark[data-note-id]')
+    if (mark) {
+      e.stopPropagation()
+      const noteId = mark.getAttribute('data-note-id')
+      const note = bookNotes.find((n) => n.id === noteId)
+      if (note) {
+        setEditingNoteId(note.id)
+        setModalRating(note.rating)
+        setModalNoteText(note.noteText)
+        setModalHighlightText(note.highlightedText || '')
+        setModalBookmark(note.isBookmarked)
+        setModalTags(note.tags)
+        setIsNotesModalOpen(true)
+      }
+    }
+  }
+
+  // Hover event delegation handlers
+  const handleContainerMouseOver = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement
+    const mark = target.closest('mark[data-note-id]')
+    if (mark) {
+      const noteId = mark.getAttribute('data-note-id')
+      const note = bookNotes.find((n) => n.id === noteId)
+      if (note && (note.noteText || note.rating || note.tags.length > 0)) {
+        const rect = mark.getBoundingClientRect()
+        setHoveredNote(note)
+        setHoveredNotePos({
+          top: rect.top + window.scrollY - 100,
+          left: rect.left + window.scrollX,
+        })
+      }
+    }
+  }
+
+  const handleContainerMouseOut = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement
+    if (target.closest('mark[data-note-id]')) {
+      setHoveredNote(null)
+      setHoveredNotePos(null)
+    }
   }
 
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
@@ -461,10 +610,8 @@ export const ReaderPage: React.FC = () => {
     setOriginalPageHeight(p.height)
   }
 
-  // Bookmarked pages selector helper
   const bookmarkedPages = bookNotes.filter((n) => n.isBookmarked).map((n) => n.pageNumber)
 
-  // Theme styling definitions
   const themeClasses = {
     light: 'bg-white text-slate-900 border-slate-200 shadow-xl',
     dark: 'bg-neutral-900 text-neutral-100 border-neutral-800 shadow-2xl',
@@ -514,7 +661,7 @@ export const ReaderPage: React.FC = () => {
     >
       {/* Top Toolbar */}
       <header
-        className={`z-20 flex h-16 shrink-0 items-center justify-between border-b px-4 ${
+        className={`z-25 flex h-16 shrink-0 items-center justify-between border-b px-4 ${
           theme === 'dark'
             ? 'border-neutral-800 bg-neutral-900'
             : 'border-slate-200 bg-white shadow-sm'
@@ -528,7 +675,7 @@ export const ReaderPage: React.FC = () => {
           >
             <ArrowLeft className="h-4.5 w-4.5" />
           </Link>
-          <div className="min-w-0">
+          <div className="min-w-0 text-left">
             <h1 className="text-text-main truncate text-xs font-extrabold tracking-wider uppercase">
               {rawBook.title}
             </h1>
@@ -538,9 +685,9 @@ export const ReaderPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Right side page manipulations */}
+        {/* Center/Right toolbar buttons */}
         <div className="flex items-center gap-2">
-          {/* Zoom Buttons */}
+          {/* Zoom Control buttons */}
           <div className="border-border-base bg-bg-surface flex items-center rounded-lg border p-0.5">
             <button
               onClick={handleZoomOut}
@@ -561,7 +708,7 @@ export const ReaderPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Scale Fit Selects */}
+          {/* Fit options */}
           <div className="border-border-base bg-bg-surface hidden items-center rounded-lg border p-0.5 sm:flex">
             <button
               onClick={() => setFitMode(fitMode === 'width' ? 'custom' : 'width')}
@@ -581,7 +728,6 @@ export const ReaderPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Rotation Toggle */}
           <button
             onClick={handleRotate}
             className="text-text-sub hover:bg-bg-app hover:text-text-main cursor-pointer rounded-lg p-2"
@@ -590,7 +736,6 @@ export const ReaderPage: React.FC = () => {
             <RotateCw className="h-4 w-4" />
           </button>
 
-          {/* Fullscreen Toggle */}
           <button
             onClick={handleFullscreenToggle}
             className="text-text-sub hover:bg-bg-app hover:text-text-main cursor-pointer rounded-lg p-2"
@@ -599,7 +744,7 @@ export const ReaderPage: React.FC = () => {
             {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
           </button>
 
-          {/* Theme select switch */}
+          {/* Theme Switchers */}
           <div className="border-border-base bg-bg-surface flex rounded-lg border p-0.5">
             {(['light', 'dark', 'sepia'] as const).map((t) => (
               <button
@@ -614,16 +759,16 @@ export const ReaderPage: React.FC = () => {
             ))}
           </div>
 
-          {/* Personal Journal Notes modal trigger */}
+          {/* Custom Journal Note Modal triggers */}
           <button
             onClick={handleOpenNoteModal}
             className="cursor-pointer rounded-lg bg-purple-50 p-2 text-purple-600 hover:bg-purple-100 dark:bg-purple-950/20"
             title="Write Study Journal Note"
           >
-            <MessageSquare className="h-4.5 w-4.5" />
+            <Edit2 className="h-4.5 w-4.5" />
           </button>
 
-          {/* Bookmark page */}
+          {/* Bookmark page directly */}
           <button
             onClick={toggleBookmark}
             className={`cursor-pointer rounded-lg p-2 ${
@@ -639,7 +784,6 @@ export const ReaderPage: React.FC = () => {
             />
           </button>
 
-          {/* Text options settings dropdown */}
           <button
             onClick={() => setShowSettings(!showSettings)}
             className={`cursor-pointer rounded-lg p-2 ${
@@ -652,7 +796,7 @@ export const ReaderPage: React.FC = () => {
             <Sliders className="h-4.5 w-4.5" />
           </button>
 
-          {/* Collapse sidebar */}
+          {/* Collapsible sidebar toggles */}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className={`cursor-pointer rounded-lg p-2 ${
@@ -660,9 +804,22 @@ export const ReaderPage: React.FC = () => {
                 ? 'text-primary-600 bg-primary-50 dark:bg-primary-500/10'
                 : 'text-text-sub hover:bg-bg-app'
             }`}
-            title="Toggle Navigation drawer"
+            title="Toggle Sidebar Navigator"
           >
             <List className="h-4.5 w-4.5" />
+          </button>
+
+          {/* Toggle Reading Journal Sidebar */}
+          <button
+            onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
+            className={`cursor-pointer rounded-lg p-2 ${
+              rightSidebarOpen
+                ? 'bg-purple-50 text-purple-600 dark:bg-purple-950/20'
+                : 'text-text-sub hover:bg-bg-app'
+            }`}
+            title="Toggle Reading Journal Panel"
+          >
+            <MessageSquare className="h-4.5 w-4.5" />
           </button>
         </div>
       </header>
@@ -675,7 +832,6 @@ export const ReaderPage: React.FC = () => {
             sidebarOpen ? 'w-64' : 'w-0 overflow-hidden'
           }`}
         >
-          {/* Tab selectors */}
           <div className="border-border-base bg-bg-app flex border-b">
             {(
               [
@@ -699,7 +855,6 @@ export const ReaderPage: React.FC = () => {
             ))}
           </div>
 
-          {/* Tab content body */}
           <div className="flex-1 space-y-4 overflow-y-auto p-4">
             {activeTab === 'toc' && (
               <div className="space-y-1">
@@ -789,21 +944,20 @@ export const ReaderPage: React.FC = () => {
                   className="flex h-8 w-full cursor-pointer items-center justify-center gap-1 rounded-lg bg-purple-600 text-xs font-bold tracking-wider text-white uppercase shadow-sm hover:bg-purple-700"
                 >
                   <Plus className="h-4.5 w-4.5" />
-                  Add New Note (p. {page})
+                  Add Note (p. {page})
                 </button>
 
-                {/* Annotation items list */}
                 <div className="border-border-light space-y-2 border-t pt-2">
                   {bookNotes.length === 0 ? (
                     <p className="text-text-muted py-6 text-center text-[10px]">
-                      No personal study notes.
+                      No study notes written.
                     </p>
                   ) : (
                     bookNotes.map((n) => (
                       <div
                         key={n.id}
                         onClick={() => setPage(n.pageNumber)}
-                        className={`cursor-pointer space-y-2 rounded-2xl border border-slate-100 bg-white p-3 text-left text-xs shadow-xs transition-colors hover:border-purple-500/35 dark:border-slate-800 dark:bg-slate-900 ${
+                        className={`hover:border-purple-550/35 cursor-pointer space-y-2 rounded-2xl border border-slate-100 bg-white p-3 text-left text-xs shadow-xs transition-colors dark:border-slate-800 dark:bg-slate-900 ${
                           n.pageNumber === page
                             ? 'border-purple-500/40 ring-1 ring-purple-500/10'
                             : ''
@@ -817,27 +971,14 @@ export const ReaderPage: React.FC = () => {
                           </div>
                         )}
                         {n.highlightedText && (
-                          <p className="border-l-2 border-purple-400 bg-purple-50/50 pl-2 font-serif text-[10px] leading-relaxed text-purple-700 italic dark:bg-purple-950/20 dark:text-purple-300">
+                          <p className="line-clamp-2 border-l-2 border-purple-400 bg-purple-50/50 pl-2 font-serif text-[10px] leading-relaxed text-purple-700 italic dark:bg-purple-950/20 dark:text-purple-300">
                             "{n.highlightedText}"
                           </p>
                         )}
                         {n.noteText && (
-                          <p className="leading-relaxed font-semibold text-slate-700 dark:text-slate-300">
+                          <p className="dark:text-slate-350 leading-relaxed font-semibold text-slate-700">
                             {n.noteText}
                           </p>
-                        )}
-
-                        {n.tags && n.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {n.tags.map((tag) => (
-                              <span
-                                key={tag}
-                                className="rounded bg-slate-50 px-1 py-0.5 text-[8px] font-bold text-slate-500 uppercase dark:bg-slate-800 dark:text-slate-400"
-                              >
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
                         )}
 
                         <div className="text-text-muted mt-1.5 flex items-center justify-between border-t border-slate-50 pt-1.5 font-sans text-[9px] font-bold dark:border-slate-800/40">
@@ -854,7 +995,7 @@ export const ReaderPage: React.FC = () => {
                                 setModalTags(n.tags)
                                 setIsNotesModalOpen(true)
                               }}
-                              className="text-slate-400 hover:text-slate-600 dark:hover:text-white"
+                              className="hover:text-slate-655 text-slate-400"
                             >
                               <Edit2 className="h-3 w-3" />
                             </button>
@@ -875,7 +1016,7 @@ export const ReaderPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Reading Settings Float Overlay */}
+        {/* Reading Settings Overlay */}
         <AnimatePresence>
           {showSettings && (
             <motion.div
@@ -896,7 +1037,6 @@ export const ReaderPage: React.FC = () => {
                 </button>
               </div>
 
-              {/* Font Size Row */}
               <div className="space-y-1.5">
                 <span className="text-text-muted block text-[8px] font-bold tracking-wider uppercase">
                   Font Size
@@ -918,7 +1058,6 @@ export const ReaderPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Line Height Row */}
               <div className="space-y-1.5">
                 <span className="text-text-muted block text-[8px] font-bold tracking-wider uppercase">
                   Line Spacing
@@ -940,7 +1079,6 @@ export const ReaderPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Page Width Row */}
               <div className="space-y-1.5">
                 <span className="text-text-muted block text-[8px] font-bold tracking-wider uppercase">
                   Page Margins
@@ -985,7 +1123,10 @@ export const ReaderPage: React.FC = () => {
               themeClasses[theme]
             } ${widthClasses[pageWidth]}`}
             style={{ transform: `scale(${scale})` }}
-            onMouseUp={handleMouseUp}
+            onMouseUp={handleTextSelection}
+            onClick={handleContainerClick}
+            onMouseOver={handleContainerMouseOver}
+            onMouseOut={handleContainerMouseOut}
           >
             <Document
               file={rawBook.filePath}
@@ -1028,11 +1169,124 @@ export const ReaderPage: React.FC = () => {
           <button
             onClick={handleNextPage}
             disabled={page >= totalPages}
-            className="border-border-base bg-bg-surface/80 hover:bg-bg-surface text-text-sub fixed top-1/2 right-8 z-10 hidden -translate-y-1/2 cursor-pointer rounded-full border p-3 shadow transition-all disabled:opacity-20 lg:block"
+            className="border-border-base bg-bg-surface/80 hover:bg-bg-surface text-text-sub fixed top-1/2 right-[320px] z-10 hidden -translate-y-1/2 cursor-pointer rounded-full border p-3 shadow transition-all disabled:opacity-20 lg:block"
           >
             <ChevronRight className="h-5 w-5" />
           </button>
         </div>
+
+        {/* Collapsible Right Sidebar: 📒 Reading Journal */}
+        <AnimatePresence>
+          {rightSidebarOpen && (
+            <motion.div
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 280, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              className="relative z-10 flex w-70 flex-col overflow-y-auto border-l border-slate-100 bg-white text-left transition-all duration-300 dark:border-slate-800 dark:bg-slate-900"
+            >
+              <div className="dark:bg-slate-850 flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50/45 px-4 py-3 dark:border-slate-800">
+                <span className="flex items-center gap-1.5 text-[10px] font-bold tracking-widest text-purple-600 uppercase">
+                  <Bookmark className="h-4 w-4" />
+                  Reading Journal
+                </span>
+                <button
+                  onClick={() => setRightSidebarOpen(false)}
+                  className="cursor-pointer font-bold text-slate-400 hover:text-slate-600"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="flex-1 space-y-4 p-4">
+                {bookNotes.length === 0 ? (
+                  <p className="py-8 text-center text-[10px] leading-relaxed text-slate-400">
+                    No annotations saved. Select text on a page to highlight or click "+ Add Note"
+                    inside the panel.
+                  </p>
+                ) : (
+                  bookNotes.map((n) => (
+                    <div
+                      key={n.id}
+                      onClick={() => setPage(n.pageNumber)}
+                      className={`hover:border-purple-550/35 cursor-pointer space-y-2 rounded-2xl border border-slate-100 bg-slate-50/40 p-3 text-xs shadow-xs transition-all hover:bg-white dark:border-slate-800 dark:bg-slate-950/20 ${
+                        n.pageNumber === page
+                          ? 'border-purple-500/40 bg-white ring-1 ring-purple-500/10'
+                          : ''
+                      }`}
+                    >
+                      <div className="text-purple-650 flex items-center justify-between text-[9px] font-extrabold uppercase">
+                        <span>Page {n.pageNumber}</span>
+                        {n.isBookmarked && (
+                          <Bookmark className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                        )}
+                      </div>
+
+                      {n.rating && (
+                        <div className="flex gap-0.5 text-amber-400">
+                          {Array.from({ length: 5 }).map((_, idx) => (
+                            <Star
+                              key={idx}
+                              className={`h-3 w-3 ${idx < n.rating! ? 'fill-current' : 'text-slate-200 dark:text-slate-800'}`}
+                            />
+                          ))}
+                        </div>
+                      )}
+
+                      {n.highlightedText && (
+                        <p className="line-clamp-3 border-l-2 border-purple-400 bg-slate-50 py-0.5 pl-2 font-serif text-[9px] leading-relaxed italic dark:bg-slate-800">
+                          "{n.highlightedText}"
+                        </p>
+                      )}
+
+                      {n.noteText && (
+                        <p className="leading-relaxed font-semibold text-slate-800 dark:text-slate-200">
+                          {n.noteText}
+                        </p>
+                      )}
+
+                      {n.tags && n.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {n.tags.map((t) => (
+                            <span
+                              key={t}
+                              className="rounded bg-slate-100 px-1.5 py-0.5 text-[8px] font-bold tracking-wider text-slate-500 uppercase dark:bg-slate-800 dark:text-slate-400"
+                            >
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="dark:border-slate-850 flex shrink-0 justify-end gap-2 border-t border-slate-50 pt-2 text-[10px] font-bold tracking-wider uppercase">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setEditingNoteId(n.id)
+                            setModalRating(n.rating)
+                            setModalNoteText(n.noteText)
+                            setModalHighlightText(n.highlightedText || '')
+                            setModalBookmark(n.isBookmarked)
+                            setModalTags(n.tags)
+                            setIsNotesModalOpen(true)
+                          }}
+                          className="hover:text-slate-655 text-slate-400"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={(e) => handleDeleteNote(n.id, e)}
+                          className="text-slate-400 hover:text-red-500"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Bottom Bar Controls */}
@@ -1071,6 +1325,97 @@ export const ReaderPage: React.FC = () => {
         </span>
       </footer>
 
+      {/* Selection Floating Action Toolbar */}
+      <AnimatePresence>
+        {floatingToolbarPos && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 10 }}
+            style={{
+              position: 'absolute',
+              top: floatingToolbarPos.top,
+              left: floatingToolbarPos.left,
+            }}
+            className="z-50 flex items-center gap-1 rounded-xl border border-slate-100 bg-slate-900/95 p-1 text-white shadow-2xl backdrop-blur-xs dark:border-slate-800"
+          >
+            <button
+              onClick={handleQuickHighlight}
+              className="text-yellow-350 flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] font-bold uppercase transition-colors hover:bg-white/10"
+            >
+              🖍 Highlight
+            </button>
+            <button
+              onClick={handleOpenNoteModal}
+              className="flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] font-bold text-purple-300 uppercase transition-colors hover:bg-white/10"
+            >
+              💬 Note
+            </button>
+            <button
+              onClick={toggleBookmark}
+              className="flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] font-bold text-amber-300 uppercase transition-colors hover:bg-white/10"
+            >
+              🔖 Save
+            </button>
+            <button
+              onClick={handleQuickCopy}
+              className="flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] font-bold text-slate-300 uppercase transition-colors hover:bg-white/10"
+            >
+              <Copy className="h-3 w-3" /> Copy
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Inline Hover preview tooltip overlay */}
+      <AnimatePresence>
+        {hoveredNote && hoveredNotePos && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            style={{
+              position: 'absolute',
+              top: hoveredNotePos.top,
+              left: hoveredNotePos.left,
+            }}
+            className="z-50 w-56 space-y-2 rounded-2xl border border-slate-100 bg-white p-3.5 text-left shadow-2xl dark:border-slate-800 dark:bg-slate-900"
+          >
+            <div className="flex items-center justify-between text-[8px] font-bold text-purple-600 uppercase">
+              <span>Page {hoveredNote.pageNumber}</span>
+              {hoveredNote.isBookmarked && (
+                <Bookmark className="h-3 w-3 fill-amber-500 text-amber-500" />
+              )}
+            </div>
+
+            {hoveredNote.rating && (
+              <div className="flex gap-0.5 text-amber-400">
+                {Array.from({ length: hoveredNote.rating }).map((_, idx) => (
+                  <Star key={idx} className="h-3 w-3 fill-current" />
+                ))}
+              </div>
+            )}
+
+            <p className="text-slate-850 text-[10px] leading-relaxed font-semibold dark:text-slate-200">
+              {hoveredNote.noteText}
+            </p>
+
+            {hoveredNote.tags && hoveredNote.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {hoveredNote.tags.map((t) => (
+                  <span
+                    key={t}
+                    className="text-slate-550 rounded bg-slate-50 px-1.5 py-0.5 text-[8px] font-bold uppercase dark:bg-slate-800 dark:text-slate-400"
+                  >
+                    {t}
+                  </span>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Reading Journal study Note Modal Popup */}
       <AnimatePresence>
         {isNotesModalOpen && (
@@ -1094,7 +1439,10 @@ export const ReaderPage: React.FC = () => {
                   </h3>
                 </div>
                 <button
-                  onClick={() => setIsNotesModalOpen(false)}
+                  onClick={() => {
+                    setIsNotesModalOpen(false)
+                    window.getSelection()?.removeAllRanges()
+                  }}
                   className="hover:text-slate-650 cursor-pointer rounded-lg p-1 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
                   <X className="h-4.5 w-4.5" />
@@ -1105,13 +1453,13 @@ export const ReaderPage: React.FC = () => {
                 {/* Highlight text input */}
                 <div className="space-y-1">
                   <label className="block text-[9px] font-bold tracking-widest text-slate-400 uppercase">
-                    Highlighted Text (Optional)
+                    Selected Text (Read-Only)
                   </label>
                   <textarea
+                    readOnly
                     value={modalHighlightText}
-                    onChange={(e) => setModalHighlightText(e.target.value)}
-                    placeholder="Highlight text will show here. Drag mouse on page to capture."
-                    className="min-h-16 w-full rounded-2xl border border-slate-200 bg-slate-50/50 p-3 text-xs text-slate-900 placeholder-slate-400 outline-hidden transition-all focus:border-purple-600 focus:bg-white dark:border-slate-800 dark:bg-slate-800/40 dark:text-white"
+                    placeholder="No selection captured."
+                    className="min-h-16 w-full rounded-2xl border border-slate-200 bg-slate-100/50 p-3 text-xs text-slate-500 outline-hidden transition-all focus:border-purple-600 focus:bg-white dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400"
                   />
                 </div>
 
@@ -1200,7 +1548,10 @@ export const ReaderPage: React.FC = () => {
                 <div className="flex justify-end gap-2 border-t border-slate-50 pt-3 dark:border-slate-800/40">
                   <button
                     type="button"
-                    onClick={() => setIsNotesModalOpen(false)}
+                    onClick={() => {
+                      setIsNotesModalOpen(false)
+                      window.getSelection()?.removeAllRanges()
+                    }}
                     className="cursor-pointer rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold tracking-wider text-slate-600 uppercase transition-colors hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800/50"
                   >
                     Cancel
