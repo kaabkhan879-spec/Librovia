@@ -273,41 +273,8 @@ export const DashboardPage: React.FC = () => {
         icon: FolderOpen,
         color: 'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/20',
       },
-      {
-        title: 'Reading Streak',
-        value: `${readingStreak} days`,
-        sub: 'active streak',
-        trend: readingStreak > 0 ? 'Motivated 🔥' : 'Idle ❄️',
-        icon: Flame,
-        color: 'text-orange-600 bg-orange-50 dark:bg-orange-950/20',
-      },
-      {
-        title: 'Weekly Goal',
-        value: `${weeklyGoalPercent}%`,
-        sub: 'weekly progress',
-        trend: `${weeklyGoalProgress}/${weeklyGoalPages} pgs`,
-        icon: Award,
-        color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20',
-      },
-      {
-        title: "Today's Goal",
-        value: `${pagesReadToday} pages`,
-        sub: 'daily progress',
-        trend: `${dailyGoalPercent}% done`,
-        icon: Sparkles,
-        color: 'text-amber-600 bg-amber-50 dark:bg-amber-950/20',
-      },
     ]
-  }, [
-    books,
-    collectionsList,
-    readingStreak,
-    weeklyGoalPercent,
-    weeklyGoalProgress,
-    weeklyGoalPages,
-    pagesReadToday,
-    dailyGoalPercent,
-  ])
+  }, [books, collectionsList])
 
   // --- READING INSIGHTS ---
   const averagePagesPerDay = useMemo(() => {
@@ -391,7 +358,7 @@ export const DashboardPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-8 bg-[#F6F8FC] pb-16 text-left select-none dark:bg-slate-950/10">
+    <div className="space-y-12 bg-[#F6F8FC] pb-16 text-left select-none dark:bg-slate-950/10">
       <AnimatePresence mode="wait">
         {loading ? (
           <motion.div
@@ -417,7 +384,7 @@ export const DashboardPage: React.FC = () => {
             variants={containerVariants}
             initial="hidden"
             animate="show"
-            className="space-y-8"
+            className="space-y-12"
           >
             {/* ==================================================
                 SECTION 1: PREMIUM HERO
@@ -431,7 +398,7 @@ export const DashboardPage: React.FC = () => {
               <div className="absolute -bottom-20 -left-20 h-80 w-80 rounded-full bg-indigo-500/20 blur-3xl" />
 
               <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-                <div className="min-w-0 flex-1 space-y-3">
+                <div className="min-w-0 flex-1 space-y-3.5">
                   <div className="space-y-1">
                     <span className="flex items-center gap-1.5 text-[9px] font-extrabold tracking-widest text-purple-300 uppercase">
                       <Sparkles className="h-3 w-3 shrink-0" />
@@ -441,56 +408,39 @@ export const DashboardPage: React.FC = () => {
                       {dynamicGreeting}, {user?.displayName || 'Reader'}
                     </h1>
                   </div>
+
+                  {/* Inline micro-progress badges */}
+                  <div className="flex flex-wrap gap-2 pt-0.5">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-[9.5px] font-bold text-white backdrop-blur-md">
+                      <Flame className="h-3 w-3 fill-orange-400 text-orange-400" />
+                      {readingStreak} {readingStreak === 1 ? 'day' : 'days'} streak
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-[9.5px] font-bold text-white backdrop-blur-md">
+                      <Award className="h-3 w-3 text-purple-300" />
+                      {weeklyGoalPercent}% weekly goal
+                    </span>
+                  </div>
+
                   <p className="max-w-xl text-xs leading-relaxed text-slate-300 italic">
                     "Consistent reading habits compound knowledge. You're building a world-class
                     digital shelf."
                   </p>
-
-                  {continueReadingBook && (
-                    <div className="pt-2">
-                      <Link to={ROUTES.READER.replace(':id', continueReadingBook.id)}>
-                        <Button
-                          size="sm"
-                          className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-2.5 text-xs font-bold text-indigo-950 shadow-md transition-all hover:bg-slate-100"
-                          leftIcon={<Play className="h-3.5 w-3.5 fill-current stroke-current" />}
-                        >
-                          Continue Reading
-                        </Button>
-                      </Link>
-                    </div>
-                  )}
                 </div>
 
-                {/* Glassmorphic Metrics inside Hero */}
-                <div className="flex flex-wrap items-center gap-4 border-t border-white/10 pt-4 lg:border-t-0 lg:pt-0">
-                  <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3.5 backdrop-blur-md">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500/20 text-orange-400">
-                      <Flame className="h-4.5 w-4.5 animate-pulse fill-current" />
-                    </div>
-                    <div>
-                      <span className="block text-[8px] leading-none font-bold text-slate-400 uppercase">
-                        Streak Count
-                      </span>
-                      <span className="font-mono text-sm font-extrabold text-white">
-                        {readingStreak} {readingStreak === 1 ? 'Day' : 'Days'}
-                      </span>
-                    </div>
+                {/* Single Primary Action: Continue Reading */}
+                {continueReadingBook && (
+                  <div className="shrink-0 text-left">
+                    <Link to={ROUTES.READER.replace(':id', continueReadingBook.id)}>
+                      <Button
+                        size="md"
+                        className="inline-flex items-center gap-2 rounded-2xl bg-white px-6 py-3 text-xs font-bold text-indigo-950 shadow-lg transition-all hover:bg-slate-100"
+                        leftIcon={<Play className="h-3.5 w-3.5 fill-current stroke-current" />}
+                      >
+                        Continue Reading
+                      </Button>
+                    </Link>
                   </div>
-
-                  <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3.5 backdrop-blur-md">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-500/20 text-purple-300">
-                      <Activity className="h-4.5 w-4.5" />
-                    </div>
-                    <div>
-                      <span className="block text-[8px] leading-none font-bold text-slate-400 uppercase">
-                        Today's Progress
-                      </span>
-                      <span className="font-mono text-sm font-extrabold text-white">
-                        {pagesReadToday} pages
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
             </motion.div>
 
@@ -499,7 +449,7 @@ export const DashboardPage: React.FC = () => {
                 ================================================== */}
             <motion.div
               variants={containerVariants}
-              className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6"
+              className="grid grid-cols-1 gap-6 sm:grid-cols-3"
             >
               {statsList.map((stat, idx) => (
                 <motion.div
