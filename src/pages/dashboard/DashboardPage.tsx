@@ -6,7 +6,6 @@ import { booksService, type Book } from '../../services/books'
 import { collectionsService, type Collection } from '../../services/collections'
 import { notesService, type Note } from '../../services/notes'
 import { useAuth } from '../../context/AuthContext'
-import { formatBytes } from '../../utils/helpers'
 import {
   BookOpen,
   FolderOpen,
@@ -16,11 +15,9 @@ import {
   X,
   MessageSquare,
   Flame,
-  HardDrive,
-  Clock,
-  BookOpenCheck,
   TrendingUp,
   Sparkles,
+  Award,
 } from 'lucide-react'
 import { Button } from '../../components/common/Button'
 
@@ -238,25 +235,17 @@ export const DashboardPage: React.FC = () => {
     return books.reduce((acc, b) => acc + (b.progress > 0 ? b.currentPage : 0), 0)
   }, [books])
 
-  const completedBooksCount = useMemo(() => {
-    return books.filter((b) => b.progress === 100).length
-  }, [books])
+  // --- GOALS PROGRESS RING ---
+  const dailyGoalPages = 20
+  const dailyGoalPercent = Math.min(100, Math.round((pagesReadToday / dailyGoalPages) * 100))
 
-  const totalReadingSeconds = useMemo(() => {
-    return books.reduce((acc, b) => acc + (b.readingTime || 0), 0)
-  }, [books])
+  const weeklyGoalPages = 100
+  const weeklyGoalProgress = totalPagesRead % 100
+  const weeklyGoalPercent = Math.min(100, Math.round((weeklyGoalProgress / weeklyGoalPages) * 100))
 
-  const totalReadingTimeStr = useMemo(() => {
-    const mins = Math.floor(totalReadingSeconds / 60)
-    if (mins >= 60) {
-      return `${(totalReadingSeconds / 3600).toFixed(1)} hrs`
-    }
-    return `${mins} mins`
-  }, [totalReadingSeconds])
-
-  const totalStorageBytes = useMemo(() => {
-    return books.reduce((acc, b) => acc + (b.fileSize || 0), 0)
-  }, [books])
+  const radius = 38
+  const circumference = 2 * Math.PI * radius
+  const strokeDashoffset = circumference - (weeklyGoalPercent / 100) * circumference
 
   const statsList = useMemo(() => {
     return [
@@ -285,48 +274,49 @@ export const DashboardPage: React.FC = () => {
         color: 'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/20',
       },
       {
-        title: 'Reading Time',
-        value: totalReadingTimeStr,
-        sub: 'active study',
-        trend: 'Accumulating',
-        icon: Clock,
-        color: 'text-amber-600 bg-amber-50 dark:bg-amber-950/20',
+        title: 'Reading Streak',
+        value: `${readingStreak} days`,
+        sub: 'active streak',
+        trend: readingStreak > 0 ? 'Motivated 🔥' : 'Idle ❄️',
+        icon: Flame,
+        color: 'text-orange-600 bg-orange-50 dark:bg-orange-950/20',
       },
       {
-        title: 'Completed Books',
-        value: String(completedBooksCount),
-        sub: 'finished volumes',
-        trend: `${completedBooksCount > 0 ? 'Milestone' : 'Goal active'}`,
-        icon: BookOpenCheck,
+        title: 'Weekly Goal',
+        value: `${weeklyGoalPercent}%`,
+        sub: 'weekly progress',
+        trend: `${weeklyGoalProgress}/${weeklyGoalPages} pgs`,
+        icon: Award,
         color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20',
       },
       {
-        title: 'Storage Used',
-        value: formatBytes(totalStorageBytes),
-        sub: 'of 1 GB limit',
-        trend: '94% free',
-        icon: HardDrive,
-        color: 'text-rose-600 bg-rose-50 dark:bg-rose-950/20',
+        title: "Today's Goal",
+        value: `${pagesReadToday} pages`,
+        sub: 'daily progress',
+        trend: `${dailyGoalPercent}% done`,
+        icon: Sparkles,
+        color: 'text-amber-600 bg-amber-50 dark:bg-amber-950/20',
       },
     ]
-  }, [books, collectionsList, totalStorageBytes, totalReadingTimeStr, completedBooksCount])
-
-  // --- GOALS PROGRESS RING ---
-  const dailyGoalPages = 20
-  const dailyGoalPercent = Math.min(100, Math.round((pagesReadToday / dailyGoalPages) * 100))
-
-  const weeklyGoalPages = 100
-  const weeklyGoalProgress = totalPagesRead % 100
-  const weeklyGoalPercent = Math.min(100, Math.round((weeklyGoalProgress / weeklyGoalPages) * 100))
-
-  const radius = 38
-  const circumference = 2 * Math.PI * radius
-  const strokeDashoffset = circumference - (weeklyGoalPercent / 100) * circumference
+  }, [
+    books,
+    collectionsList,
+    readingStreak,
+    weeklyGoalPercent,
+    weeklyGoalProgress,
+    weeklyGoalPages,
+    pagesReadToday,
+    dailyGoalPercent,
+  ])
 
   // --- READING INSIGHTS ---
   const averagePagesPerDay = useMemo(() => {
     return Math.round(totalPagesRead / 5) || 8
   }, [totalPagesRead])
+
+  const totalReadingSeconds = useMemo(() => {
+    return books.reduce((acc, b) => acc + (b.readingTime || 0), 0)
+  }, [books])
 
   const averageReadingSessionMins = useMemo(() => {
     return Math.round(totalReadingSeconds / 60 / (books.length || 1)) || 15
