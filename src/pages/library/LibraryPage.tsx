@@ -222,13 +222,25 @@ export const LibraryPage: React.FC = () => {
   return (
     <div className="relative min-h-screen space-y-8 pb-20 text-left select-none">
       {/* Header Section */}
-      <div className="space-y-1">
-        <h1 className="font-sans text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
-          My Library
-        </h1>
-        <p className="text-sm font-semibold tracking-wider text-slate-500 dark:text-slate-400">
-          Manage, organize and access all your books.
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-1">
+          <h1 className="font-sans text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
+            My Library
+          </h1>
+          <p className="text-sm font-semibold tracking-wider text-slate-500 dark:text-slate-400">
+            Manage, organize and access all your books.
+          </p>
+        </div>
+
+        <Link to={ROUTES.UPLOAD}>
+          <Button
+            size="sm"
+            leftIcon={<Plus className="h-4 w-4" />}
+            className="bg-purple-650 rounded-xl font-bold text-white shadow-xs transition-all hover:bg-purple-700"
+          >
+            Upload Book
+          </Button>
+        </Link>
       </div>
 
       {/* Tab Selectors */}

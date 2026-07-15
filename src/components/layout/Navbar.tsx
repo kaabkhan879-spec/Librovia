@@ -16,6 +16,8 @@ import {
   Award,
   MessageSquare,
   FolderOpen,
+  Sun,
+  Moon,
 } from 'lucide-react'
 import { Button } from '../common/Button'
 
@@ -89,6 +91,23 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   pageTitle = 'Dashboard',
 }) => {
   const { user } = useAuth()
+  const [isDark, setIsDark] = useState(() => {
+    return (
+      document.documentElement.classList.contains('dark') ||
+      localStorage.getItem('librovia-theme') === 'dark'
+    )
+  })
+
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.add('dark')
+      localStorage.setItem('librovia-theme', 'dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+      localStorage.setItem('librovia-theme', 'light')
+    }
+  }, [isDark])
+
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
   const [showAllNotifs, setShowAllNotifs] = useState(false)
@@ -250,17 +269,18 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
       {/* Right side Actions */}
       <div className="flex items-center gap-4">
-        {/* Upload book button */}
-        <Link to={ROUTES.UPLOAD}>
-          <Button
-            size="sm"
-            variant="outline"
-            leftIcon={<UploadCloud className="h-4 w-4" />}
-            className="hidden sm:flex"
-          >
-            Upload
-          </Button>
-        </Link>
+        {/* Theme Toggle Button */}
+        <button
+          onClick={() => setIsDark(!isDark)}
+          className="border-border-base bg-bg-surface text-text-sub hover:bg-bg-app hover:text-text-main flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border transition-all"
+          title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+        >
+          {isDark ? (
+            <Sun className="h-4.5 w-4.5 fill-amber-500/10 text-amber-500" />
+          ) : (
+            <Moon className="h-4.5 w-4.5 text-slate-400" />
+          )}
+        </button>
 
         {/* Notifications Bell with Dropdown Container */}
         <div className="relative" ref={dropdownRef}>
