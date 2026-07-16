@@ -20,12 +20,11 @@ import { LibraryPage } from '../pages/library/LibraryPage'
 import { UploadBookPage } from '../pages/upload/UploadBookPage'
 import { BookDetailsPage } from '../pages/book-details/BookDetailsPage'
 import { ReaderPage } from '../pages/reader/ReaderPage'
-import { FavoritesPage } from '../pages/favorites/FavoritesPage'
 import { CategoriesPage } from '../pages/categories/CategoriesPage'
+import { NotesPage } from '../pages/notes/NotesPage'
 import { ProfilePage } from '../pages/profile/ProfilePage'
 import { SettingsPage } from '../pages/settings/SettingsPage'
 import { StoragePage } from '../pages/storage/StoragePage'
-import { ReadingPage } from '../pages/reading/ReadingPage'
 import { AnalyticsPage } from '../pages/analytics/AnalyticsPage'
 
 export const AppRoutes: React.FC = () => {
@@ -51,9 +50,10 @@ export const AppRoutes: React.FC = () => {
           <Route path={ROUTES.UPLOAD} element={<UploadBookPage />} />
           <Route path={ROUTES.BOOK_DETAILS} element={<BookDetailsPage />} />
           <Route path={ROUTES.READER} element={<ReaderPage />} />
-          <Route path={ROUTES.FAVORITES} element={<FavoritesPage />} />
+          <Route path={ROUTES.FAVORITES} element={<Navigate to="/library?tab=favorites" replace />} />
           <Route path={ROUTES.COLLECTIONS} element={<CategoriesPage />} />
-          <Route path={ROUTES.READING} element={<ReadingPage />} />
+          <Route path={ROUTES.NOTES} element={<NotesPage />} />
+          <Route path={ROUTES.READING} element={<Navigate to="/analytics" replace />} />
           <Route path={ROUTES.ANALYTICS} element={<AnalyticsPage />} />
           <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
           <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />

@@ -15,7 +15,6 @@ import {
   X,
   MessageSquare,
   Flame,
-  TrendingUp,
   Sparkles,
   Award,
 } from 'lucide-react'
@@ -147,9 +146,6 @@ export const DashboardPage: React.FC = () => {
       .reduce((acc, b) => acc + Math.min(b.currentPage, 12), 0)
   }, [books])
 
-  const readingTimeTodayMins = useMemo(() => {
-    return Math.round(pagesReadToday * 1.5)
-  }, [pagesReadToday])
 
   // --- CONTINUE READING (Show only ONE book) ---
   const continueReadingBook = useMemo(() => {
@@ -276,70 +272,6 @@ export const DashboardPage: React.FC = () => {
     ]
   }, [books, collectionsList])
 
-  // --- READING INSIGHTS ---
-  const averagePagesPerDay = useMemo(() => {
-    return Math.round(totalPagesRead / 5) || 8
-  }, [totalPagesRead])
-
-  const totalReadingSeconds = useMemo(() => {
-    return books.reduce((acc, b) => acc + (b.readingTime || 0), 0)
-  }, [books])
-
-  const averageReadingSessionMins = useMemo(() => {
-    return Math.round(totalReadingSeconds / 60 / (books.length || 1)) || 15
-  }, [totalReadingSeconds, books])
-
-  const weeklyChartData = useMemo(() => {
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-    const result = days.map((label) => ({ label, value: 0 }))
-
-    books.forEach((b) => {
-      if (b.lastReadAt) {
-        const d = new Date(b.lastReadAt)
-        const dayIdx = d.getDay()
-        result[dayIdx].value += Math.min(b.currentPage, 8)
-      }
-    })
-
-    const totalVal = result.reduce((acc, d) => acc + d.value, 0)
-    if (totalVal === 0) {
-      result[1].value = 4
-      result[2].value = 12
-      result[3].value = 8
-      result[4].value = 16
-      result[5].value = 6
-    }
-    return result
-  }, [books])
-
-  const mostActiveReadingDay = useMemo(() => {
-    let maxVal = -1
-    let activeDay = 'Wednesday'
-    weeklyChartData.forEach((d) => {
-      if (d.value > maxVal) {
-        maxVal = d.value
-        activeDay = d.label
-      }
-    })
-    return activeDay === 'Wed'
-      ? 'Wednesday'
-      : activeDay === 'Sat'
-        ? 'Saturday'
-        : activeDay === 'Sun'
-          ? 'Sunday'
-          : `${activeDay}day`
-  }, [weeklyChartData])
-
-  // --- TOP COLLECTIONS PREVIEW ---
-  const topCollections = useMemo(() => {
-    return collectionsList
-      .map((col) => {
-        const bookCount = books.filter((b) => b.collectionId === col.id).length
-        return { ...col, bookCount }
-      })
-      .sort((a, b) => b.bookCount - a.bookCount)
-      .slice(0, 3)
-  }, [collectionsList, books])
 
   const quoteOfTheDay = useMemo(() => {
     const day = new Date().getDay()
@@ -563,146 +495,6 @@ export const DashboardPage: React.FC = () => {
                     </div>
                   )}
                 </motion.div>
-
-                {/* ==================================================
-                    SECTION 4: READING INSIGHTS
-                    ================================================== */}
-                <motion.div variants={itemVariants} className="space-y-4">
-                  <h3 className="text-left text-xs font-extrabold tracking-widest text-slate-400 uppercase dark:text-slate-500">
-                    Reading Insights
-                  </h3>
-                  <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-                      {/* Left side: Stats List */}
-                      <div className="dark:border-slate-850 space-y-4 border-r border-slate-50 pr-4 text-left md:col-span-1">
-                        <div className="space-y-1">
-                          <span className="text-[9px] font-bold text-slate-400 uppercase">
-                            Daily Average
-                          </span>
-                          <p className="font-mono text-2xl font-black text-slate-950 dark:text-white">
-                            {averagePagesPerDay}{' '}
-                            <span className="text-xs font-bold text-slate-400 uppercase">
-                              pages
-                            </span>
-                          </p>
-                        </div>
-                        <div className="space-y-1">
-                          <span className="text-[9px] font-bold text-slate-400 uppercase">
-                            Average Session
-                          </span>
-                          <p className="font-mono text-2xl font-black text-slate-950 dark:text-white">
-                            {averageReadingSessionMins}{' '}
-                            <span className="text-xs font-bold text-slate-400 uppercase">mins</span>
-                          </p>
-                        </div>
-                        <div className="space-y-1">
-                          <span className="text-[9px] font-bold text-slate-400 uppercase">
-                            Study Time Today
-                          </span>
-                          <p className="font-mono text-2xl font-black text-slate-950 dark:text-white">
-                            {readingTimeTodayMins}{' '}
-                            <span className="text-xs font-bold text-slate-400 uppercase">mins</span>
-                          </p>
-                        </div>
-                        <div className="space-y-1">
-                          <span className="text-[9px] font-bold text-slate-400 uppercase">
-                            Most Active Day
-                          </span>
-                          <p className="text-purple-650 text-sm font-extrabold dark:text-purple-400">
-                            {mostActiveReadingDay}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Right side: Charts */}
-                      <div className="md:col-span-2">
-                        <div className="flex items-center justify-between pb-2 text-[10px] font-bold text-slate-400 uppercase">
-                          <span>Weekly Progress Report</span>
-                          <span className="flex items-center gap-1 font-sans text-purple-600 dark:text-purple-400">
-                            <TrendingUp className="h-3.5 w-3.5" /> High Activity
-                          </span>
-                        </div>
-                        <div className="flex h-32 items-end justify-between gap-3 px-2 pt-2">
-                          {weeklyChartData.map((day, idx) => {
-                            const maxVal = Math.max(...weeklyChartData.map((d) => d.value)) || 10
-                            const percentHeight = Math.max(
-                              10,
-                              Math.round((day.value / maxVal) * 90)
-                            )
-                            return (
-                              <div
-                                key={idx}
-                                className="group/bar flex flex-1 flex-col items-center gap-2"
-                              >
-                                <div className="relative flex w-full justify-center">
-                                  <div className="pointer-events-none absolute -top-8 scale-0 rounded bg-slate-950 px-2 py-1 text-[8px] font-bold text-white shadow-md transition-all group-hover/bar:scale-100">
-                                    {day.value} pgs
-                                  </div>
-                                  <div
-                                    className="w-full max-w-[20px] rounded-t-lg bg-purple-100 transition-all duration-300 group-hover/bar:bg-purple-600 dark:bg-purple-950/30"
-                                    style={{ height: `${percentHeight}px` }}
-                                  />
-                                </div>
-                                <span className="font-mono text-[9px] font-bold text-slate-400">
-                                  {day.label}
-                                </span>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-
-                {/* ==================================================
-                    SECTION 8: COLLECTIONS PREVIEW
-                    ================================================== */}
-                <motion.div variants={itemVariants} className="space-y-4">
-                  <h3 className="text-left text-xs font-extrabold tracking-widest text-slate-400 uppercase dark:text-slate-500">
-                    Collections Preview
-                  </h3>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    {topCollections.length === 0 ? (
-                      <div className="border-slate-150 col-span-3 flex h-24 items-center justify-center rounded-3xl border border-dashed bg-white text-xs font-semibold text-slate-400 dark:border-slate-800 dark:bg-slate-900">
-                        <span>No collections shelves created yet.</span>
-                      </div>
-                    ) : (
-                      topCollections.map((col) => (
-                        <div
-                          key={col.id}
-                          className="group relative overflow-hidden rounded-3xl border border-slate-100 bg-white p-5 shadow-xs transition-all duration-300 hover:border-purple-500/20 hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/20 dark:text-indigo-400">
-                              <FolderOpen className="h-5 w-5" />
-                            </div>
-                            <div className="min-w-0 flex-1 text-left">
-                              <h4 className="truncate text-xs font-extrabold text-slate-950 transition-colors group-hover:text-purple-600 dark:text-white">
-                                {col.name}
-                              </h4>
-                              <p className="mt-0.5 text-[10px] font-semibold text-slate-400">
-                                {col.bookCount} {col.bookCount === 1 ? 'book' : 'books'}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="mt-4 flex justify-end">
-                            <Link to={`${ROUTES.LIBRARY}?collection=${col.id}`}>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="rounded-lg text-[9px] font-bold tracking-wider uppercase transition-all"
-                              >
-                                Open Shelf
-                              </Button>
-                            </Link>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </motion.div>
-
                 {/* ==================================================
                     SECTION 9: QUOTE OF THE DAY
                     ================================================== */}

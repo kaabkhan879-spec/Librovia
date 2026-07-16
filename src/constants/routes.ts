@@ -9,6 +9,7 @@ export const ROUTES = {
   READER: '/reader/:id',
   FAVORITES: '/favorites',
   COLLECTIONS: '/collections',
+  NOTES: '/notes',
   READING: '/reading',
   ANALYTICS: '/analytics',
   PROFILE: '/profile',

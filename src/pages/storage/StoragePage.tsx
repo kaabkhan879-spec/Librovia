@@ -3,13 +3,14 @@ import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { booksService, type Book } from '../../services/books'
 import { ROUTES } from '../../constants/routes'
-import { Cloud, Database } from 'lucide-react'
+import { Cloud, Database, HardDrive, ShieldAlert, Sparkles } from 'lucide-react'
 import { formatBytes } from '../../utils/helpers'
 import { Button } from '../../components/common/Button'
 
 export const StoragePage: React.FC = () => {
   const [books, setBooks] = useState<Book[]>([])
   const [loading, setLoading] = useState(true)
+
   useEffect(() => {
     booksService.getBooks().then((data) => {
       setBooks(data)
@@ -26,12 +27,21 @@ export const StoragePage: React.FC = () => {
     return formatBytes(totalStorageBytes)
   }, [totalStorageBytes])
 
-  const limitBytes = 1000000000 // 1 GB
+  const limitBytes = 1000000000 // 1 GB allocation
   const limitStr = formatBytes(limitBytes)
 
   const storagePercent = useMemo(() => {
     return Math.min(100, Math.round((totalStorageBytes / limitBytes) * 100))
   }, [totalStorageBytes])
+
+  // Remaining space calculation
+  const remainingBytes = useMemo(() => {
+    return Math.max(0, limitBytes - totalStorageBytes)
+  }, [totalStorageBytes])
+
+  const remainingStr = useMemo(() => {
+    return formatBytes(remainingBytes)
+  }, [remainingBytes])
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -43,7 +53,11 @@ export const StoragePage: React.FC = () => {
 
   const itemVariants = {
     hidden: { opacity: 0, y: 12 },
-    show: { opacity: 1, y: 0, transition: { type: 'spring' as const, stiffness: 100 } },
+    show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 100 } },
+  } as const
+
+  const handleUpgradeAlert = () => {
+    alert('Librovia Premium checkout flow is currently disabled during testing. High capacity tiers will be unlocked in Phase 5!')
   }
 
   return (
@@ -54,7 +68,7 @@ export const StoragePage: React.FC = () => {
           Cloud Storage
         </h1>
         <p className="text-xs font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">
-          Monitor your digital library workspace and space limits.
+          Monitor your digital library workspace files capacity and limits.
         </p>
       </div>
 
@@ -88,8 +102,8 @@ export const StoragePage: React.FC = () => {
                 your cloud space here.
               </p>
             </div>
-            <Link to={ROUTES.UPLOAD} className="inline-block">
-              <Button>Upload a Book</Button>
+            <Link to={ROUTES.LIBRARY} className="inline-block">
+              <Button>Browse Library</Button>
             </Link>
           </motion.div>
         ) : (
@@ -100,6 +114,17 @@ export const StoragePage: React.FC = () => {
             animate="show"
             className="space-y-6"
           >
+            {/* Storage Warning Banner */}
+            {storagePercent >= 85 && (
+              <motion.div
+                variants={itemVariants}
+                className="flex items-center gap-3 rounded-2xl border border-amber-250 bg-amber-50 p-4 text-xs font-semibold text-amber-800 dark:border-amber-950/30 dark:bg-amber-950/15 dark:text-amber-300"
+              >
+                <ShieldAlert className="h-5 w-5 shrink-0" />
+                <p>Warning: You are approaching your storage limit. Consider upgrading your plan to prevent upload failures.</p>
+              </motion.div>
+            )}
+
             {/* Usage Summary Card */}
             <motion.div
               variants={itemVariants}
@@ -138,6 +163,72 @@ export const StoragePage: React.FC = () => {
               </div>
             </motion.div>
 
+            {/* Storage breakdown details widgets */}
+            <motion.div
+              variants={containerVariants}
+              className="grid grid-cols-1 gap-6 sm:grid-cols-3"
+            >
+              <motion.div
+                variants={itemVariants}
+                whileHover={{ y: -3 }}
+                className="flex min-h-[90px] flex-col justify-between rounded-3xl border border-slate-100 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900"
+              >
+                <div className="flex items-start justify-between">
+                  <span className="text-[9px] font-extrabold tracking-wider text-slate-400 uppercase">
+                    Remaining Space
+                  </span>
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20">
+                    <HardDrive className="h-4 w-4" />
+                  </div>
+                </div>
+                <div className="mt-3 text-left">
+                  <h3 className="text-xl font-extrabold text-slate-950 dark:text-white">
+                    {remainingStr}
+                  </h3>
+                </div>
+              </motion.div>
+
+              <motion.div
+                variants={itemVariants}
+                whileHover={{ y: -3 }}
+                className="flex min-h-[90px] flex-col justify-between rounded-3xl border border-slate-100 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900"
+              >
+                <div className="flex items-start justify-between">
+                  <span className="text-[9px] font-extrabold tracking-wider text-slate-400 uppercase">
+                    Storage Allocation Limit
+                  </span>
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg text-blue-600 bg-blue-50 dark:bg-blue-950/20">
+                    <Database className="h-4 w-4" />
+                  </div>
+                </div>
+                <div className="mt-3 text-left">
+                  <h3 className="text-xl font-extrabold text-slate-950 dark:text-white">
+                    {limitStr}
+                  </h3>
+                </div>
+              </motion.div>
+
+              <motion.div
+                variants={itemVariants}
+                whileHover={{ y: -3 }}
+                className="flex min-h-[90px] flex-col justify-between rounded-3xl border border-slate-100 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900"
+              >
+                <div className="flex items-start justify-between">
+                  <span className="text-[9px] font-extrabold tracking-wider text-slate-400 uppercase">
+                    Total Uploaded Files
+                  </span>
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg text-purple-650 bg-purple-50 dark:bg-purple-950/20">
+                    <Cloud className="h-4 w-4" />
+                  </div>
+                </div>
+                <div className="mt-3 text-left">
+                  <h3 className="text-xl font-extrabold text-slate-950 dark:text-white">
+                    {books.length} {books.length === 1 ? 'file' : 'files'}
+                  </h3>
+                </div>
+              </motion.div>
+            </motion.div>
+
             {/* List of files occupying storage */}
             <motion.div
               variants={itemVariants}
@@ -145,7 +236,7 @@ export const StoragePage: React.FC = () => {
             >
               <div className="border-b border-slate-50 p-5 text-left dark:border-slate-800/40">
                 <h3 className="text-sm font-bold tracking-wider text-slate-800 uppercase dark:text-white">
-                  Library Space Allocation ({books.length} {books.length === 1 ? 'file' : 'files'})
+                  Library Space Allocation Breakdown
                 </h3>
               </div>
 
@@ -189,6 +280,34 @@ export const StoragePage: React.FC = () => {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </motion.div>
+
+            {/* Premium Upgrade Card */}
+            <motion.div
+              variants={itemVariants}
+              className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-purple-700 via-indigo-850 to-slate-900 p-6 text-white shadow-lg text-left"
+            >
+              <div className="absolute -top-16 -right-16 h-48 w-48 rounded-full bg-purple-500/20 blur-2xl" />
+              <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-1.5 max-w-xl">
+                  <span className="flex items-center gap-1 text-[9px] font-extrabold tracking-widest text-purple-300 uppercase">
+                    <Sparkles className="h-3 w-3 shrink-0" />
+                    Premium Tier
+                  </span>
+                  <h3 className="text-lg font-black tracking-tight">Need more digital shelving space?</h3>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Upgrade to **Librovia Premium** for 50 GB cloud storage, unlimited file sizes, custom tagging categories, and advanced priority annotations sync.
+                  </p>
+                </div>
+                <div className="shrink-0 pt-2 sm:pt-0">
+                  <Button
+                    onClick={handleUpgradeAlert}
+                    className="rounded-xl bg-white px-5 py-2.5 text-xs font-bold text-indigo-950 shadow hover:bg-slate-100"
+                  >
+                    Upgrade Storage
+                  </Button>
+                </div>
               </div>
             </motion.div>
           </motion.div>

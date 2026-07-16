@@ -432,15 +432,18 @@ export const CategoriesPage: React.FC = () => {
                     <motion.div
                       key={cat.id}
                       variants={itemVariants}
-                      whileHover={{ y: -4 }}
+                      whileHover={{ y: -5 }}
                       onClick={() => handleViewDetails(cat)}
-                      className="bg-bg-surface border-border-base hover:border-primary-500/20 group flex h-40 cursor-pointer flex-col justify-between rounded-2xl border p-6 shadow-sm transition-all hover:shadow-md"
+                      className="relative bg-bg-surface border-border-base hover:border-primary-500/20 group flex h-48 cursor-pointer flex-col justify-between rounded-3xl border p-6 shadow-sm transition-all hover:shadow-md"
                     >
+                      {/* Folder tab design decoration */}
+                      <div className="absolute top-0 left-6 -translate-y-[1px] bg-bg-surface border-t border-x border-border-base rounded-t-xl h-2 w-16" />
+
                       <div className="flex items-start justify-between">
                         <div
-                          className={`h-10 w-10 rounded-xl bg-gradient-to-tr ${color} flex shrink-0 items-center justify-center text-white shadow-md`}
+                          className={`h-11 w-11 rounded-2xl bg-gradient-to-tr ${color} flex shrink-0 items-center justify-center text-white shadow-md`}
                         >
-                          <Folder className="h-5 w-5" />
+                          <Folder className="h-5.5 w-5.5" />
                         </div>
                         <div className="flex items-center gap-1">
                           <button
@@ -465,12 +468,38 @@ export const CategoriesPage: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="mt-4 flex items-end justify-between">
-                        <div>
-                          <h4 className="text-text-main max-w-[130px] truncate text-xs font-extrabold tracking-wider uppercase">
+                      {/* Display stacked preview covers of first 3 books on this shelf */}
+                      <div className="flex -space-x-2.5 my-1.5 overflow-hidden items-center h-10 select-none">
+                        {(() => {
+                          const shelfBooks = books.filter((b) => b.collectionId === cat.id)
+                          const covers = shelfBooks
+                            .slice(0, 3)
+                            .map((b) => b.coverPath)
+                            .filter(Boolean)
+                          if (covers.length > 0) {
+                            return covers.map((cover, cIdx) => (
+                              <img
+                                key={cIdx}
+                                src={cover}
+                                alt=""
+                                className="w-6.5 h-9 object-cover rounded-md border border-white dark:border-slate-800 shadow-xs ring-1 ring-black/5 transform rotate-[-4deg]"
+                              />
+                            ))
+                          }
+                          return (
+                            <span className="text-[10px] text-text-muted font-bold tracking-wide italic pl-1">
+                              Empty Shelf
+                            </span>
+                          )
+                        })()}
+                      </div>
+
+                      <div className="flex items-end justify-between border-t border-border-light pt-3">
+                        <div className="min-w-0 flex-1">
+                          <h4 className="text-text-main group-hover:text-primary-600 truncate text-xs font-extrabold tracking-wider uppercase transition-colors">
                             {cat.name}
                           </h4>
-                          <p className="text-text-muted mt-0.5 text-[9px]">Private Shelf</p>
+                          <p className="text-text-muted mt-0.5 text-[9px]">Private Collection</p>
                         </div>
                         <span className="bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400 border-primary-200/10 rounded-lg border px-2.5 py-1 text-[10px] font-bold shadow-sm">
                           {cat.bookCount || 0} {cat.bookCount === 1 ? 'Book' : 'Books'}

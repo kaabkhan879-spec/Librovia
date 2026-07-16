@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ROUTES } from '../../constants/routes'
 import { booksService, type Book } from '../../services/books'
@@ -26,6 +26,9 @@ import { Button } from '../../components/common/Button'
 type SortType = 'newest' | 'oldest' | 'a-z' | 'recently-opened'
 
 export const LibraryPage: React.FC = () => {
+  const [searchParams] = useSearchParams()
+  const tabParam = searchParams.get('tab')
+
   const [books, setBooks] = useState<Book[]>([])
   const [collections, setCollections] = useState<Collection[]>([])
   const [loading, setLoading] = useState(true)
@@ -34,7 +37,20 @@ export const LibraryPage: React.FC = () => {
   const [selectedCollectionId, setSelectedCollectionId] = useState<string>('all')
   const [selectedAuthor, setSelectedAuthor] = useState<string>('all')
   const [sortBy, setSortBy] = useState<SortType>('newest')
-  const [activeTab, setActiveTab] = useState<'all' | 'favorites' | 'recent'>('all')
+  const [activeTab, setActiveTab] = useState<'all' | 'favorites' | 'reading' | 'completed'>(() => {
+    if (tabParam === 'favorites') return 'favorites'
+    if (tabParam === 'reading') return 'reading'
+    if (tabParam === 'completed') return 'completed'
+    return 'all'
+  })
+
+  // Sync state if URL search param updates dynamically
+  useEffect(() => {
+    if (tabParam === 'favorites') setActiveTab('favorites')
+    else if (tabParam === 'reading') setActiveTab('reading')
+    else if (tabParam === 'completed') setActiveTab('completed')
+    else if (tabParam === 'all') setActiveTab('all')
+  }, [tabParam])
 
   // Context Menu & Modal States
   const [activeMenuBookId, setActiveMenuBookId] = useState<string | null>(null)
@@ -162,6 +178,10 @@ export const LibraryPage: React.FC = () => {
     // 1. Tab Filter
     if (activeTab === 'favorites') {
       result = result.filter((b) => b.isFavorite)
+    } else if (activeTab === 'reading') {
+      result = result.filter((b) => b.progress > 0 && b.progress < 100)
+    } else if (activeTab === 'completed') {
+      result = result.filter((b) => b.progress === 100)
     }
 
     result = result.filter((book) => {
@@ -189,9 +209,6 @@ export const LibraryPage: React.FC = () => {
 
     // 5. Sorting
     return result.sort((a, b) => {
-      if (activeTab === 'recent') {
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      }
       if (sortBy === 'a-z') return a.title.localeCompare(b.title)
       if (sortBy === 'oldest')
         return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
@@ -253,7 +270,7 @@ export const LibraryPage: React.FC = () => {
               : 'border-transparent text-slate-400 hover:text-slate-600'
           }`}
         >
-          All Books
+          All
         </button>
         <button
           onClick={() => setActiveTab('favorites')}
@@ -266,14 +283,24 @@ export const LibraryPage: React.FC = () => {
           Favorites ⭐
         </button>
         <button
-          onClick={() => setActiveTab('recent')}
+          onClick={() => setActiveTab('reading')}
           className={`cursor-pointer border-b-2 px-4 py-2 text-xs font-bold tracking-wider uppercase transition-all ${
-            activeTab === 'recent'
+            activeTab === 'reading'
               ? 'border-purple-650 text-purple-650'
               : 'border-transparent text-slate-400 hover:text-slate-600'
           }`}
         >
-          Recently Uploaded 📅
+          Reading 📖
+        </button>
+        <button
+          onClick={() => setActiveTab('completed')}
+          className={`cursor-pointer border-b-2 px-4 py-2 text-xs font-bold tracking-wider uppercase transition-all ${
+            activeTab === 'completed'
+              ? 'border-purple-650 text-purple-650'
+              : 'border-transparent text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          Completed ✅
         </button>
       </div>
 
