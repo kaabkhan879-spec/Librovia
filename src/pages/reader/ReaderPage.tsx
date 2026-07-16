@@ -3,6 +3,8 @@ import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { PageWrapper } from '../../components/common/PageWrapper'
 import { ROUTES } from '../../constants/routes'
+import { useToast } from '../../context/ToastContext'
+
 import {
   ArrowLeft,
   ZoomIn,
@@ -44,6 +46,7 @@ export const ReaderPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const [searchParams] = useSearchParams()
   const pageParam = searchParams.get('page')
+  const { showInfo } = useToast()
 
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -146,7 +149,7 @@ export const ReaderPage: React.FC = () => {
       .getBookById(id)
       .then((data) => {
         if (!data) {
-          setErrorMsg('Book not found or access denied.')
+          setErrorMsg('This book is no longer available.')
           setLoading(false)
           return
         }
@@ -215,18 +218,66 @@ export const ReaderPage: React.FC = () => {
     }
   }, [bookNotes, page, id])
 
-  // Run highlight injector when page or notes update
+  // Redirect to correct page if target note is on another page
+  useEffect(() => {
+    const noteIdParam = searchParams.get('noteId')
+    if (loading || bookNotes.length === 0 || !noteIdParam) return
+
+    const targetNote = bookNotes.find((n) => n.id === noteIdParam)
+    if (targetNote && targetNote.pageNumber !== page) {
+      setPage(targetNote.pageNumber)
+    }
+  }, [loading, bookNotes, searchParams, page])
+
+  // Run highlight injector when page or notes update, and handle scrolling/focus for target noteId
   useEffect(() => {
     let active = true
     const timer = setTimeout(() => {
-      if (active) injectHighlights()
-    }, 300)
+      if (!active) return
+      injectHighlights()
+
+      const noteIdParam = searchParams.get('noteId')
+      if (noteIdParam && bookNotes.length > 0) {
+        const targetNote = bookNotes.find((n) => n.id === noteIdParam)
+        if (targetNote && targetNote.pageNumber === page) {
+          // Open Note details modal automatically
+          setEditingNoteId(targetNote.id)
+          setModalRating(targetNote.rating)
+          setModalNoteText(targetNote.noteText)
+          setModalHighlightText(targetNote.highlightedText || '')
+          setModalBookmark(targetNote.isBookmarked)
+          setModalTags(targetNote.tags)
+          if (targetNote.xPosition !== undefined && targetNote.yPosition !== undefined) {
+            setStickyNotePromptPos({
+              top: 0,
+              left: 0,
+              percentX: targetNote.xPosition,
+              percentY: targetNote.yPosition,
+            })
+          } else {
+            setStickyNotePromptPos(null)
+          }
+          setIsNotesModalOpen(true)
+
+          // Scroll & Highlight focus overlay element
+          const selector = `[data-note-id="${targetNote.id}"]`
+          const element = containerRef.current?.querySelector(selector)
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            element.classList.add('ring-4', 'ring-purple-500/50', 'ring-offset-2')
+            setTimeout(() => {
+              element.classList.remove('ring-4', 'ring-purple-500/50', 'ring-offset-2')
+            }, 3000)
+          }
+        }
+      }
+    }, 450)
 
     return () => {
       active = false
       clearTimeout(timer)
     }
-  }, [page, bookNotes, injectHighlights])
+  }, [page, bookNotes, injectHighlights, searchParams])
 
   // Synchronize reading progress with Supabase
   const lastSavedPageRef = useRef<number>(1)
@@ -776,6 +827,13 @@ export const ReaderPage: React.FC = () => {
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setTotalPages(numPages)
+    const targetPage = pageParam ? Number(pageParam) : null
+    if (targetPage !== null) {
+      if (targetPage < 1 || targetPage > numPages) {
+        setPage(1)
+        showInfo(`Page ${targetPage} cannot be found. Opening at page 1 instead.`)
+      }
+    }
   }
 
   const onPageLoadSuccess = (p: { width: number; height: number }) => {
@@ -1355,6 +1413,7 @@ export const ReaderPage: React.FC = () => {
                     transform: 'translate(-50%, -50%)',
                   }}
                   className="sticky-note-marker z-20 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-purple-600 text-xs text-white shadow-lg transition-transform select-none hover:scale-110 active:scale-95"
+                  data-note-id={note.id}
                   title={note.noteTitle || 'Sticky Note'}
                 >
                   💬

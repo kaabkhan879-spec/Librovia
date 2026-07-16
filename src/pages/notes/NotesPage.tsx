@@ -110,6 +110,7 @@ export const NotesPage: React.FC = () => {
         ...selectedNote,
         noteTitle: noteTitleInput.trim() || undefined,
         noteText: noteTextInput,
+        bookTitle: getBookTitle(selectedNote.bookId),
         updatedAt: new Date().toISOString(),
       }
       const updated = await notesService.saveNote(payload)
@@ -360,9 +361,13 @@ export const NotesPage: React.FC = () => {
                               day: 'numeric',
                             })}
                           </span>
-                          <span className="text-purple-650 text-[9px] font-bold hover:underline">
+                          <Link
+                            to={`${ROUTES.READER.replace(':id', note.bookId)}?page=${note.pageNumber}&noteId=${note.id}`}
+                            className="text-purple-650 text-[9px] font-bold hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             Open Details →
-                          </span>
+                          </Link>
                         </div>
                       </div>
                     )

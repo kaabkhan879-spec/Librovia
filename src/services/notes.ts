@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { booksService } from './books'
 
 export interface Note {
   id: string
@@ -15,6 +16,7 @@ export interface Note {
   xPosition?: number
   yPosition?: number
   noteTitle?: string
+  bookTitle?: string
 }
 
 const LOCAL_NOTES_KEY = 'librovia-fallback-notes'
@@ -79,12 +81,24 @@ export const notesService = {
   },
 
   async saveNote(
-    note: Omit<Note, 'id' | 'userId' | 'createdAt' | 'updatedAt'> & { id?: string }
+    note: Omit<Note, 'id' | 'userId' | 'createdAt' | 'updatedAt'> & { id?: string; bookTitle?: string }
   ): Promise<Note> {
     const {
       data: { user },
     } = await supabase.auth.getUser()
     if (!user) throw new Error('User not authenticated')
+
+    let resolvedBookTitle = note.bookTitle || ''
+    if (!resolvedBookTitle) {
+      try {
+        const book = await booksService.getBookById(note.bookId)
+        if (book) {
+          resolvedBookTitle = book.title
+        }
+      } catch (err) {
+        console.error('Failed to resolve book title during note save:', err)
+      }
+    }
 
     const isLive = await this.isSupabaseAvailable()
     const now = new Date().toISOString()
@@ -143,13 +157,14 @@ export const notesService = {
           xPosition: result.x_position !== null ? Number(result.x_position) : undefined,
           yPosition: result.y_position !== null ? Number(result.y_position) : undefined,
           noteTitle: result.note_title || undefined,
+          bookTitle: resolvedBookTitle,
         }
       } catch (err) {
         console.error('Failed to save to Supabase, falling back to local:', err)
-        return this.saveLocalNote(note, user.id)
+        return this.saveLocalNote({ ...note, bookTitle: resolvedBookTitle }, user.id)
       }
     } else {
-      return this.saveLocalNote(note, user.id)
+      return this.saveLocalNote({ ...note, bookTitle: resolvedBookTitle }, user.id)
     }
   },
 
@@ -226,7 +241,7 @@ export const notesService = {
   },
 
   saveLocalNote(
-    note: Omit<Note, 'id' | 'userId' | 'createdAt' | 'updatedAt'> & { id?: string },
+    note: Omit<Note, 'id' | 'userId' | 'createdAt' | 'updatedAt'> & { id?: string; bookTitle?: string },
     userId: string
   ): Note {
     const allNotesStr = localStorage.getItem(LOCAL_NOTES_KEY) || '[]'
@@ -256,6 +271,7 @@ export const notesService = {
           xPosition: note.xPosition,
           yPosition: note.yPosition,
           noteTitle: note.noteTitle,
+          bookTitle: note.bookTitle || allNotes[idx].bookTitle,
         }
         allNotes[idx] = saved
       } else {
@@ -275,6 +291,7 @@ export const notesService = {
           xPosition: note.xPosition,
           yPosition: note.yPosition,
           noteTitle: note.noteTitle,
+          bookTitle: note.bookTitle,
         }
         allNotes.push(saved)
       }
@@ -295,6 +312,7 @@ export const notesService = {
         xPosition: note.xPosition,
         yPosition: note.yPosition,
         noteTitle: note.noteTitle,
+        bookTitle: note.bookTitle,
       }
       allNotes.push(saved)
     }
