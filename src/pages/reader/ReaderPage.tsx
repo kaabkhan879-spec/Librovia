@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { PageWrapper } from '../../components/common/PageWrapper'
+import { MarkdownRenderer } from '../../components/MarkdownRenderer'
 import { ROUTES } from '../../constants/routes'
 import { useToast } from '../../context/ToastContext'
 import { aiService, type AiActionType } from '../../services/ai'
@@ -109,6 +110,43 @@ export const ReaderPage: React.FC = () => {
   const [aiError, setAiError] = useState<string | null>(null)
   const [sidebarWidth, setSidebarWidth] = useState(320)
 
+  // Premium AI additional states
+  interface Conversation {
+    id: string
+    action: AiActionType
+    selectedText: string
+    response: string
+    timestamp: string
+    helpful?: 'yes' | 'no' | null
+  }
+
+  const [aiConversations, setAiConversations] = useState<Conversation[]>(() => {
+    if (!id) return []
+    const saved = localStorage.getItem(`librovia-conversations-${id}`)
+    return saved ? JSON.parse(saved) : []
+  })
+  const [aiSearchQuery, setAiSearchQuery] = useState('')
+  const [isTyping, setIsTyping] = useState(false)
+  const [displayingResponse, setDisplayingResponse] = useState('')
+  const [copiedIndex, setCopiedIndex] = useState<string | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const typingTimerRef = useRef<number | null>(null)
+
+  // Window width listener for responsiveness
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth)
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  // Persist conversations
+  useEffect(() => {
+    if (id) {
+      localStorage.setItem(`librovia-conversations-${id}`, JSON.stringify(aiConversations))
+    }
+  }, [aiConversations, id])
+
   const isResizingRef = useRef(false)
 
   const startResizing = useCallback((mouseDownEvent: React.MouseEvent) => {
@@ -141,27 +179,106 @@ export const ReaderPage: React.FC = () => {
     }
   }, [resize, stopResizing])
 
+  const handleStopGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+    }
+    if (typingTimerRef.current) {
+      window.clearInterval(typingTimerRef.current)
+      typingTimerRef.current = null
+    }
+    setIsTyping(false)
+    setAiLoading(false)
+    showInfo('Generation stopped.')
+  }
+
   const handleAiActionDirect = async (textToUse: string, action: AiActionType) => {
+    // Stop any active generation first
+    handleStopGeneration()
+
     setAiAction(action)
     setAiLoading(true)
     setAiError(null)
     setAiResponse(null)
+    setDisplayingResponse('')
+
+    const controller = new AbortController()
+    abortControllerRef.current = controller
 
     try {
+      // Simulate real call or call service with controller signal if supported
       const result = await aiService.runAiAction(textToUse, action, 'en-US')
+      
+      if (controller.signal.aborted) return
+
       setAiResponse(result)
+      setAiLoading(false)
+
+      // typing progressive animation effect
+      setIsTyping(true)
+      const words = result.split(' ')
+      let wordIndex = 0
+
+      // clear any old typing timer
+      if (typingTimerRef.current) {
+        window.clearInterval(typingTimerRef.current)
+      }
+
+      typingTimerRef.current = window.setInterval(() => {
+        if (wordIndex < words.length) {
+          setDisplayingResponse((prev) => prev + (wordIndex === 0 ? '' : ' ') + words[wordIndex])
+          wordIndex++
+        } else {
+          if (typingTimerRef.current) {
+            window.clearInterval(typingTimerRef.current)
+            typingTimerRef.current = null
+          }
+          setIsTyping(false)
+
+          // Save to local book history
+          const newConv: Conversation = {
+            id: Math.random().toString(36).substring(2, 9),
+            action,
+            selectedText: textToUse,
+            response: result,
+            timestamp: new Date().toISOString(),
+            helpful: null,
+          }
+          setAiConversations((prev) => [newConv, ...prev])
+        }
+      }, 40) // speed of typing
     } catch (err: any) {
+      if (controller.signal.aborted) return
       setAiError('AI is currently unavailable. Please try again.')
-    } finally {
       setAiLoading(false)
     }
   }
 
-  const handleCopyAiResponse = () => {
-    if (!aiResponse) return
-    const cleanText = aiResponse.replace(/[#*`]/g, '')
+  const handleCopyAiResponse = (responseVal?: string, idVal?: string) => {
+    const textToCopy = typeof responseVal === 'string' ? responseVal : aiResponse || ''
+    if (!textToCopy) return
+    const cleanText = textToCopy.replace(/[#*`]/g, '')
     navigator.clipboard.writeText(cleanText)
-    showSuccess('AI response copied to clipboard!')
+    if (typeof idVal === 'string') {
+      setCopiedIndex(idVal)
+      setTimeout(() => setCopiedIndex(null), 2000)
+    } else {
+      showSuccess('AI response copied to clipboard!')
+    }
+  }
+
+  const handleDeleteConversation = (convId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setAiConversations((prev) => prev.filter((c) => c.id !== convId))
+    showSuccess('Conversation deleted.')
+  }
+
+  const handleFeedback = (convId: string, helpful: 'yes' | 'no') => {
+    setAiConversations((prev) =>
+      prev.map((c) => (c.id === convId ? { ...c, helpful: c.helpful === helpful ? null : helpful } : c))
+    )
+    showSuccess('Thank you for your feedback!')
   }
 
   const handleOpenAddNotePopup = () => {
@@ -1445,22 +1562,53 @@ export const ReaderPage: React.FC = () => {
         <AnimatePresence>
           {rightSidebarOpen && (
             <motion.div
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: sidebarWidth, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              className="relative z-10 flex flex-col border-l border-slate-100 bg-white text-left transition-all duration-300 dark:border-slate-800 dark:bg-slate-900 h-full shrink-0 overflow-hidden"
+              initial={
+                windowWidth < 640
+                  ? { y: '100%', opacity: 0 }
+                  : windowWidth < 1024
+                    ? { x: '100%', opacity: 0 }
+                    : { width: 0, opacity: 0 }
+              }
+              animate={
+                windowWidth < 640
+                  ? { y: 0, opacity: 1, width: '100%' }
+                  : windowWidth < 1024
+                    ? { x: 0, opacity: 1, width: 360 }
+                    : { width: sidebarWidth, opacity: 1 }
+              }
+              exit={
+                windowWidth < 640
+                  ? { y: '100%', opacity: 0 }
+                  : windowWidth < 1024
+                    ? { x: '100%', opacity: 0 }
+                    : { width: 0, opacity: 0 }
+              }
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className={`
+                flex flex-col border-slate-100 bg-white text-left dark:border-slate-800 dark:bg-slate-900 overflow-hidden h-full
+                ${
+                  windowWidth < 640
+                    ? 'fixed bottom-0 left-0 right-0 z-40 h-[70vh] border-t rounded-t-[24px] shadow-2xl'
+                    : windowWidth < 1024
+                      ? 'fixed right-0 top-0 bottom-0 z-40 border-l shadow-2xl w-[360px]'
+                      : 'relative z-10 border-l shrink-0'
+                }
+              `}
+              style={windowWidth >= 1024 ? { width: sidebarWidth } : {}}
             >
-              {/* Resize Handle */}
-              <div
-                onMouseDown={startResizing}
-                className="absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-purple-500/30 transition-colors z-30"
-              />
+              {/* Resize Handle (only show on desktop >= 1024px) */}
+              {windowWidth >= 1024 && (
+                <div
+                  onMouseDown={startResizing}
+                  className="absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-purple-500/30 transition-colors z-30"
+                />
+              )}
 
               <div className="dark:bg-slate-850 flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50/45 px-4 py-3 dark:border-slate-800">
                 <div className="flex gap-2">
                   <button
                     onClick={() => setRightSidebarTab('journal')}
-                    className={`text-[9px] font-extrabold tracking-widest uppercase py-1 px-2.5 rounded-lg transition-all ${
+                    className={`text-[9px] font-extrabold tracking-widest uppercase py-1 px-2.5 rounded-lg transition-all cursor-pointer ${
                       rightSidebarTab === 'journal'
                         ? 'bg-purple-50 text-purple-650 dark:bg-purple-950/20 dark:text-purple-400 font-black'
                         : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
@@ -1470,7 +1618,7 @@ export const ReaderPage: React.FC = () => {
                   </button>
                   <button
                     onClick={() => setRightSidebarTab('ai')}
-                    className={`text-[9px] font-extrabold tracking-widest uppercase py-1 px-2.5 rounded-lg transition-all ${
+                    className={`text-[9px] font-extrabold tracking-widest uppercase py-1 px-2.5 rounded-lg transition-all cursor-pointer ${
                       rightSidebarTab === 'ai'
                         ? 'bg-purple-50 text-purple-650 dark:bg-purple-950/20 dark:text-purple-400 font-black'
                         : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
@@ -1569,7 +1717,7 @@ export const ReaderPage: React.FC = () => {
                           </div>
                         )}
 
-                        <div className="dark:border-slate-850 flex shrink-0 justify-end gap-2 border-t border-slate-50 pt-2 text-[10px] font-bold tracking-wider uppercase">
+                        <div className="dark:border-slate-855 flex shrink-0 justify-end gap-2 border-t border-slate-50 pt-2 text-[10px] font-bold tracking-wider uppercase">
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
@@ -1608,170 +1756,262 @@ export const ReaderPage: React.FC = () => {
                   )}
                 </div>
               ) : (
-                <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-slate-900 overflow-hidden">
-                  {/* Selected Text Excerpt Card */}
-                  <div className="p-4 border-b border-slate-100 dark:border-slate-800 space-y-2 bg-slate-50/40 dark:bg-slate-950/20 shrink-0">
-                    <span className="text-[8px] font-extrabold tracking-widest text-slate-400 uppercase">
-                      Selected Excerpt
-                    </span>
-                    {selectedTextForAi ? (
-                      <p className="line-clamp-4 font-serif text-[10px] leading-relaxed italic text-slate-600 dark:text-slate-400 border-l-2 border-purple-400 pl-2">
-                        "{selectedTextForAi}"
-                      </p>
-                    ) : (
-                      <div className="space-y-2">
-                        <textarea
-                          placeholder="Type or paste text here to ask the AI assistant..."
-                          value={customAiText}
-                          onChange={(e) => setCustomAiText(e.target.value)}
-                          className="w-full text-[10.5px] p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-850 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-purple-500 font-sans resize-none"
-                          rows={3}
-                        />
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                          {(['explain', 'summarize', 'key-points', 'simplify'] as const).map((act) => (
+                <div className="flex-1 flex flex-col min-h-0 bg-slate-50/50 dark:bg-slate-950/10 overflow-hidden font-sans">
+                  {/* Search Box */}
+                  {aiConversations.length > 0 && (
+                    <div className="p-3 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 shrink-0">
+                      <input
+                        type="text"
+                        placeholder="Search AI conversations..."
+                        value={aiSearchQuery}
+                        onChange={(e) => setAiSearchQuery(e.target.value)}
+                        className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-950/20 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-purple-500 font-sans transition-all"
+                      />
+                    </div>
+                  )}
+
+                  {/* Scrollable Conversation Stream */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+                    {/* Active Prompt Creator (when not loading) */}
+                    {!aiLoading && !isTyping && (
+                      <div className="rounded-3xl border border-slate-100 bg-white p-4.5 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-3">
+                        <span className="text-[9px] font-black uppercase text-purple-650 tracking-widest block">
+                          Selected Excerpt
+                        </span>
+                        {selectedTextForAi ? (
+                          <div className="space-y-3">
+                            <p className="line-clamp-4 font-serif text-[10.5px] leading-relaxed italic text-slate-600 dark:text-slate-400 border-l-2 border-purple-400 pl-2">
+                              "{selectedTextForAi}"
+                            </p>
+                            <div className="flex justify-end">
+                              <button
+                                onClick={() => setSelectedTextForAi('')}
+                                className="text-[8px] font-extrabold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 uppercase cursor-pointer"
+                              >
+                                Clear Selection
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            <textarea
+                              placeholder="Type or paste text here to ask the AI assistant..."
+                              value={customAiText}
+                              onChange={(e) => setCustomAiText(e.target.value)}
+                              className="w-full text-xs p-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/30 dark:bg-slate-855 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-purple-500 font-sans resize-none transition-all"
+                              rows={3}
+                            />
+                          </div>
+                        )}
+
+                        {/* Action Pickers */}
+                        <div className="grid grid-cols-2 gap-2 pt-1.5">
+                          {[
+                            { id: 'explain', label: '✨ Explain', desc: 'Simple terms' },
+                            { id: 'summarize', label: '📝 Summary', desc: 'Concise review' },
+                            { id: 'key-points', label: '💡 Key Points', desc: 'Main takeaways' },
+                            { id: 'simplify', label: '📚 Simplify', desc: 'For beginners' },
+                            { id: 'translate', label: '🌍 Translate', desc: 'To target lang' }
+                          ].map((act) => (
                             <button
-                              key={act}
+                              key={act.id}
                               onClick={() => {
-                                if (customAiText.trim()) {
-                                  setSelectedTextForAi(customAiText.trim())
-                                  handleAiActionDirect(customAiText.trim(), act)
+                                const text = selectedTextForAi || customAiText.trim()
+                                if (text) {
+                                  setSelectedTextForAi(text)
+                                  handleAiActionDirect(text, act.id as any)
                                 }
                               }}
-                              disabled={!customAiText.trim()}
-                              className="text-[8px] font-extrabold uppercase py-1 px-2 rounded-md bg-purple-50 hover:bg-purple-100 text-purple-650 dark:bg-purple-950/20 dark:text-purple-400 transition-all disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+                              disabled={!selectedTextForAi && !customAiText.trim()}
+                              className="text-left rounded-2xl border border-slate-100 hover:border-purple-200 bg-slate-50/30 hover:bg-purple-50/20 p-2.5 transition-all cursor-pointer dark:border-slate-800 dark:bg-slate-950/20 dark:hover:bg-purple-950/15 disabled:opacity-40 disabled:pointer-events-none"
                             >
-                              {act === 'key-points' ? '💡 Key Points' : act === 'explain' ? '✨ Explain' : act === 'summarize' ? '📝 Summarize' : '📚 Simplify'}
+                              <span className="block text-[10.5px] font-extrabold text-slate-800 dark:text-white">
+                                {act.label}
+                              </span>
+                              <span className="block text-[8px] text-slate-400 font-medium">
+                                {act.desc}
+                              </span>
                             </button>
                           ))}
                         </div>
                       </div>
                     )}
-                  </div>
 
-                  {!aiAction ? (
-                    /* Initial AI Action Picker */
-                    <div className="flex-1 flex flex-col justify-center p-6 space-y-4">
-                      <div className="text-center space-y-1">
-                        <span className="text-[10px] font-bold text-purple-600 uppercase tracking-widest block">
-                          ✨ Librovia AI
-                        </span>
-                        <p className="text-xs text-slate-400">
-                          Select an action to run on your selection
-                        </p>
-                      </div>
-                      <div className="grid grid-cols-1 gap-2">
-                        {[
-                          { id: 'explain', label: '✨ Explain Selection', desc: 'Explain this text in simple language' },
-                          { id: 'summarize', label: '📝 Summarize Selection', desc: 'Create a concise summary of the text' },
-                          { id: 'key-points', label: '💡 Extract Key Points', desc: 'Pull out the main takeaways' },
-                          { id: 'simplify', label: '📚 Simplify Language', desc: 'Rewrite the selection for beginners' },
-                          { id: 'translate', label: '🌍 Translate Selection', desc: 'Translate selection into target languages' },
-                        ].map((act) => (
+                    {/* Active Loading Thinking Block */}
+                    {aiLoading && (
+                      <div className="rounded-3xl border border-slate-100 bg-white p-4.5 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9px] font-black uppercase text-purple-650 tracking-wider">
+                            ✨ Gemini is thinking...
+                          </span>
                           <button
-                            key={act.id}
-                            onClick={() => {
-                              const text = selectedTextForAi || customAiText.trim()
-                              if (text) {
-                                setSelectedTextForAi(text)
-                                handleAiActionDirect(text, act.id as any)
-                              }
-                            }}
-                            disabled={!selectedTextForAi && !customAiText.trim()}
-                            className="w-full text-left rounded-xl border border-slate-100 hover:border-purple-200 bg-white hover:bg-purple-50/30 p-3 transition-all cursor-pointer dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-purple-950/15 disabled:opacity-40 disabled:pointer-events-none"
+                            onClick={handleStopGeneration}
+                            className="text-[9px] font-black uppercase text-red-500 hover:text-red-650 px-2.5 py-1 rounded-xl border border-red-200 dark:border-red-800 bg-red-50/30 cursor-pointer transition-colors"
                           >
-                            <span className="block text-xs font-bold text-slate-800 dark:text-white">
-                              {act.label}
-                            </span>
-                            <span className="block text-[10px] text-slate-400">
-                              {act.desc}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    /* AI Thinking / Response Display */
-                    <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-slate-900">
-                      <div className="flex-1 overflow-y-auto p-5 space-y-4">
-                        {aiLoading ? (
-                          <div className="space-y-4 py-4">
-                            <span className="text-[10px] font-extrabold tracking-widest text-purple-650 animate-pulse uppercase block">
-                              ✨ Thinking...
-                            </span>
-                            <div className="space-y-2.5 animate-pulse">
-                              <div className="h-3 w-full rounded-md shimmer-placeholder bg-slate-100 dark:bg-slate-800" />
-                              <div className="h-3 w-[92%] rounded-md shimmer-placeholder bg-slate-100 dark:bg-slate-800" />
-                              <div className="h-3 w-[95%] rounded-md shimmer-placeholder bg-slate-100 dark:bg-slate-800" />
-                              <div className="h-3 w-[78%] rounded-md shimmer-placeholder bg-slate-100 dark:bg-slate-800" />
-                            </div>
-                          </div>
-                        ) : aiError ? (
-                          <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-center">
-                            <span className="text-xs font-bold text-red-500">{aiError}</span>
-                          </div>
-                        ) : aiResponse ? (
-                          <div className="prose prose-sm dark:prose-invert font-sans text-xs leading-relaxed text-slate-800 dark:text-slate-350 space-y-3">
-                            {aiResponse.split('\n').map((line, idx) => {
-                              if (line.startsWith('###')) {
-                                return (
-                                  <h4 key={idx} className="text-xs font-black uppercase text-purple-650 tracking-wider pt-2">
-                                    {line.replace('###', '')}
-                                  </h4>
-                                )
-                              }
-                              if (line.startsWith('*')) {
-                                return (
-                                  <li key={idx} className="list-disc pl-1 ml-4 text-slate-700 dark:text-slate-300">
-                                    {line.replace('*', '').trim()}
-                                  </li>
-                                )
-                              }
-                              if (line.startsWith('**')) {
-                                return (
-                                  <p key={idx} className="font-semibold text-slate-900 dark:text-white">
-                                    {line}
-                                  </p>
-                                )
-                              }
-                              return (
-                                <p key={idx} className="text-slate-700 dark:text-slate-300">
-                                  {line}
-                                </p>
-                              )
-                            })}
-                          </div>
-                        ) : (
-                          <div className="py-12 text-center text-xs text-slate-400">
-                            No active AI prompts. Select an option to query AI.
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Footer controls inside AI Panel */}
-                      {aiResponse && !aiLoading && (
-                        <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex gap-2 shrink-0 bg-slate-50/20 dark:bg-slate-900/35">
-                          <button
-                            onClick={handleCopyAiResponse}
-                            className="flex-1 cursor-pointer rounded-xl bg-purple-600 text-white font-bold text-xs py-2 transition-all hover:bg-purple-750 active:scale-95 text-center shadow-md animate-fade-in"
-                          >
-                            Copy Output
-                          </button>
-                          <button
-                            onClick={() => handleAiActionDirect(selectedTextForAi, aiAction!)}
-                            className="cursor-pointer rounded-xl border border-slate-200 bg-white text-slate-700 font-bold text-xs py-2 px-3 transition-all hover:bg-slate-50 active:scale-95 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
-                          >
-                            Regenerate
-                          </button>
-                          <button
-                            onClick={() => setAiAction(null)}
-                            className="cursor-pointer rounded-xl border border-slate-200 bg-white text-slate-700 font-bold text-xs py-2 px-3 transition-all hover:bg-slate-50 active:scale-95 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
-                          >
-                            Back
+                            Stop
                           </button>
                         </div>
-                      )}
-                    </div>
-                  )}
+                        <div className="space-y-2.5 animate-pulse">
+                          <div className="h-3 w-full rounded-md bg-slate-100 dark:bg-slate-800" />
+                          <div className="h-3 w-[92%] rounded-md bg-slate-100 dark:bg-slate-800" />
+                          <div className="h-3 w-[85%] rounded-md bg-slate-100 dark:bg-slate-800" />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Active Error Block */}
+                    {aiError && (
+                      <div className="rounded-3xl border border-red-500/20 bg-red-500/10 p-4.5 space-y-3 text-center">
+                        <p className="text-xs font-bold text-red-500">
+                          Unable to generate a response. Please try again.
+                        </p>
+                        <button
+                          onClick={() => {
+                            const text = selectedTextForAi || customAiText.trim()
+                            if (text && aiAction) {
+                              handleAiActionDirect(text, aiAction)
+                            }
+                          }}
+                          className="text-[9px] font-black uppercase text-white bg-red-500 px-3.5 py-1.5 rounded-xl transition-all active:scale-95 cursor-pointer shadow-md shadow-red-500/10"
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Active Typing Stream Block */}
+                    {isTyping && displayingResponse && (
+                      <div className="rounded-3xl border border-slate-100 bg-white p-4.5 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-3">
+                        <div className="flex items-center justify-between border-b border-slate-50 pb-2 dark:border-slate-800/40">
+                          <div className="space-y-0.5">
+                            <span className="text-[8px] font-black uppercase text-purple-650 tracking-widest">
+                              Active Response
+                            </span>
+                            <span className="block text-[8px] text-slate-400 capitalize">
+                              Action: {aiAction}
+                            </span>
+                          </div>
+                          <button
+                            onClick={handleStopGeneration}
+                            className="text-[9px] font-black uppercase text-red-500 hover:text-red-650 px-2.5 py-1 rounded-xl border border-red-200 dark:border-red-800 bg-red-50/30 cursor-pointer transition-colors"
+                          >
+                            Stop
+                          </button>
+                        </div>
+                        <div className="relative text-xs leading-relaxed text-slate-800 dark:text-slate-200">
+                          <MarkdownRenderer text={displayingResponse} />
+                          <span className="inline-block w-1.5 h-3 ml-0.5 bg-purple-600 animate-pulse align-middle" />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Empty State */}
+                    {aiConversations.length === 0 && !aiLoading && !isTyping && !aiError && (
+                      <div className="flex flex-col items-center justify-center p-8 text-center text-slate-450 space-y-3 py-20">
+                        <span className="text-2xl animate-bounce">✨</span>
+                        <p className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400">
+                          Select text from the PDF and ask AI to start learning.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Previous Conversations History List */}
+                    {aiConversations
+                      .filter((c) => {
+                        if (!aiSearchQuery.trim()) return true
+                        const query = aiSearchQuery.toLowerCase()
+                        return (
+                          (c.selectedText && c.selectedText.toLowerCase().includes(query)) ||
+                          (c.response && c.response.toLowerCase().includes(query)) ||
+                          c.action.toLowerCase().includes(query)
+                        )
+                      })
+                      .map((c) => (
+                        <div
+                          key={c.id}
+                          className="rounded-3xl border border-slate-100 bg-white p-4.5 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-3 relative hover:shadow-md transition-shadow duration-200 text-left animate-fade-in"
+                        >
+                          {/* Card Header */}
+                          <div className="flex items-center justify-between border-b border-slate-50 pb-2 dark:border-slate-800/40">
+                            <div className="space-y-0.5">
+                              <span className="text-[8px] font-extrabold uppercase text-purple-650 tracking-widest bg-purple-50 px-2 py-0.5 rounded-lg dark:bg-purple-950/20 dark:text-purple-400">
+                                {c.action === 'key-points' ? '💡 Key Points' : c.action === 'explain' ? '✨ Explain' : c.action === 'summarize' ? '📝 Summarize' : c.action === 'simplify' ? '📚 Simplify' : '🌍 Translate'}
+                              </span>
+                              <span className="block text-[7.5px] text-slate-400 font-bold uppercase tracking-wider">
+                                {new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <button
+                              onClick={(e) => handleDeleteConversation(c.id, e)}
+                              className="text-slate-350 hover:text-red-500 cursor-pointer p-1 transition-colors"
+                              title="Delete conversation"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+
+                          {/* Excerpt Excerpt Text */}
+                          {c.selectedText && (
+                            <div className="bg-slate-50/50 dark:bg-slate-800/25 p-2.5 rounded-2xl border border-slate-50/80 dark:border-slate-800/40">
+                              <span className="block text-[7.5px] font-black uppercase text-slate-400 tracking-wider mb-0.5">
+                                Selected Text Excerpt
+                              </span>
+                              <p className="line-clamp-2 font-serif text-[9px] leading-relaxed italic text-slate-550 dark:text-slate-455 border-l-2 border-purple-300 pl-1.5">
+                                "{c.selectedText}"
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Body content */}
+                          <div className="relative text-xs leading-relaxed text-slate-800 dark:text-slate-200">
+                            <MarkdownRenderer text={c.response} />
+                          </div>
+
+                          {/* Actions footer */}
+                          <div className="flex items-center justify-between border-t border-slate-50 pt-2.5 dark:border-slate-800/40">
+                            <div className="flex gap-3">
+                              <button
+                                onClick={() => handleCopyAiResponse(c.response, c.id)}
+                                className="text-[9px] font-extrabold uppercase text-slate-400 hover:text-purple-650 dark:hover:text-purple-400 transition-colors flex items-center gap-1 cursor-pointer"
+                              >
+                                {copiedIndex === c.id ? 'Copied successfully. ✅' : '📋 Copy'}
+                              </button>
+                              <button
+                                onClick={() => handleAiActionDirect(c.selectedText, c.action)}
+                                className="text-[9px] font-extrabold uppercase text-slate-400 hover:text-purple-650 dark:hover:text-purple-400 transition-colors flex items-center gap-1 cursor-pointer"
+                              >
+                                🔄 Regenerate
+                              </button>
+                            </div>
+                            
+                            <div className="flex gap-1.5 items-center">
+                              <button
+                                onClick={() => handleFeedback(c.id, 'yes')}
+                                className={`text-[10px] p-1 rounded-md transition-all cursor-pointer ${
+                                  c.helpful === 'yes'
+                                    ? 'bg-emerald-50 text-emerald-650 dark:bg-emerald-950/20 dark:text-emerald-400'
+                                    : 'text-slate-350 hover:text-emerald-500'
+                                }`}
+                                title="Helpful"
+                              >
+                                👍
+                              </button>
+                              <button
+                                onClick={() => handleFeedback(c.id, 'no')}
+                                className={`text-[10px] p-1 rounded-md transition-all cursor-pointer ${
+                                  c.helpful === 'no'
+                                    ? 'bg-rose-50 text-rose-650 dark:bg-rose-950/20 dark:text-rose-400'
+                                    : 'text-slate-350 hover:text-rose-500'
+                                }`}
+                                title="Not Helpful"
+                              >
+                                👎
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
                 </div>
               )}
             </motion.div>
