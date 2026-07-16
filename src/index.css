@@ -323,6 +323,7 @@
   display: block !important;
   z-index: 1 !important;
   position: relative !important;
+  pointer-events: none !important;
 }
 
 .react-pdf__Page__textLayer {
