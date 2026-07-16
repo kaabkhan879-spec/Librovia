@@ -516,7 +516,6 @@ export const booksService = {
     if (!user) throw new Error('User not authenticated')
 
     const isCompleted = page === totalPages
-    const rpAvailable = await this.isProgressAvailable()
     const now = new Date().toISOString()
 
     const currentProgress = await this.getReadingProgress(bookId)
@@ -524,47 +523,66 @@ export const booksService = {
     const currentReadingTime = currentProgress?.readingTime || 0
     const newReadingTime = currentReadingTime + (additionalSeconds || 0)
 
-    if (rpAvailable) {
-      try {
-        const payload = {
-          user_id: user.id,
-          book_id: bookId,
-          current_page: page,
-          total_pages: totalPages,
-          is_completed: isCompleted,
-          last_read_at: now,
-          started_at: startedAt,
-          reading_time: newReadingTime,
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine
+
+    if (isOnline) {
+      const rpAvailable = await this.isProgressAvailable()
+      if (rpAvailable) {
+        try {
+          const payload = {
+            user_id: user.id,
+            book_id: bookId,
+            current_page: page,
+            total_pages: totalPages,
+            is_completed: isCompleted,
+            last_read_at: now,
+            started_at: startedAt,
+            reading_time: newReadingTime,
+          }
+
+          const { data, error } = await supabase
+            .from('reading_progress')
+            .upsert(payload, { onConflict: 'user_id,book_id' })
+            .select()
+            .single()
+
+          if (error) throw error
+
+          await supabase
+            .from('books')
+            .update({
+              updated_at: now,
+            })
+            .eq('id', bookId)
+
+          return {
+            id: data.id,
+            bookId: data.book_id,
+            currentPage: data.current_page,
+            totalPages: data.total_pages || totalPages,
+            lastReadAt: data.last_read_at,
+            isCompleted: data.is_completed,
+            startedAt: data.started_at,
+            readingTime: data.reading_time,
+          }
+        } catch (err) {
+          console.error('Error upserting progress in Supabase, saving locally and queuing:', err)
         }
-
-        const { data, error } = await supabase
-          .from('reading_progress')
-          .upsert(payload, { onConflict: 'user_id,book_id' })
-          .select()
-          .single()
-
-        if (error) throw error
-
-        await supabase
-          .from('books')
-          .update({
-            updated_at: now,
-          })
-          .eq('id', bookId)
-
-        return {
-          id: data.id,
-          bookId: data.book_id,
-          currentPage: data.current_page,
-          totalPages: data.total_pages || totalPages,
-          lastReadAt: data.last_read_at,
-          isCompleted: data.is_completed,
-          startedAt: data.started_at,
-          readingTime: data.reading_time,
-        }
-      } catch (err) {
-        console.error('Error upserting progress in Supabase, saving locally:', err)
       }
+    }
+
+    // Queue updates when offline
+    if (!isOnline) {
+      const queue = JSON.parse(localStorage.getItem('librovia-progress-queue') || '[]')
+      const filtered = queue.filter((q: any) => q.bookId !== bookId)
+      filtered.push({
+        bookId,
+        page,
+        totalPages,
+        additionalSeconds: additionalSeconds || 0,
+        timestamp: now,
+      })
+      localStorage.setItem('librovia-progress-queue', JSON.stringify(filtered))
     }
 
     // Local Storage Fallback
@@ -665,5 +683,32 @@ export const booksService = {
     } catch (err) {
       console.error('Failed to run migration:', err)
     }
+  },
+
+  async syncOfflineProgress(): Promise<void> {
+    const queueStr = localStorage.getItem('librovia-progress-queue') || '[]'
+    let queue: any[] = []
+    try {
+      queue = JSON.parse(queueStr)
+    } catch {
+      return
+    }
+
+    if (queue.length === 0) return
+
+    for (const item of queue) {
+      try {
+        await this.updateReadingProgress(
+          item.bookId,
+          item.page,
+          item.totalPages,
+          item.additionalSeconds
+        )
+      } catch (err) {
+        console.error('Failed to sync offline progress for book:', item.bookId, err)
+      }
+    }
+
+    localStorage.removeItem('librovia-progress-queue')
   },
 }

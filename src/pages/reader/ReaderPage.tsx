@@ -140,6 +140,8 @@ export const ReaderPage: React.FC = () => {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
+
+
   // Persist conversations
   useEffect(() => {
     if (id) {
@@ -194,6 +196,11 @@ export const ReaderPage: React.FC = () => {
   }
 
   const handleAiActionDirect = async (textToUse: string, action: AiActionType) => {
+    if (!isOnline) {
+      showInfo("AI requires an internet connection. Your reading progress and notes are still being saved locally.")
+      return
+    }
+
     // Stop any active generation first
     handleStopGeneration()
 
@@ -405,6 +412,35 @@ export const ReaderPage: React.FC = () => {
       console.error('Failed to load notes:', err)
     }
   }, [id])
+
+  // Offline / Online state
+  const [isOnline, setIsOnline] = useState(() => typeof navigator !== 'undefined' ? navigator.onLine : true)
+
+  useEffect(() => {
+    const handleOnline = async () => {
+      setIsOnline(true)
+      try {
+        // Sync progress and notes automatically
+        await booksService.syncOfflineProgress()
+        await notesService.syncOfflineNotes()
+        await fetchNotes()
+        showSuccess("You're back online. Your changes have been synchronized.")
+      } catch (err) {
+        console.error('Failed to sync offline updates:', err)
+      }
+    }
+
+    const handleOffline = () => {
+      setIsOnline(false)
+    }
+
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [fetchNotes, showSuccess])
 
   // Query Supabase for book path on mount
   useEffect(() => {
@@ -1063,6 +1099,12 @@ export const ReaderPage: React.FC = () => {
             <p className="text-text-muted mt-0.5 truncate text-[9px] font-bold">
               By {rawBook.author}
             </p>
+          </div>
+          <div className="flex items-center gap-1.5 ml-3 pl-3 border-l border-slate-200 dark:border-slate-800">
+            <span className={`inline-block h-2 w-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+            <span className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+              {isOnline ? 'Online' : 'Offline (Changes will sync automatically)'}
+            </span>
           </div>
         </div>
 

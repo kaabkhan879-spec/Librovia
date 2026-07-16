@@ -45,6 +45,11 @@ export const notesService = {
     } = await supabase.auth.getUser()
     if (!user) return []
 
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine
+    if (!isOnline) {
+      return this.getLocalNotes(bookId, user.id)
+    }
+
     const isLive = await this.isSupabaseAvailable()
     if (isLive) {
       const { data, error } = await supabase
@@ -100,9 +105,25 @@ export const notesService = {
       }
     }
 
-    const isLive = await this.isSupabaseAvailable()
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine
     const now = new Date().toISOString()
 
+    // If offline, save locally and push to offline queue
+    if (!isOnline) {
+      const saved = this.saveLocalNote({ ...note, bookTitle: resolvedBookTitle }, user.id)
+      const queue = JSON.parse(localStorage.getItem('librovia-notes-queue') || '[]')
+      const filtered = queue.filter((q: any) => q.noteId !== saved.id)
+      filtered.push({
+        type: 'save',
+        noteId: saved.id,
+        payload: saved,
+        timestamp: now,
+      })
+      localStorage.setItem('librovia-notes-queue', JSON.stringify(filtered))
+      return saved
+    }
+
+    const isLive = await this.isSupabaseAvailable()
     if (isLive) {
       try {
         const payload = {
@@ -160,23 +181,59 @@ export const notesService = {
           bookTitle: resolvedBookTitle,
         }
       } catch (err) {
-        console.error('Failed to save to Supabase, falling back to local:', err)
-        return this.saveLocalNote({ ...note, bookTitle: resolvedBookTitle }, user.id)
+        console.error('Failed to save to Supabase, falling back to local and queuing:', err)
+        const saved = this.saveLocalNote({ ...note, bookTitle: resolvedBookTitle }, user.id)
+        const queue = JSON.parse(localStorage.getItem('librovia-notes-queue') || '[]')
+        const filtered = queue.filter((q: any) => q.noteId !== saved.id)
+        filtered.push({
+          type: 'save',
+          noteId: saved.id,
+          payload: saved,
+          timestamp: now,
+        })
+        localStorage.setItem('librovia-notes-queue', JSON.stringify(filtered))
+        return saved
       }
     } else {
-      return this.saveLocalNote({ ...note, bookTitle: resolvedBookTitle }, user.id)
+      const saved = this.saveLocalNote({ ...note, bookTitle: resolvedBookTitle }, user.id)
+      return saved
     }
   },
 
   async deleteNote(id: string): Promise<void> {
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine
+    const now = new Date().toISOString()
+
+    // If offline, delete locally and push delete to offline queue
+    if (!isOnline) {
+      this.deleteLocalNote(id)
+      const queue = JSON.parse(localStorage.getItem('librovia-notes-queue') || '[]')
+      const filtered = queue.filter((q: any) => q.noteId !== id)
+      filtered.push({
+        type: 'delete',
+        noteId: id,
+        timestamp: now,
+      })
+      localStorage.setItem('librovia-notes-queue', JSON.stringify(filtered))
+      return
+    }
+
     const isLive = await this.isSupabaseAvailable()
     if (isLive) {
       try {
         const { error } = await supabase.from('notes').delete().eq('id', id)
         if (error) throw error
       } catch (err) {
-        console.error('Failed to delete from Supabase, falling back to local:', err)
+        console.error('Failed to delete from Supabase, falling back to local and queuing:', err)
         this.deleteLocalNote(id)
+        const queue = JSON.parse(localStorage.getItem('librovia-notes-queue') || '[]')
+        const filtered = queue.filter((q: any) => q.noteId !== id)
+        filtered.push({
+          type: 'delete',
+          noteId: id,
+          timestamp: now,
+        })
+        localStorage.setItem('librovia-notes-queue', JSON.stringify(filtered))
       }
     } else {
       this.deleteLocalNote(id)
@@ -330,5 +387,74 @@ export const notesService = {
     } catch {
       // Do nothing
     }
+  },
+
+  async syncOfflineNotes(): Promise<void> {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return
+
+    const queueStr = localStorage.getItem('librovia-notes-queue') || '[]'
+    let queue: any[] = []
+    try {
+      queue = JSON.parse(queueStr)
+    } catch {
+      return
+    }
+
+    if (queue.length === 0) return
+
+    for (const item of queue) {
+      try {
+        if (item.type === 'save') {
+          const noteData = item.payload
+          // Check if it already exists in Supabase
+          const { data: existing } = await supabase
+            .from('notes')
+            .select('id, updated_at')
+            .eq('id', item.noteId)
+            .maybeSingle()
+
+          const payload = {
+            user_id: user.id,
+            book_id: noteData.bookId,
+            page_number: noteData.pageNumber,
+            note_text: noteData.noteText,
+            rating: noteData.rating || null,
+            highlighted_text: noteData.highlightedText || null,
+            is_bookmarked: noteData.isBookmarked,
+            tags: noteData.tags,
+            updated_at: noteData.updatedAt || new Date().toISOString(),
+            x_position: noteData.xPosition !== undefined ? noteData.xPosition : null,
+            y_position: noteData.yPosition !== undefined ? noteData.yPosition : null,
+            note_title: noteData.noteTitle || null,
+          }
+
+          if (existing) {
+            // Compare timestamps: only overwrite if local version is newer
+            const existingTime = new Date(existing.updated_at).getTime()
+            const localTime = new Date(noteData.updatedAt || 0).getTime()
+            if (localTime > existingTime) {
+              await supabase.from('notes').update(payload).eq('id', item.noteId)
+            }
+          } else {
+            // Insert
+            await supabase.from('notes').insert({
+              ...payload,
+              id: item.noteId,
+              created_at: noteData.createdAt || new Date().toISOString()
+            })
+          }
+        } else if (item.type === 'delete') {
+          await supabase.from('notes').delete().eq('id', item.noteId)
+        }
+      } catch (err) {
+        console.error('Failed to sync offline note item:', item, err)
+      }
+    }
+
+    // Clear queue after sync
+    localStorage.removeItem('librovia-notes-queue')
   },
 }
