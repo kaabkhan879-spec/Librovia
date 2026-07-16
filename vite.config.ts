@@ -177,6 +177,130 @@ Text excerpt:
               }
               return
             }
+
+            if (req.url?.startsWith('/api/flashcards')) {
+              if (req.method === 'POST') {
+                try {
+                  const body = await new Promise<any>((resolve, reject) => {
+                    let data = ''
+                    req.on('data', (chunk) => {
+                      data += chunk
+                    })
+                    req.on('end', () => {
+                      try {
+                        resolve(JSON.parse(data))
+                      } catch (err) {
+                        reject(err)
+                      }
+                    })
+                  })
+
+                  const { text } = body
+                  if (!text) {
+                    res.statusCode = 400
+                    res.setHeader('Content-Type', 'application/json')
+                    res.end(JSON.stringify({ error: 'Missing text parameter' }))
+                    return
+                  }
+
+                  const apiKey = env.GEMINI_API_KEY || process.env.GEMINI_API_KEY
+                  const model = env.GEMINI_MODEL || process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite'
+
+                  const prompt = `Based on the following text excerpt, generate 2-4 high-quality, educational study Q&A flashcards.
+Each flashcard should target definitions, concepts, comparisons, examples, or exam-focused questions.
+Keep answers concise, clear, and easy to read.
+Avoid duplicate concepts.
+Output the result ONLY as a raw JSON array of objects matching the following typescript schema, without any markdown formatting wrappers or explanation text:
+[{"question": "string", "answer": "string", "difficulty": "easy" | "medium" | "hard", "topic": "string"}]
+
+Text excerpt:
+"${text}"`
+
+                  if (!apiKey) {
+                    const delay = 800 + Math.random() * 500
+                    await new Promise((resolve) => setTimeout(resolve, delay))
+
+                    res.statusCode = 200
+                    res.setHeader('Content-Type', 'application/json')
+                    res.end(
+                      JSON.stringify({
+                        flashcards: [
+                          {
+                            question: "What is the subject of this excerpt?",
+                            answer: "The excerpt discusses basic concepts: " + (text.length > 60 ? text.substring(0, 60) + "..." : text),
+                            difficulty: "easy",
+                            topic: "General Reading"
+                          },
+                          {
+                            question: "Why is this text excerpt important?",
+                            answer: "It introduces structural parameters and key definitions to the reader.",
+                            difficulty: "medium",
+                            topic: "Context"
+                          }
+                        ]
+                      })
+                    )
+                    return
+                  }
+
+                  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+
+                  const response = await fetch(geminiUrl, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      contents: [{ parts: [{ text: prompt }] }],
+                      generationConfig: {
+                        temperature: 0.7,
+                        maxOutputTokens: 2048,
+                      },
+                    }),
+                  })
+
+                  if (!response.ok) {
+                    const errData = (await response.json().catch(() => ({}))) as any
+                    res.statusCode = response.status
+                    res.setHeader('Content-Type', 'application/json')
+                    res.end(
+                      JSON.stringify({
+                        error:
+                          errData.error?.message ||
+                          `Gemini API returned error code ${response.status}`,
+                      })
+                    )
+                    return
+                  }
+
+                  const resData = (await response.json()) as any
+                  let aiText = resData.candidates?.[0]?.content?.parts?.[0]?.text || ''
+
+                  // Clean markdown wraps
+                  aiText = aiText.replace(/```json/g, '').replace(/```/g, '').trim()
+
+                  let parsedCards = []
+                  try {
+                    parsedCards = JSON.parse(aiText)
+                  } catch (parseErr) {
+                    console.error('Failed to parse AI output as JSON:', aiText)
+                    res.statusCode = 502
+                    res.setHeader('Content-Type', 'application/json')
+                    res.end(JSON.stringify({ error: 'AI response did not match JSON array structure' }))
+                    return
+                  }
+
+                  res.statusCode = 200
+                  res.setHeader('Content-Type', 'application/json')
+                  res.end(JSON.stringify({ flashcards: parsedCards }))
+                } catch (error: any) {
+                  res.statusCode = 500
+                  res.setHeader('Content-Type', 'application/json')
+                  res.end(JSON.stringify({ error: error.message || 'Internal server error' }))
+                }
+              }
+              return
+            }
             next()
           })
         },

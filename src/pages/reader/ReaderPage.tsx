@@ -32,6 +32,7 @@ import {
 import { booksService, type Book } from '../../services/books'
 import { notesService, type Note } from '../../services/notes'
 import { notificationsService } from '../../services/notifications'
+import { flashcardsService } from '../../services/flashcards'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/TextLayer.css'
 
@@ -50,7 +51,7 @@ export const ReaderPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const [searchParams] = useSearchParams()
   const pageParam = searchParams.get('page')
-  const { showInfo, showSuccess } = useToast()
+  const { showInfo, showSuccess, showError } = useToast()
 
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -334,6 +335,23 @@ export const ReaderPage: React.FC = () => {
     setRightSidebarOpen(true)
     setFloatingToolbarPos(null)
     window.getSelection()?.removeAllRanges()
+  }
+
+  const handleGenerateFlashcards = async () => {
+    const selection = window.getSelection()?.toString().trim() || modalHighlightText
+    if (!id || !selection) return
+
+    setFloatingToolbarPos(null)
+    window.getSelection()?.removeAllRanges()
+    showInfo('Generating study flashcards via AI... Please wait.')
+
+    try {
+      const cards = await flashcardsService.generateFlashcards(id, page, selection)
+      showSuccess(`Successfully generated ${cards.length} AI study flashcards! 🃏`)
+    } catch (err: any) {
+      console.error(err)
+      showError(err.message || 'Failed to generate flashcards.')
+    }
   }
 
   const handleQuickHighlight = async () => {
@@ -2122,6 +2140,13 @@ export const ReaderPage: React.FC = () => {
               className="text-purple-300 flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase transition-colors hover:bg-white/10"
             >
               ✨ Ask AI
+            </button>
+            <button
+              onClick={handleGenerateFlashcards}
+              className="text-purple-300 flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase transition-colors hover:bg-white/10"
+              title="Generate study flashcards from selection"
+            >
+              🃏 Flashcards
             </button>
             <button
               onClick={handleQuickHighlight}

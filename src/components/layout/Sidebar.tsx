@@ -18,6 +18,7 @@ import {
   ChevronRight,
   Sun,
   Moon,
+  Layers,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -62,6 +63,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { name: 'My Library', to: ROUTES.LIBRARY, icon: Library },
     { name: 'Collections', to: ROUTES.COLLECTIONS, icon: Folder },
     { name: 'Notes', to: ROUTES.NOTES, icon: MessageSquare },
+    { name: 'AI Flashcards', to: ROUTES.FLASHCARDS, icon: Layers },
     { name: 'Analytics', to: ROUTES.ANALYTICS, icon: BarChart3 },
     { name: 'Storage', to: ROUTES.STORAGE, icon: Cloud },
     { name: 'Settings', to: ROUTES.SETTINGS, icon: Settings },

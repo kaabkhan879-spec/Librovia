@@ -17,4 +17,5 @@ export const ROUTES = {
   STORAGE: '/storage',
   DESIGN_SYSTEM: '/design-system',
   FORGOT_PASSWORD: '/forgot-password',
+  FLASHCARDS: '/flashcards',
 } as const
