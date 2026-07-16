@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react'
 import { collectionsService, type Collection } from '../../services/collections'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { PageWrapper } from '../../components/common/PageWrapper'
+import { useToast } from '../../context/ToastContext'
 import { ROUTES } from '../../constants/routes'
 import { booksService } from '../../services/books'
 import { notificationsService } from '../../services/notifications'
@@ -15,6 +17,7 @@ interface TagItem {
 }
 
 export const UploadBookPage: React.FC = () => {
+  const { showSuccess, showError } = useToast()
   const navigate = useNavigate()
   const coverInputRef = useRef<HTMLInputElement>(null)
 
@@ -64,7 +67,7 @@ export const UploadBookPage: React.FC = () => {
       setShowCreateModal(false)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to create collection'
-      alert(msg)
+      showError(msg)
     }
   }
 
@@ -206,6 +209,7 @@ export const UploadBookPage: React.FC = () => {
       setProgressLabel('Indexing text elements & generating shelf reference...')
       setUploadProgress(100)
       setStatus('success')
+      showSuccess(`"${title.trim()}" uploaded successfully! 📚`)
       notificationsService
         .addNotification(
           'upload',
@@ -222,7 +226,7 @@ export const UploadBookPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen space-y-8 pb-20 text-left select-none">
+    <PageWrapper className="min-h-screen space-y-8 pb-20 text-left select-none">
       {/* Dynamic Header Banner */}
       <div className="border-border-base flex flex-col gap-4 border-b pb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -772,6 +776,6 @@ export const UploadBookPage: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
-    </div>
+    </PageWrapper>
   )
 }

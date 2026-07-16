@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { PageWrapper } from '../../components/common/PageWrapper'
 import { ROUTES } from '../../constants/routes'
 import { booksService, type Book } from '../../services/books'
 import { collectionsService, type Collection } from '../../services/collections'
@@ -237,7 +238,7 @@ export const LibraryPage: React.FC = () => {
   }
 
   return (
-    <div className="relative min-h-screen space-y-8 pb-20 text-left select-none">
+    <PageWrapper className="relative min-h-screen space-y-8 pb-20 text-left select-none">
       {/* Header Section */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
@@ -313,14 +314,21 @@ export const LibraryPage: React.FC = () => {
             exit={{ opacity: 0 }}
             className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4"
           >
-            {Array.from({ length: 4 }).map((_, idx) => (
+            {Array.from({ length: 8 }).map((_, idx) => (
               <div
                 key={idx}
-                className="flex h-64 animate-pulse flex-col justify-between rounded-3xl border border-slate-100 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+                className="flex flex-col justify-between rounded-3xl border border-slate-100 bg-white p-4.5 text-left shadow-xs dark:border-slate-800 dark:bg-slate-900 h-[360px]"
               >
-                <div className="h-32 rounded bg-slate-100 dark:bg-slate-800" />
-                <div className="mt-4 h-4 w-2/3 rounded bg-slate-100 dark:bg-slate-800" />
-                <div className="h-3 w-1/3 rounded bg-slate-100 dark:bg-slate-800" />
+                <div className="relative aspect-[0.7/1] w-full overflow-hidden rounded-2xl shimmer-placeholder flex-1" />
+                <div className="mt-4 space-y-2.5">
+                  <div className="h-3 w-16 rounded shimmer-placeholder" />
+                  <div className="h-4 w-3/4 rounded shimmer-placeholder" />
+                  <div className="h-3 w-1/2 rounded shimmer-placeholder" />
+                  <div className="pt-1.5 space-y-1">
+                    <div className="h-1.5 w-full rounded-full bg-slate-50 dark:bg-slate-800" />
+                    <div className="h-2.5 w-8 rounded shimmer-placeholder" />
+                  </div>
+                </div>
               </div>
             ))}
           </motion.div>
@@ -449,7 +457,7 @@ export const LibraryPage: React.FC = () => {
                 {filteredBooks.map((book) => (
                   <div
                     key={book.id}
-                    className="group/card relative flex flex-col justify-between rounded-3xl border border-slate-100 bg-white p-4.5 text-left shadow-xs transition-all duration-300 hover:border-purple-500/20 hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
+                    className="group/card premium-card cursor-pointer relative flex flex-col justify-between rounded-3xl border border-slate-100 bg-white p-4.5 text-left shadow-xs dark:border-slate-800 dark:bg-slate-900"
                   >
                     <div className="relative aspect-[0.7/1] w-full animate-none overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 shadow-xs dark:border-slate-800 dark:bg-slate-950/20">
                       <img
@@ -846,6 +854,6 @@ export const LibraryPage: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </PageWrapper>
   )
 }

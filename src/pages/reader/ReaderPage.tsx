@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { PageWrapper } from '../../components/common/PageWrapper'
 import { ROUTES } from '../../constants/routes'
 import {
   ArrowLeft,
@@ -828,7 +829,7 @@ export const ReaderPage: React.FC = () => {
   }
 
   return (
-    <div
+    <PageWrapper
       className={`flex h-screen w-screen flex-col overflow-hidden font-sans transition-colors duration-300 select-none ${
         theme === 'dark' ? 'bg-neutral-950 text-neutral-200' : 'bg-neutral-100 text-slate-800'
       }`}
@@ -1839,6 +1840,6 @@ export const ReaderPage: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </PageWrapper>
   )
 }

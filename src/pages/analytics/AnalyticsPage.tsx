@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { PageWrapper } from '../../components/common/PageWrapper'
 import { booksService, type Book } from '../../services/books'
 import { collectionsService, type Collection } from '../../services/collections'
 import { ROUTES } from '../../constants/routes'
@@ -195,7 +196,7 @@ export const AnalyticsPage: React.FC = () => {
   } as const
 
   return (
-    <div className="min-h-screen space-y-8 pb-20 text-left select-none">
+    <PageWrapper className="min-h-screen space-y-8 pb-20 text-left select-none">
       {/* Header section */}
       <div className="space-y-1">
         <h1 className="font-sans text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
@@ -213,14 +214,102 @@ export const AnalyticsPage: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-4"
+            className="space-y-8"
           >
-            {Array.from({ length: 4 }).map((_, idx) => (
-              <div
-                key={idx}
-                className="h-28 animate-pulse rounded-3xl border border-slate-100 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-              />
-            ))}
+            {/* 4 Stats Cards */}
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, idx) => (
+                <div
+                  key={idx}
+                  className="rounded-3xl border border-slate-100 bg-white p-5 h-28 flex flex-col justify-between dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <div className="flex justify-between items-center">
+                    <div className="h-3 w-20 rounded shimmer-placeholder" />
+                    <div className="h-7 w-7 rounded-xl shimmer-placeholder" />
+                  </div>
+                  <div className="h-7 w-24 rounded-lg shimmer-placeholder" />
+                </div>
+              ))}
+            </div>
+
+            {/* Charts & Targets */}
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+              {/* Chart 1 */}
+              <div className="rounded-3xl border border-slate-100 bg-white p-6 h-56 flex flex-col justify-between dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex justify-between">
+                  <div className="h-3.5 w-24 rounded shimmer-placeholder" />
+                  <div className="h-3 w-10 rounded shimmer-placeholder" />
+                </div>
+                <div className="flex items-end justify-between gap-3 h-28 pt-4">
+                  {[40, 75, 50, 90, 60, 30, 45].map((h, i) => (
+                    <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
+                      <div className="w-full rounded-t-md shimmer-placeholder" style={{ height: `${h}%` }} />
+                      <div className="h-2 w-5 rounded shimmer-placeholder" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Chart 2 */}
+              <div className="rounded-3xl border border-slate-100 bg-white p-6 h-56 flex flex-col justify-between dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex justify-between">
+                  <div className="h-3.5 w-24 rounded shimmer-placeholder" />
+                  <div className="h-3 w-16 rounded shimmer-placeholder" />
+                </div>
+                <div className="flex items-end justify-between gap-6 h-28 pt-4">
+                  {[50, 80, 40, 95].map((h, i) => (
+                    <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
+                      <div className="w-full rounded-t-md shimmer-placeholder" style={{ height: `${h}%` }} />
+                      <div className="h-2 w-8 rounded shimmer-placeholder" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Goals Progress */}
+              <div className="rounded-3xl border border-slate-100 bg-white p-6 h-56 flex flex-col justify-between dark:border-slate-800 dark:bg-slate-900">
+                <div className="h-3.5 w-24 rounded shimmer-placeholder" />
+                <div className="space-y-4 py-2">
+                  <div className="space-y-2">
+                    <div className="h-3.5 w-3/4 rounded shimmer-placeholder" />
+                    <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800" />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="h-3.5 w-2/3 rounded shimmer-placeholder" />
+                    <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Reading History Logs */}
+            <div className="space-y-4">
+              <div className="h-4.5 w-36 rounded shimmer-placeholder" />
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {Array.from({ length: 4 }).map((_, idx) => (
+                  <div
+                    key={idx}
+                    className="rounded-3xl border border-slate-100 bg-white p-4 h-36 flex justify-between dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    <div className="flex gap-4 flex-1">
+                      <div className="aspect-[0.7/1] w-16 shrink-0 rounded-xl shimmer-placeholder" />
+                      <div className="space-y-2 flex-1 pt-1">
+                        <div className="h-3 w-16 rounded shimmer-placeholder" />
+                        <div className="h-4 w-32 rounded shimmer-placeholder" />
+                        <div className="h-3 w-20 rounded shimmer-placeholder" />
+                      </div>
+                    </div>
+                    <div className="flex flex-col justify-between items-end border-l border-slate-50 pl-4 w-28 dark:border-slate-800/40 animate-none">
+                      <div className="space-y-1.5 w-full flex flex-col items-end">
+                        <div className="h-2.5 w-12 rounded shimmer-placeholder" />
+                        <div className="h-3 w-16 rounded shimmer-placeholder" />
+                      </div>
+                      <div className="h-8 w-16 rounded-xl shimmer-placeholder" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </motion.div>
         ) : books.length === 0 ? (
           <motion.div
@@ -254,8 +343,7 @@ export const AnalyticsPage: React.FC = () => {
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-4">
               <motion.div
                 variants={itemVariants}
-                whileHover={{ y: -4 }}
-                className="flex min-h-[100px] flex-col justify-between rounded-3xl border border-slate-100 bg-white p-5 shadow-xs transition-all duration-300 hover:border-purple-500/20 hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
+                className="flex min-h-[100px] flex-col justify-between rounded-3xl border border-slate-100 bg-white p-5 shadow-xs premium-card dark:border-slate-800 dark:bg-slate-900"
               >
                 <div className="flex items-start justify-between">
                   <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
@@ -274,8 +362,7 @@ export const AnalyticsPage: React.FC = () => {
 
               <motion.div
                 variants={itemVariants}
-                whileHover={{ y: -4 }}
-                className="flex min-h-[100px] flex-col justify-between rounded-3xl border border-slate-100 bg-white p-5 shadow-xs transition-all duration-300 hover:border-purple-500/20 hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
+                className="flex min-h-[100px] flex-col justify-between rounded-3xl border border-slate-100 bg-white p-5 shadow-xs premium-card dark:border-slate-800 dark:bg-slate-900"
               >
                 <div className="flex items-start justify-between">
                   <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
@@ -294,8 +381,7 @@ export const AnalyticsPage: React.FC = () => {
 
               <motion.div
                 variants={itemVariants}
-                whileHover={{ y: -4 }}
-                className="flex min-h-[100px] flex-col justify-between rounded-3xl border border-slate-100 bg-white p-5 shadow-xs transition-all duration-300 hover:border-purple-500/20 hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
+                className="flex min-h-[100px] flex-col justify-between rounded-3xl border border-slate-100 bg-white p-5 shadow-xs premium-card dark:border-slate-800 dark:bg-slate-900"
               >
                 <div className="flex items-start justify-between">
                   <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
@@ -315,8 +401,7 @@ export const AnalyticsPage: React.FC = () => {
 
               <motion.div
                 variants={itemVariants}
-                whileHover={{ y: -4 }}
-                className="flex min-h-[100px] flex-col justify-between rounded-3xl border border-slate-100 bg-white p-5 shadow-xs transition-all duration-300 hover:border-purple-500/20 hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
+                className="flex min-h-[100px] flex-col justify-between rounded-3xl border border-slate-100 bg-white p-5 shadow-xs premium-card dark:border-slate-800 dark:bg-slate-900"
               >
                 <div className="flex items-start justify-between">
                   <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
@@ -357,9 +442,11 @@ export const AnalyticsPage: React.FC = () => {
                           <div className="pointer-events-none absolute -top-8 scale-0 rounded bg-slate-950 px-2 py-1 text-[8px] font-bold text-white shadow-md transition-all group-hover/bar:scale-100">
                             {day.value} pgs
                           </div>
-                          <div
+                          <motion.div
+                            initial={{ height: 0 }}
+                            animate={{ height: `${percentHeight}px` }}
+                            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
                             className="w-full max-w-[16px] rounded-t-lg bg-purple-100 transition-all duration-300 group-hover/bar:bg-purple-600 dark:bg-purple-950/20"
-                            style={{ height: `${percentHeight}px` }}
                           />
                         </div>
                         <span className="font-mono text-[9px] font-bold text-slate-400">
@@ -390,9 +477,11 @@ export const AnalyticsPage: React.FC = () => {
                           <div className="pointer-events-none absolute -top-8 scale-0 rounded bg-slate-950 px-2 py-1 text-[8px] font-bold text-white shadow-md transition-all group-hover/bar:scale-100">
                             {week.value} pgs
                           </div>
-                          <div
+                          <motion.div
+                            initial={{ height: 0 }}
+                            animate={{ height: `${percentHeight}px` }}
+                            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
                             className="w-full max-w-[24px] rounded-t-lg bg-blue-100 transition-all duration-300 group-hover/bar:bg-blue-500 dark:bg-blue-950/20"
-                            style={{ height: `${percentHeight}px` }}
                           />
                         </div>
                         <span className="font-sans text-[9px] font-bold text-slate-400">
@@ -531,6 +620,6 @@ export const AnalyticsPage: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </PageWrapper>
   )
 }

@@ -19,6 +19,7 @@ import {
   Award,
 } from 'lucide-react'
 import { Button } from '../../components/common/Button'
+import { PageWrapper } from '../../components/common/PageWrapper'
 
 // Defined outside of the component to prevent useMemo dependency warnings
 const quotesList = [
@@ -281,16 +282,28 @@ export const DashboardPage: React.FC = () => {
   // Animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { staggerChildren: 0.05 } },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.08,
+      },
+    },
   }
 
   const itemVariants = {
-    hidden: { opacity: 0, y: 15 },
-    show: { opacity: 1, y: 0, transition: { type: 'spring' as const, stiffness: 100 } },
-  }
+    hidden: { opacity: 0, y: 20 },
+    show: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.25,
+        ease: [0.16, 1, 0.3, 1],
+      },
+    },
+  } as const
 
   return (
-    <div className="space-y-12 bg-[#F6F8FC] pb-16 text-left select-none dark:bg-slate-950/10">
+    <PageWrapper className="space-y-12 bg-[#F6F8FC] pb-16 text-left select-none dark:bg-slate-950/10">
       <AnimatePresence mode="wait">
         {loading ? (
           <motion.div
@@ -298,17 +311,91 @@ export const DashboardPage: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3"
+            className="space-y-12"
           >
-            {Array.from({ length: 3 }).map((_, idx) => (
-              <div
-                key={idx}
-                className="flex h-28 animate-pulse flex-col justify-between rounded-3xl border border-slate-100 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-              >
-                <div className="h-4 w-1/2 rounded bg-slate-100 dark:bg-slate-800" />
-                <div className="h-8 w-1/3 rounded bg-slate-100 dark:bg-slate-800" />
+            {/* Hero Banner Skeleton */}
+            <div className="relative overflow-hidden rounded-[28px] bg-slate-100 dark:bg-slate-900/60 p-6 sm:p-8 h-48 flex items-center justify-between">
+              <div className="space-y-3.5 w-1/2">
+                <div className="h-3 w-20 rounded-lg shimmer-placeholder" />
+                <div className="h-8 w-60 rounded-xl shimmer-placeholder" />
+                <div className="flex gap-2">
+                  <div className="h-5 w-20 rounded-full shimmer-placeholder" />
+                  <div className="h-5 w-20 rounded-full shimmer-placeholder" />
+                </div>
               </div>
-            ))}
+              <div className="h-10 w-32 rounded-xl shimmer-placeholder hidden sm:block" />
+            </div>
+
+            {/* Stats Cards Skeleton */}
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, idx) => (
+                <div
+                  key={idx}
+                  className="rounded-3xl border border-slate-100 bg-white p-5 h-28 flex flex-col justify-between dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <div className="flex justify-between items-center">
+                    <div className="h-3.5 w-20 rounded shimmer-placeholder" />
+                    <div className="h-8 w-8 rounded-xl shimmer-placeholder" />
+                  </div>
+                  <div className="h-7 w-12 rounded-lg shimmer-placeholder" />
+                </div>
+              ))}
+            </div>
+
+            {/* Bottom Grid Columns Skeleton */}
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+              {/* Left Column Skeletons */}
+              <div className="space-y-8 lg:col-span-2">
+                {/* Continue Reading */}
+                <div className="space-y-4">
+                  <div className="h-4 w-28 rounded shimmer-placeholder" />
+                  <div className="rounded-3xl border border-slate-100 bg-white p-6 h-36 flex gap-4 dark:border-slate-800 dark:bg-slate-900">
+                    <div className="h-full aspect-[0.7/1] rounded-xl shimmer-placeholder shrink-0" />
+                    <div className="flex-1 flex flex-col justify-between py-1">
+                      <div className="space-y-2">
+                        <div className="h-4 w-40 rounded shimmer-placeholder" />
+                        <div className="h-3.5 w-24 rounded shimmer-placeholder" />
+                      </div>
+                      <div className="h-6 w-32 rounded-lg shimmer-placeholder" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quote of the Day */}
+                <div className="rounded-3xl border border-slate-100 bg-white/40 p-6 h-24 flex flex-col items-center justify-center gap-2.5 dark:border-slate-800/40">
+                  <div className="h-3 w-3/4 rounded shimmer-placeholder" />
+                  <div className="h-2.5 w-1/4 rounded shimmer-placeholder" />
+                </div>
+              </div>
+
+              {/* Right Column Skeletons */}
+              <div className="space-y-8">
+                {/* Reading Goals */}
+                <div className="rounded-3xl border border-slate-100 bg-white p-6 h-48 flex flex-col justify-between dark:border-slate-800 dark:bg-slate-900">
+                  <div className="h-4 w-24 rounded shimmer-placeholder" />
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="h-3 w-full rounded shimmer-placeholder" />
+                      <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800" />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="h-3 w-full rounded shimmer-placeholder" />
+                      <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Recent Notes */}
+                <div className="rounded-3xl border border-slate-100 bg-white p-6 h-56 flex flex-col justify-between dark:border-slate-800 dark:bg-slate-900">
+                  <div className="h-4 w-24 rounded shimmer-placeholder" />
+                  <div className="space-y-3">
+                    <div className="h-3.5 w-full rounded shimmer-placeholder" />
+                    <div className="h-3.5 w-5/6 rounded shimmer-placeholder" />
+                    <div className="h-3.5 w-4/5 rounded shimmer-placeholder" />
+                  </div>
+                </div>
+              </div>
+            </div>
           </motion.div>
         ) : (
           <motion.div
@@ -387,8 +474,7 @@ export const DashboardPage: React.FC = () => {
                 <motion.div
                   key={idx}
                   variants={itemVariants}
-                  whileHover={{ y: -5 }}
-                  className="group relative overflow-hidden rounded-3xl border border-slate-100 bg-white p-4 shadow-sm transition-all duration-300 hover:border-purple-500/20 hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
+                  className="group premium-card relative overflow-hidden rounded-3xl border border-slate-100 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
                 >
                   <div className="flex items-start justify-between">
                     <span className="text-[9px] font-extrabold tracking-wider text-slate-400 uppercase dark:text-slate-500">
@@ -762,6 +848,6 @@ export const DashboardPage: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </PageWrapper>
   )
 }

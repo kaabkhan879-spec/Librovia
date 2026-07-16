@@ -131,6 +131,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     {isActive && (
                       <motion.div
                         layoutId="active-indicator"
+                        transition={{ type: 'spring', stiffness: 380, damping: 30 }}
                         className="bg-primary-600 absolute top-3 bottom-3 left-0 w-1 rounded-r-full"
                       />
                     )}

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { PageWrapper } from '../../components/common/PageWrapper'
+import { useToast } from '../../context/ToastContext'
 import { notesService, type Note } from '../../services/notes'
 import { booksService, type Book } from '../../services/books'
 import { notificationsService } from '../../services/notifications'
@@ -20,6 +22,7 @@ import { Button } from '../../components/common/Button'
 type SortType = 'newest' | 'oldest' | 'page'
 
 export const NotesPage: React.FC = () => {
+  const { showSuccess, showInfo } = useToast()
   const [notes, setNotes] = useState<Note[]>([])
   const [books, setBooks] = useState<Book[]>([])
   const [loading, setLoading] = useState(true)
@@ -100,6 +103,7 @@ export const NotesPage: React.FC = () => {
       setSelectedNote(updated)
       setSaveSuccess(true)
       setIsSaving(false)
+      showSuccess('Note Saved Successfully! 📝')
 
       notificationsService
         .addNotification(
@@ -122,6 +126,7 @@ export const NotesPage: React.FC = () => {
       await notesService.deleteNote(id)
       const updatedNotes = notes.filter((n) => n.id !== id)
       setNotes(updatedNotes)
+      showInfo('Note Deleted Successfully! 🗑️')
       
       notificationsService
         .addNotification(
@@ -184,7 +189,7 @@ export const NotesPage: React.FC = () => {
 
 
   return (
-    <div className="relative min-h-screen space-y-8 pb-20 text-left select-none">
+    <PageWrapper className="relative min-h-screen space-y-8 pb-20 text-left select-none">
       {/* Header section */}
       <div className="space-y-1">
         <h1 className="font-sans text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
@@ -474,6 +479,6 @@ export const NotesPage: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </PageWrapper>
   )
 }

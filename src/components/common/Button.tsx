@@ -23,7 +23,7 @@ export const Button: React.FC<ButtonProps> = ({
 }) => {
   // Variant styling mapping using Librovia design system variables
   const baseStyles =
-    'inline-flex items-center justify-center font-semibold tracking-wide rounded-sm active:scale-[0.98] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none disabled:active:scale-100'
+    'inline-flex items-center justify-center font-semibold tracking-wide rounded-sm active:scale-[0.98] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none disabled:active:scale-100 premium-button'
 
   const variants = {
     primary:

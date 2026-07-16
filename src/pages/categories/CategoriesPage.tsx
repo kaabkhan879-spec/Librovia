@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { PageWrapper } from '../../components/common/PageWrapper'
+import { useToast } from '../../context/ToastContext'
 import { booksService, type Book } from '../../services/books'
 import { collectionsService, type Collection } from '../../services/collections'
 import { notificationsService } from '../../services/notifications'
@@ -20,6 +22,7 @@ import {
 import { Button } from '../../components/common/Button'
 
 export const CategoriesPage: React.FC = () => {
+  const { showSuccess, showError, showInfo } = useToast()
   const [books, setBooks] = useState<Book[]>([])
   const [collections, setCollections] = useState<Collection[]>([])
   const [selectedCol, setSelectedCol] = useState<Collection | null>(null)
@@ -93,9 +96,10 @@ export const CategoriesPage: React.FC = () => {
       setNewColName('')
       setShowCreateModal(false)
       setRefreshTrigger((prev) => prev + 1)
+      showSuccess(`Collection "${newColName.trim()}" created successfully! 📁`)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to create collection'
-      alert(msg)
+      showError(msg)
     }
   }
 
@@ -108,9 +112,10 @@ export const CategoriesPage: React.FC = () => {
       setRenameId('')
       setShowRenameModal(false)
       setRefreshTrigger((prev) => prev + 1)
+      showSuccess('Collection renamed successfully! ✏️')
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to rename collection'
-      alert(msg)
+      showError(msg)
     }
   }
 
@@ -124,8 +129,10 @@ export const CategoriesPage: React.FC = () => {
         setSelectedColBooks([])
       }
       setRefreshTrigger((prev) => prev + 1)
+      showInfo('Collection deleted successfully! 🗑️')
     } catch (err) {
       console.error(err)
+      showError('Failed to delete collection.')
     }
   }
 
@@ -166,7 +173,7 @@ export const CategoriesPage: React.FC = () => {
   }
 
   return (
-    <div className="relative min-h-screen space-y-8 pb-20 text-left select-none">
+    <PageWrapper className="relative min-h-screen space-y-8 pb-20 text-left select-none">
       {/* Header section */}
       <div className="border-border-light flex flex-wrap items-center justify-between gap-4 border-b pb-5">
         <div className="space-y-1">
@@ -202,11 +209,33 @@ export const CategoriesPage: React.FC = () => {
             {Array.from({ length: 4 }).map((_, idx) => (
               <div
                 key={idx}
-                className="border-border-base bg-bg-surface flex h-40 animate-pulse flex-col justify-between rounded-2xl border p-6"
+                className="relative bg-bg-surface border-border-base flex h-48 flex-col justify-between rounded-3xl border p-6"
               >
-                <div className="bg-border-light h-10 w-10 rounded-xl" />
-                <div className="bg-border-light mt-4 h-4 w-2/3 rounded" />
-                <div className="bg-border-light h-3 w-1/3 rounded" />
+                {/* Folder tab decoration placeholder */}
+                <div className="absolute top-0 left-6 -translate-y-[1px] bg-bg-surface border-t border-x border-border-base rounded-t-xl h-2 w-16" />
+
+                <div className="flex items-start justify-between">
+                  <div className="h-11 w-11 rounded-2xl shimmer-placeholder" />
+                  <div className="flex gap-1.5">
+                    <div className="h-5 w-5 rounded shimmer-placeholder" />
+                    <div className="h-5 w-5 rounded shimmer-placeholder" />
+                  </div>
+                </div>
+
+                {/* Layered book cover preview templates */}
+                <div className="flex -space-x-2.5 my-1.5 items-center h-10">
+                  <div className="w-6.5 h-9 rounded-md shimmer-placeholder border border-white dark:border-slate-800 transform rotate-[-4deg]" />
+                  <div className="w-6.5 h-9 rounded-md shimmer-placeholder border border-white dark:border-slate-800 transform rotate-[-4deg]" />
+                  <div className="w-6.5 h-9 rounded-md shimmer-placeholder border border-white dark:border-slate-800 transform rotate-[-4deg]" />
+                </div>
+
+                <div className="flex items-end justify-between border-t border-border-light pt-3">
+                  <div className="space-y-1.5 flex-1">
+                    <div className="h-3.5 w-20 rounded shimmer-placeholder" />
+                    <div className="h-2 w-14 rounded shimmer-placeholder" />
+                  </div>
+                  <div className="h-5 w-12 rounded-lg shimmer-placeholder" />
+                </div>
               </div>
             ))}
           </motion.div>
@@ -432,9 +461,8 @@ export const CategoriesPage: React.FC = () => {
                     <motion.div
                       key={cat.id}
                       variants={itemVariants}
-                      whileHover={{ y: -5 }}
                       onClick={() => handleViewDetails(cat)}
-                      className="relative bg-bg-surface border-border-base hover:border-primary-500/20 group flex h-48 cursor-pointer flex-col justify-between rounded-3xl border p-6 shadow-sm transition-all hover:shadow-md"
+                      className="group premium-card relative bg-bg-surface border-border-base flex h-48 cursor-pointer flex-col justify-between rounded-3xl border p-6 shadow-sm"
                     >
                       {/* Folder tab design decoration */}
                       <div className="absolute top-0 left-6 -translate-y-[1px] bg-bg-surface border-t border-x border-border-base rounded-t-xl h-2 w-16" />
@@ -621,6 +649,6 @@ export const CategoriesPage: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
-    </div>
+    </PageWrapper>
   )
 }

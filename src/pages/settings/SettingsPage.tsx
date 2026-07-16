@@ -1,23 +1,25 @@
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { PageWrapper } from '../../components/common/PageWrapper'
+import { useToast } from '../../context/ToastContext'
 import {
   User,
   Shield,
   Sliders,
   Bell,
-  CheckCircle,
   Globe,
   Settings,
   Download,
   Trash2,
+  CheckCircle,
 } from 'lucide-react'
 import { Button } from '../../components/common/Button'
 
 type SettingsTab = 'profile' | 'appearance' | 'notifications' | 'language' | 'security' | 'account'
 
 export const SettingsPage: React.FC = () => {
+  const { showSuccess } = useToast()
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile')
-  const [alertMsg, setAlertMsg] = useState<string | null>(null)
 
   // Profile details states
   const [name, setName] = useState('Kaab Khan')
@@ -44,8 +46,7 @@ export const SettingsPage: React.FC = () => {
   const [locale, setLocale] = useState('en-US')
 
   const triggerAlert = (message: string) => {
-    setAlertMsg(message)
-    setTimeout(() => setAlertMsg(null), 3000)
+    showSuccess(message)
   }
 
   const handleExportData = () => {
@@ -96,21 +97,7 @@ export const SettingsPage: React.FC = () => {
   ]
 
   return (
-    <div className="relative min-h-screen space-y-8 pb-20 text-left select-none">
-      {/* Alert toast notifier */}
-      <AnimatePresence>
-        {alertMsg && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-xs font-semibold text-emerald-600 shadow"
-          >
-            <CheckCircle className="h-4 w-4 shrink-0" />
-            <p>{alertMsg}</p>
-          </motion.div>
-        )}
-      </AnimatePresence>
+    <PageWrapper className="relative min-h-screen space-y-8 pb-20 text-left select-none">
 
       {/* Settings Grid */}
       <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-4">
@@ -603,6 +590,6 @@ export const SettingsPage: React.FC = () => {
           </AnimatePresence>
         </div>
       </div>
-    </div>
+    </PageWrapper>
   )
 }

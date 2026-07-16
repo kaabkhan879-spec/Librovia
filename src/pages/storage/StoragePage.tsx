@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { PageWrapper } from '../../components/common/PageWrapper'
+import { useToast } from '../../context/ToastContext'
 import { booksService, type Book } from '../../services/books'
 import { ROUTES } from '../../constants/routes'
 import { Cloud, Database, HardDrive, ShieldAlert, Sparkles } from 'lucide-react'
@@ -8,6 +10,7 @@ import { formatBytes } from '../../utils/helpers'
 import { Button } from '../../components/common/Button'
 
 export const StoragePage: React.FC = () => {
+  const { showInfo } = useToast()
   const [books, setBooks] = useState<Book[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -57,11 +60,11 @@ export const StoragePage: React.FC = () => {
   } as const
 
   const handleUpgradeAlert = () => {
-    alert('Librovia Premium checkout flow is currently disabled during testing. High capacity tiers will be unlocked in Phase 5!')
+    showInfo('Checkout is disabled during testing. High capacity tiers unlock in Phase 5! 🚀')
   }
 
   return (
-    <div className="min-h-screen space-y-8 pb-20 text-left select-none">
+    <PageWrapper className="min-h-screen space-y-8 pb-20 text-left select-none">
       {/* Header section */}
       <div className="space-y-1">
         <h1 className="font-sans text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
@@ -81,8 +84,72 @@ export const StoragePage: React.FC = () => {
             exit={{ opacity: 0 }}
             className="space-y-6"
           >
-            <div className="h-44 animate-pulse rounded-3xl border border-slate-100 bg-white p-6 dark:border-slate-800 dark:bg-slate-900" />
-            <div className="h-64 animate-pulse rounded-3xl border border-slate-100 bg-white p-6 dark:border-slate-800 dark:bg-slate-900" />
+            {/* Capacity Meter Skeleton */}
+            <div className="rounded-3xl border border-slate-100 bg-white p-6 h-28 flex flex-col justify-between dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 rounded-2xl shimmer-placeholder shrink-0" />
+                  <div className="space-y-2">
+                    <div className="h-3 w-20 rounded shimmer-placeholder" />
+                    <div className="h-6 w-48 rounded shimmer-placeholder" />
+                  </div>
+                </div>
+                <div className="w-full max-w-md flex-1 space-y-2.5">
+                  <div className="flex justify-between">
+                    <div className="h-3 w-16 rounded shimmer-placeholder" />
+                    <div className="h-3 w-8 rounded shimmer-placeholder" />
+                  </div>
+                  <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800" />
+                </div>
+              </div>
+            </div>
+
+            {/* Storage breakdown details cards skeleton */}
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, idx) => (
+                <div
+                  key={idx}
+                  className="rounded-3xl border border-slate-100 bg-white p-5 h-24 flex flex-col justify-between dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <div className="flex justify-between items-center">
+                    <div className="h-2.5 w-20 rounded shimmer-placeholder" />
+                    <div className="h-7 w-7 rounded shimmer-placeholder" />
+                  </div>
+                  <div className="h-5 w-16 rounded shimmer-placeholder" />
+                </div>
+              ))}
+            </div>
+
+            {/* List of files occupying storage table skeleton */}
+            <div className="rounded-3xl border border-slate-100 bg-white dark:border-slate-800 dark:bg-slate-900 overflow-hidden">
+              <div className="border-b border-slate-50 p-5 dark:border-slate-800/40">
+                <div className="h-4 w-44 rounded shimmer-placeholder" />
+              </div>
+              <div className="p-6 space-y-4">
+                {Array.from({ length: 3 }).map((_, idx) => (
+                  <div key={idx} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0 dark:border-slate-800/40">
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className="h-9 w-7 rounded shimmer-placeholder shrink-0" />
+                      <div className="space-y-2 flex-1">
+                        <div className="h-3.5 w-1/3 rounded shimmer-placeholder" />
+                        <div className="h-2.5 w-20 rounded shimmer-placeholder" />
+                      </div>
+                    </div>
+                    <div className="h-3 w-16 rounded shimmer-placeholder" />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Upgrade banner skeleton */}
+            <div className="rounded-3xl bg-slate-100 dark:bg-slate-900/60 p-6 h-28 flex items-center justify-between">
+              <div className="space-y-2.5 w-2/3">
+                <div className="h-2.5 w-20 rounded shimmer-placeholder" />
+                <div className="h-4 w-48 rounded shimmer-placeholder" />
+                <div className="h-3 w-full rounded shimmer-placeholder" />
+              </div>
+              <div className="h-10 w-28 rounded-xl shimmer-placeholder shrink-0" />
+            </div>
           </motion.div>
         ) : books.length === 0 ? (
           <motion.div
@@ -313,6 +380,6 @@ export const StoragePage: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </PageWrapper>
   )
 }
