@@ -32,6 +32,8 @@ import { booksService, type Book } from '../../services/books'
 import { notesService, type Note } from '../../services/notes'
 import { notificationsService } from '../../services/notifications'
 import { Document, Page, pdfjs } from 'react-pdf'
+import 'react-pdf/dist/Page/TextLayer.css'
+
 
 // Set react-pdf worker source to CDN worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
@@ -480,16 +482,51 @@ export const ReaderPage: React.FC = () => {
     localStorage.setItem('librovia-reader-theme', theme)
   }, [theme])
 
-  // Close selection toolbar when selection disappears
+  // Close selection toolbar when clicking elsewhere or clearing selection
   useEffect(() => {
-    const handleSelectionChange = () => {
+    const handleGlobalClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      // Do not clear if clicking inside the floating toolbar
+      if (target.closest('.floating-ai-toolbar')) {
+        return
+      }
+      
+      // Let selection state settle
+      setTimeout(() => {
+        const selection = window.getSelection()
+        if (!selection || selection.isCollapsed || !selection.toString().trim()) {
+          setFloatingToolbarPos(null)
+        }
+      }, 100)
+    }
+
+    document.addEventListener('mouseup', handleGlobalClick)
+    return () => document.removeEventListener('mouseup', handleGlobalClick)
+  }, [])
+
+  // Keep floating selection toolbar position updated during container/window scrolls
+  useEffect(() => {
+    const handleScroll = () => {
       const selection = window.getSelection()
-      if (!selection || selection.isCollapsed || !selection.toString().trim()) {
-        setFloatingToolbarPos(null)
+      if (selection && !selection.isCollapsed && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0)
+        const rect = range.getBoundingClientRect()
+        setFloatingToolbarPos({
+          top: rect.top - 55,
+          left: rect.left + rect.width / 2 - 120,
+        })
       }
     }
-    document.addEventListener('selectionchange', handleSelectionChange)
-    return () => document.removeEventListener('selectionchange', handleSelectionChange)
+    // Listen to scrolling on the PDF viewer container
+    const pdfViewer = containerRef.current?.parentElement
+    if (pdfViewer) {
+      pdfViewer.addEventListener('scroll', handleScroll)
+    }
+    window.addEventListener('scroll', handleScroll)
+    return () => {
+      if (pdfViewer) pdfViewer.removeEventListener('scroll', handleScroll)
+      window.removeEventListener('scroll', handleScroll)
+    }
   }, [])
 
   // Fullscreen event listener sync
@@ -593,6 +630,10 @@ export const ReaderPage: React.FC = () => {
           e.preventDefault()
           handleFullscreenToggle()
           break
+        case 'Escape':
+          window.getSelection()?.removeAllRanges()
+          setFloatingToolbarPos(null)
+          break
         default:
           break
       }
@@ -620,8 +661,8 @@ export const ReaderPage: React.FC = () => {
     const range = selection.getRangeAt(0)
     const rect = range.getBoundingClientRect()
     setFloatingToolbarPos({
-      top: rect.top + window.scrollY - 55,
-      left: rect.left + window.scrollX + rect.width / 2 - 80,
+      top: rect.top - 55,
+      left: rect.left + rect.width / 2 - 120,
     })
     setModalHighlightText(selection.toString().trim())
   }
@@ -1843,11 +1884,11 @@ export const ReaderPage: React.FC = () => {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 10 }}
             style={{
-              position: 'absolute',
+              position: 'fixed',
               top: floatingToolbarPos.top,
               left: floatingToolbarPos.left,
             }}
-            className="z-50 flex items-center gap-1 rounded-xl border border-slate-100 bg-slate-900/95 p-1 text-white shadow-2xl backdrop-blur-xs dark:border-slate-800"
+            className="floating-ai-toolbar z-50 flex items-center gap-1 rounded-xl border border-slate-100 bg-slate-900/95 p-1 text-white shadow-2xl backdrop-blur-xs dark:border-slate-800"
           >
             <button
               onClick={() => handleAiAction('explain')}
