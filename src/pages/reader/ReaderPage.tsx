@@ -95,6 +95,9 @@ export const ReaderPage: React.FC = () => {
   const [modalBookmark, setModalBookmark] = useState(false)
   const [modalTags, setModalTags] = useState<string[]>([])
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
+  const [isAddNotePopupOpen, setIsAddNotePopupOpen] = useState(false)
+  const [popupNoteTitle, setPopupNoteTitle] = useState('')
+  const [popupNoteText, setPopupNoteText] = useState('')
 
   // Right sidebar tab state & AI variables
   const [rightSidebarTab, setRightSidebarTab] = useState<'journal' | 'ai'>('journal')
@@ -138,30 +141,6 @@ export const ReaderPage: React.FC = () => {
     }
   }, [resize, stopResizing])
 
-  // AI helper actions trigger
-  const handleAiAction = async (action: AiActionType) => {
-    const selection = window.getSelection()?.toString().trim() || modalHighlightText
-    if (!selection) return
-
-    setSelectedTextForAi(selection)
-    setAiAction(action)
-    setAiLoading(true)
-    setAiError(null)
-    setAiResponse(null)
-    setRightSidebarTab('ai')
-    setRightSidebarOpen(true)
-    setFloatingToolbarPos(null)
-
-    try {
-      const result = await aiService.runAiAction(selection, action, 'en-US')
-      setAiResponse(result)
-    } catch (err: any) {
-      setAiError('AI is currently unavailable. Please try again.')
-    } finally {
-      setAiLoading(false)
-    }
-  }
-
   const handleAiActionDirect = async (textToUse: string, action: AiActionType) => {
     setAiAction(action)
     setAiLoading(true)
@@ -185,12 +164,83 @@ export const ReaderPage: React.FC = () => {
     showSuccess('AI response copied to clipboard!')
   }
 
-  const handleCopySelection = () => {
+  const handleOpenAddNotePopup = () => {
+    const selection = window.getSelection()?.toString().trim() || modalHighlightText
+    if (!selection) return
+    setPopupNoteTitle('')
+    setPopupNoteText('')
+    setIsAddNotePopupOpen(true)
+    setFloatingToolbarPos(null)
+  }
+
+  const handleSavePopupNote = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!id || !modalHighlightText.trim()) return
+
+    try {
+      const payload = {
+        bookId: id,
+        pageNumber: page,
+        noteTitle: popupNoteTitle.trim() || undefined,
+        noteText: popupNoteText.trim(),
+        highlightedText: modalHighlightText.trim(),
+        isBookmarked: false,
+        tags: [],
+        createdAt: new Date().toISOString(),
+      }
+      const saved = await notesService.saveNote(payload)
+      setBookNotes((prev) => [...prev, saved])
+      setIsAddNotePopupOpen(false)
+      window.getSelection()?.removeAllRanges()
+      showSuccess('Note saved successfully! 📝')
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const handleTriggerAskAi = () => {
+    const selection = window.getSelection()?.toString().trim() || modalHighlightText
+    if (!selection) return
+    setSelectedTextForAi(selection)
+    setAiAction(null)
+    setAiResponse(null)
+    setAiLoading(false)
+    setAiError(null)
+    setRightSidebarTab('ai')
+    setRightSidebarOpen(true)
+    setFloatingToolbarPos(null)
+    window.getSelection()?.removeAllRanges()
+  }
+
+  const handleQuickHighlight = async () => {
+    const selection = window.getSelection()?.toString().trim() || modalHighlightText
+    if (!id || !selection) return
+    try {
+      const payload = {
+        bookId: id,
+        pageNumber: page,
+        noteText: '',
+        highlightedText: selection,
+        isBookmarked: false,
+        tags: [],
+      }
+      const saved = await notesService.saveNote(payload)
+      setBookNotes((prev) => [...prev, saved])
+      window.getSelection()?.removeAllRanges()
+      setFloatingToolbarPos(null)
+      showSuccess('Text highlighted successfully! 🖍')
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const handleCopySelectionText = () => {
     const selection = window.getSelection()?.toString().trim() || modalHighlightText
     if (!selection) return
     navigator.clipboard.writeText(selection)
-    showSuccess('Selected text copied to clipboard!')
+    showSuccess('Copied successfully.')
     setFloatingToolbarPos(null)
+    window.getSelection()?.removeAllRanges()
   }
 
   // Sticky Notes states
@@ -537,6 +587,11 @@ export const ReaderPage: React.FC = () => {
     document.addEventListener('fullscreenchange', handleFullscreenChange)
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
   }, [])
+
+  // Hide selection toolbar on page changes
+  useEffect(() => {
+    setFloatingToolbarPos(null)
+  }, [page])
 
   // Auto layout fitting scale calculation logic
   const adjustScale = useCallback(() => {
@@ -998,7 +1053,7 @@ export const ReaderPage: React.FC = () => {
 
   return (
     <PageWrapper
-      className={`flex h-screen w-screen flex-col overflow-hidden font-sans transition-colors duration-300 select-none ${
+      className={`flex h-screen w-screen flex-col overflow-hidden font-sans transition-colors duration-300 ${
         theme === 'dark' ? 'bg-neutral-950 text-neutral-200' : 'bg-neutral-100 text-slate-800'
       }`}
     >
@@ -1760,77 +1815,128 @@ export const ReaderPage: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Response Block */}
-                  <div className="flex-1 overflow-y-auto p-5 space-y-4">
-                    {aiLoading ? (
-                      <div className="space-y-4 py-4">
-                        <span className="text-[10px] font-extrabold tracking-widest text-purple-650 animate-pulse uppercase block">
-                          ✨ Thinking...
+                  {!aiAction ? (
+                    /* Initial AI Action Picker */
+                    <div className="flex-1 flex flex-col justify-center p-6 space-y-4">
+                      <div className="text-center space-y-1">
+                        <span className="text-[10px] font-bold text-purple-600 uppercase tracking-widest block">
+                          ✨ Librovia AI
                         </span>
-                        <div className="space-y-2.5 animate-pulse">
-                          <div className="h-3 w-full rounded-md shimmer-placeholder bg-slate-100 dark:bg-slate-800" />
-                          <div className="h-3 w-[92%] rounded-md shimmer-placeholder bg-slate-100 dark:bg-slate-800" />
-                          <div className="h-3 w-[95%] rounded-md shimmer-placeholder bg-slate-100 dark:bg-slate-800" />
-                          <div className="h-3 w-[78%] rounded-md shimmer-placeholder bg-slate-100 dark:bg-slate-800" />
-                        </div>
+                        <p className="text-xs text-slate-400">
+                          Select an action to run on your selection
+                        </p>
                       </div>
-                    ) : aiError ? (
-                      <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-center">
-                        <span className="text-xs font-bold text-red-500">{aiError}</span>
+                      <div className="grid grid-cols-1 gap-2">
+                        {[
+                          { id: 'explain', label: '✨ Explain Selection', desc: 'Explain this text in simple language' },
+                          { id: 'summarize', label: '📝 Summarize Selection', desc: 'Create a concise summary of the text' },
+                          { id: 'key-points', label: '💡 Extract Key Points', desc: 'Pull out the main takeaways' },
+                          { id: 'simplify', label: '📚 Simplify Language', desc: 'Rewrite the selection for beginners' },
+                          { id: 'translate', label: '🌍 Translate Selection', desc: 'Translate selection into target languages' },
+                        ].map((act) => (
+                          <button
+                            key={act.id}
+                            onClick={() => {
+                              const text = selectedTextForAi || customAiText.trim()
+                              if (text) {
+                                setSelectedTextForAi(text)
+                                handleAiActionDirect(text, act.id as any)
+                              }
+                            }}
+                            disabled={!selectedTextForAi && !customAiText.trim()}
+                            className="w-full text-left rounded-xl border border-slate-100 hover:border-purple-200 bg-white hover:bg-purple-50/30 p-3 transition-all cursor-pointer dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-purple-950/15 disabled:opacity-40 disabled:pointer-events-none"
+                          >
+                            <span className="block text-xs font-bold text-slate-800 dark:text-white">
+                              {act.label}
+                            </span>
+                            <span className="block text-[10px] text-slate-400">
+                              {act.desc}
+                            </span>
+                          </button>
+                        ))}
                       </div>
-                    ) : aiResponse ? (
-                      <div className="prose prose-sm dark:prose-invert font-sans text-xs leading-relaxed text-slate-800 dark:text-slate-350 space-y-3">
-                        {aiResponse.split('\n').map((line, idx) => {
-                          if (line.startsWith('###')) {
-                            return (
-                              <h4 key={idx} className="text-xs font-black uppercase text-purple-650 tracking-wider pt-2">
-                                {line.replace('###', '')}
-                              </h4>
-                            )
-                          }
-                          if (line.startsWith('*')) {
-                            return (
-                              <li key={idx} className="list-disc pl-1 ml-4 text-slate-700 dark:text-slate-300">
-                                {line.replace('*', '').trim()}
-                              </li>
-                            )
-                          }
-                          if (line.startsWith('**')) {
-                            return (
-                              <p key={idx} className="font-semibold text-slate-900 dark:text-white">
-                                {line}
-                              </p>
-                            )
-                          }
-                          return (
-                            <p key={idx} className="text-slate-700 dark:text-slate-300">
-                              {line}
-                            </p>
-                          )
-                        })}
+                    </div>
+                  ) : (
+                    /* AI Thinking / Response Display */
+                    <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-slate-900">
+                      <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                        {aiLoading ? (
+                          <div className="space-y-4 py-4">
+                            <span className="text-[10px] font-extrabold tracking-widest text-purple-650 animate-pulse uppercase block">
+                              ✨ Thinking...
+                            </span>
+                            <div className="space-y-2.5 animate-pulse">
+                              <div className="h-3 w-full rounded-md shimmer-placeholder bg-slate-100 dark:bg-slate-800" />
+                              <div className="h-3 w-[92%] rounded-md shimmer-placeholder bg-slate-100 dark:bg-slate-800" />
+                              <div className="h-3 w-[95%] rounded-md shimmer-placeholder bg-slate-100 dark:bg-slate-800" />
+                              <div className="h-3 w-[78%] rounded-md shimmer-placeholder bg-slate-100 dark:bg-slate-800" />
+                            </div>
+                          </div>
+                        ) : aiError ? (
+                          <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-center">
+                            <span className="text-xs font-bold text-red-500">{aiError}</span>
+                          </div>
+                        ) : aiResponse ? (
+                          <div className="prose prose-sm dark:prose-invert font-sans text-xs leading-relaxed text-slate-800 dark:text-slate-350 space-y-3">
+                            {aiResponse.split('\n').map((line, idx) => {
+                              if (line.startsWith('###')) {
+                                return (
+                                  <h4 key={idx} className="text-xs font-black uppercase text-purple-650 tracking-wider pt-2">
+                                    {line.replace('###', '')}
+                                  </h4>
+                                )
+                              }
+                              if (line.startsWith('*')) {
+                                return (
+                                  <li key={idx} className="list-disc pl-1 ml-4 text-slate-700 dark:text-slate-300">
+                                    {line.replace('*', '').trim()}
+                                  </li>
+                                )
+                              }
+                              if (line.startsWith('**')) {
+                                return (
+                                  <p key={idx} className="font-semibold text-slate-900 dark:text-white">
+                                    {line}
+                                  </p>
+                                )
+                              }
+                              return (
+                                <p key={idx} className="text-slate-700 dark:text-slate-300">
+                                  {line}
+                                </p>
+                              )
+                            })}
+                          </div>
+                        ) : (
+                          <div className="py-12 text-center text-xs text-slate-400">
+                            No active AI prompts. Select an option to query AI.
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      <div className="py-12 text-center text-xs text-slate-400">
-                        No active AI prompts. Highlight text inside the book to trigger AI tools.
-                      </div>
-                    )}
-                  </div>
 
-                  {/* Footer controls inside AI Panel */}
-                  {aiResponse && !aiLoading && (
-                    <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex gap-2 shrink-0 bg-slate-50/20">
-                      <button
-                        onClick={handleCopyAiResponse}
-                        className="flex-1 cursor-pointer rounded-xl bg-purple-600 text-white font-bold text-xs py-2 transition-all hover:bg-purple-750 active:scale-95 text-center shadow-md"
-                      >
-                        Copy Output
-                      </button>
-                      <button
-                        onClick={() => handleAiAction(aiAction!)}
-                        className="cursor-pointer rounded-xl border border-slate-200 bg-white text-slate-700 font-bold text-xs py-2 px-3 transition-all hover:bg-slate-50 active:scale-95 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
-                      >
-                        Regenerate
-                      </button>
+                      {/* Footer controls inside AI Panel */}
+                      {aiResponse && !aiLoading && (
+                        <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex gap-2 shrink-0 bg-slate-50/20 dark:bg-slate-900/35">
+                          <button
+                            onClick={handleCopyAiResponse}
+                            className="flex-1 cursor-pointer rounded-xl bg-purple-600 text-white font-bold text-xs py-2 transition-all hover:bg-purple-750 active:scale-95 text-center shadow-md animate-fade-in"
+                          >
+                            Copy Output
+                          </button>
+                          <button
+                            onClick={() => handleAiActionDirect(selectedTextForAi, aiAction!)}
+                            className="cursor-pointer rounded-xl border border-slate-200 bg-white text-slate-700 font-bold text-xs py-2 px-3 transition-all hover:bg-slate-50 active:scale-95 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+                          >
+                            Regenerate
+                          </button>
+                          <button
+                            onClick={() => setAiAction(null)}
+                            className="cursor-pointer rounded-xl border border-slate-200 bg-white text-slate-700 font-bold text-xs py-2 px-3 transition-all hover:bg-slate-50 active:scale-95 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+                          >
+                            Back
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1891,37 +1997,31 @@ export const ReaderPage: React.FC = () => {
             className="floating-ai-toolbar z-50 flex items-center gap-1 rounded-xl border border-slate-100 bg-slate-900/95 p-1 text-white shadow-2xl backdrop-blur-xs dark:border-slate-800"
           >
             <button
-              onClick={() => handleAiAction('explain')}
+              onClick={handleOpenAddNotePopup}
               className="text-purple-300 flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase transition-colors hover:bg-white/10"
             >
-              ✨ Explain
+              📝 Add Note
             </button>
             <button
-              onClick={() => handleAiAction('summarize')}
+              onClick={handleTriggerAskAi}
               className="text-purple-300 flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase transition-colors hover:bg-white/10"
             >
-              📝 Summarize
+              ✨ Ask AI
             </button>
             <button
-              onClick={() => handleAiAction('key-points')}
-              className="text-purple-300 flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase transition-colors hover:bg-white/10"
+              onClick={handleQuickHighlight}
+              className="text-yellow-350 flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase transition-colors hover:bg-white/10"
             >
-              💡 Key Points
+              🖍 Highlight
             </button>
             <button
-              onClick={() => handleAiAction('simplify')}
-              className="text-purple-300 flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase transition-colors hover:bg-white/10"
+              onClick={toggleBookmark}
+              className="text-amber-300 flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase transition-colors hover:bg-white/10"
             >
-              📚 Simplify
+              🔖 Bookmark
             </button>
             <button
-              onClick={() => handleAiAction('translate')}
-              className="text-purple-300 flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase transition-colors hover:bg-white/10"
-            >
-              🌍 Translate
-            </button>
-            <button
-              onClick={handleCopySelection}
+              onClick={handleCopySelectionText}
               className="text-slate-300 flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase transition-colors hover:bg-white/10"
             >
               📋 Copy
@@ -2145,6 +2245,89 @@ export const ReaderPage: React.FC = () => {
               </form>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Slide Up Add Note Popup Modal */}
+      <AnimatePresence>
+        {isAddNotePopupOpen && (
+          <div className="fixed inset-0 z-999 flex items-center justify-center bg-slate-950/45 p-4 text-left backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, y: 50, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 50, scale: 0.98 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              className="w-full max-w-md rounded-3xl border border-slate-100 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900"
+            >
+              <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800/40">
+                <span className="text-[10px] font-black uppercase text-purple-650 tracking-widest">
+                  📝 Add Note (Page {page})
+                </span>
+                <button
+                  onClick={() => setIsAddNotePopupOpen(false)}
+                  className="cursor-pointer font-bold text-slate-400 hover:text-slate-600 text-xs"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleSavePopupNote} className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-extrabold uppercase text-slate-400 tracking-wider">
+                    Note Title
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Enter note title..."
+                    value={popupNoteTitle}
+                    onChange={(e) => setPopupNoteTitle(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-850 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500/25"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-extrabold uppercase text-slate-400 tracking-wider">
+                    Personal Thoughts & Notes
+                  </label>
+                  <textarea
+                    placeholder="Add your reading insights or annotations..."
+                    value={popupNoteText}
+                    onChange={(e) => setPopupNoteText(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-850 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500/25 font-sans"
+                    rows={4}
+                    required
+                  />
+                </div>
+
+                {modalHighlightText && (
+                  <div className="space-y-1 bg-slate-50/50 dark:bg-slate-800/20 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                    <span className="text-[8px] font-extrabold uppercase text-slate-400 tracking-wider">
+                      Selected Text
+                    </span>
+                    <p className="line-clamp-3 font-serif text-[10px] leading-relaxed italic text-slate-500 dark:text-slate-400 border-l-2 border-purple-400 pl-2">
+                      "{modalHighlightText}"
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddNotePopupOpen(false)}
+                    className="cursor-pointer text-xs font-bold text-slate-500 hover:text-slate-700 border border-slate-200 rounded-xl px-4 py-2 hover:bg-slate-50 dark:border-slate-850 dark:hover:bg-slate-800"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="cursor-pointer text-xs font-bold text-white bg-purple-600 rounded-xl px-5 py-2 hover:bg-purple-750 active:scale-95 transition-all shadow-md shadow-purple-600/10"
+                  >
+                    Save
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
