@@ -113,16 +113,23 @@ export const SettingsPage: React.FC = () => {
                   <button
                     key={item.id}
                     onClick={() => setActiveTab(item.id)}
-                    className={`group flex w-full cursor-pointer items-center gap-2.5 rounded-xl p-2.5 text-left text-xs font-bold tracking-wider uppercase transition-all ${
+                    className={`group relative flex w-full cursor-pointer items-center gap-2.5 rounded-xl p-2.5 text-left text-xs font-bold tracking-wider uppercase transition-all ${
                       activeTab === item.id
                         ? 'bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400'
                         : 'text-text-sub hover:bg-bg-app hover:text-text-main'
                     } `}
                   >
+                    {activeTab === item.id && (
+                      <motion.div
+                        layoutId="settings-active-indicator"
+                        transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                        className="bg-primary-600 absolute top-2.5 bottom-2.5 left-0 w-1 rounded-r-full"
+                      />
+                    )}
                     <item.icon
-                      className={`h-4.5 w-4.5 ${activeTab === item.id ? 'text-primary-600 dark:text-primary-400' : 'text-text-muted group-hover:text-text-main'}`}
+                      className={`h-4.5 w-4.5 z-10 ${activeTab === item.id ? 'text-primary-600 dark:text-primary-400' : 'text-text-muted group-hover:text-text-main'}`}
                     />
-                    <span>{item.label}</span>
+                    <span className="z-10">{item.label}</span>
                   </button>
                 ))}
               </div>

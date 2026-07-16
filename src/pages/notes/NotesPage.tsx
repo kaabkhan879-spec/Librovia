@@ -26,6 +26,22 @@ export const NotesPage: React.FC = () => {
   const [notes, setNotes] = useState<Note[]>([])
   const [books, setBooks] = useState<Book[]>([])
   const [loading, setLoading] = useState(true)
+  const searchBarRef = React.useRef<HTMLInputElement>(null)
+
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        const activeElem = document.activeElement
+        if (activeElem && (activeElem.tagName === 'INPUT' || activeElem.tagName === 'TEXTAREA')) {
+          return
+        }
+        e.preventDefault()
+        searchBarRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   // Filters & Sorting
   const [searchQuery, setSearchQuery] = useState('')
@@ -251,12 +267,18 @@ export const NotesPage: React.FC = () => {
                   <div className="relative w-full">
                     <Search className="absolute top-2.5 left-3.5 h-4.5 w-4.5 text-slate-400" />
                     <input
+                      ref={searchBarRef}
                       type="text"
-                      placeholder="Search note contents..."
+                      placeholder="Search note contents... (Ctrl + K)"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 py-2 pr-4 pl-10 text-xs font-semibold text-slate-900 placeholder-slate-400 outline-hidden transition-all focus:border-purple-650 focus:bg-white dark:border-slate-800 dark:bg-slate-800/40 dark:text-white"
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 py-2 pr-12 pl-10 text-xs font-semibold text-slate-900 placeholder-slate-400 outline-hidden transition-all focus:border-purple-650 focus:bg-white focus:shadow-md dark:border-slate-800 dark:bg-slate-800/40 dark:text-white"
                     />
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                      <kbd className="inline-flex items-center gap-0.5 rounded border border-slate-100 bg-white/90 px-1.5 font-sans text-[8px] font-bold text-slate-400 shadow-2xs dark:border-slate-850 dark:bg-slate-905">
+                        <span className="text-[9px]">⌘</span>K
+                      </kbd>
+                    </div>
                   </div>
 
                   <div className="flex gap-2">

@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { NavLink, Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { ROUTES } from '../../constants/routes'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   BookOpen,
   LayoutDashboard,
@@ -126,7 +126,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {({ isActive }) => (
                   <>
                     <item.icon className="h-5 w-5 shrink-0" />
-                    {!isCollapsed && <span>{item.name}</span>}
+                    <AnimatePresence>
+                      {!isCollapsed && (
+                        <motion.span
+                          initial={{ opacity: 0, width: 0 }}
+                          animate={{ opacity: 1, width: 'auto' }}
+                          exit={{ opacity: 0, width: 0 }}
+                          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                          className="overflow-hidden whitespace-nowrap"
+                        >
+                          {item.name}
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
                     {/* Visual indicator bar on hover/active */}
                     {isActive && (
                       <motion.div

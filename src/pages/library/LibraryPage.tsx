@@ -61,6 +61,22 @@ export const LibraryPage: React.FC = () => {
   const [movingCollectionId, setMovingCollectionId] = useState('')
 
   const menuRef = useRef<HTMLDivElement | null>(null)
+  const searchBarRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        const activeElem = document.activeElement
+        if (activeElem && (activeElem.tagName === 'INPUT' || activeElem.tagName === 'TEXTAREA')) {
+          return
+        }
+        e.preventDefault()
+        searchBarRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   const fetchBooksAndCollections = useCallback(() => {
     Promise.all([booksService.getBooks(), collectionsService.getCollections()]).then(
@@ -262,47 +278,32 @@ export const LibraryPage: React.FC = () => {
       </div>
 
       {/* Tab Selectors */}
-      <div className="border-border-base flex gap-2 border-b pb-1">
-        <button
-          onClick={() => setActiveTab('all')}
-          className={`cursor-pointer border-b-2 px-4 py-2 text-xs font-bold tracking-wider uppercase transition-all ${
-            activeTab === 'all'
-              ? 'border-purple-650 text-purple-650'
-              : 'border-transparent text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          All
-        </button>
-        <button
-          onClick={() => setActiveTab('favorites')}
-          className={`cursor-pointer border-b-2 px-4 py-2 text-xs font-bold tracking-wider uppercase transition-all ${
-            activeTab === 'favorites'
-              ? 'border-purple-650 text-purple-650'
-              : 'border-transparent text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          Favorites ⭐
-        </button>
-        <button
-          onClick={() => setActiveTab('reading')}
-          className={`cursor-pointer border-b-2 px-4 py-2 text-xs font-bold tracking-wider uppercase transition-all ${
-            activeTab === 'reading'
-              ? 'border-purple-650 text-purple-650'
-              : 'border-transparent text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          Reading 📖
-        </button>
-        <button
-          onClick={() => setActiveTab('completed')}
-          className={`cursor-pointer border-b-2 px-4 py-2 text-xs font-bold tracking-wider uppercase transition-all ${
-            activeTab === 'completed'
-              ? 'border-purple-650 text-purple-650'
-              : 'border-transparent text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          Completed ✅
-        </button>
+      <div className="flex rounded-2xl bg-slate-100 p-1.5 dark:bg-slate-900/60 max-w-lg self-start">
+        {([
+          { id: 'all', label: 'All Books' },
+          { id: 'favorites', label: 'Favorites ⭐' },
+          { id: 'reading', label: 'Reading 📖' },
+          { id: 'completed', label: 'Completed ✅' }
+        ] as const).map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`relative rounded-xl px-4 py-2 text-xs font-bold transition-all duration-200 cursor-pointer ${
+              activeTab === tab.id
+                ? 'text-purple-650 dark:text-purple-400'
+                : 'text-slate-500 hover:text-slate-750 dark:text-slate-450 dark:hover:text-slate-200'
+            }`}
+          >
+            <span className="relative z-10">{tab.label}</span>
+            {activeTab === tab.id && (
+              <motion.div
+                layoutId="library-active-tab"
+                transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                className="absolute inset-0 rounded-xl bg-white shadow-sm dark:bg-slate-800"
+              />
+            )}
+          </button>
+        ))}
       </div>
 
       <AnimatePresence mode="wait">
@@ -371,12 +372,18 @@ export const LibraryPage: React.FC = () => {
                 <div className="relative w-full max-w-xs shrink-0">
                   <Search className="absolute top-2.5 left-3.5 h-4.5 w-4.5 text-slate-400" />
                   <input
+                    ref={searchBarRef}
                     type="text"
-                    placeholder="Search Books..."
+                    placeholder="Search books, authors... (Ctrl + K)"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 py-2 pr-4 pl-10 text-xs font-semibold text-slate-900 placeholder-slate-400 outline-hidden transition-all focus:border-purple-600 focus:bg-white dark:border-slate-800 dark:bg-slate-800/40 dark:text-white"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 py-2 pr-12 pl-10 text-xs font-semibold text-slate-900 placeholder-slate-400 outline-hidden transition-all focus:border-purple-600 focus:bg-white focus:shadow-md dark:border-slate-800 dark:bg-slate-800/40 dark:text-white"
                   />
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                    <kbd className="inline-flex items-center gap-0.5 rounded border border-slate-100 bg-white/90 px-1.5 font-sans text-[8px] font-bold text-slate-400 shadow-2xs dark:border-slate-850 dark:bg-slate-905">
+                      <span className="text-[9px]">⌘</span>K
+                    </kbd>
+                  </div>
                 </div>
 
                 {/* Collection Filter */}

@@ -89,11 +89,17 @@ export const DashboardPage: React.FC = () => {
   )
 
   // --- DYNAMIC GREETING ---
-  const dynamicGreeting = useMemo(() => {
+  const { dynamicGreeting, greetingIcon } = useMemo(() => {
     const hour = new Date().getHours()
-    if (hour < 12) return 'Good Morning'
-    if (hour < 17) return 'Good Afternoon'
-    return 'Good Evening'
+    if (hour >= 5 && hour < 12) {
+      return { dynamicGreeting: 'Good morning', greetingIcon: '🌅' }
+    } else if (hour >= 12 && hour < 17) {
+      return { dynamicGreeting: 'Good afternoon', greetingIcon: '☀️' }
+    } else if (hour >= 17 && hour < 22) {
+      return { dynamicGreeting: 'Good evening', greetingIcon: '🌇' }
+    } else {
+      return { dynamicGreeting: 'Good night', greetingIcon: '🌙' }
+    }
   }, [])
 
   // --- STREAK & LOGS CALCULATIONS ---
@@ -410,21 +416,46 @@ export const DashboardPage: React.FC = () => {
                 ================================================== */}
             <motion.div
               variants={itemVariants}
-              className="relative overflow-hidden rounded-[28px] bg-gradient-to-r from-[#5f27cd] via-[#341f97] to-[#1e272e] p-6 text-white shadow-xl sm:p-8"
+              className="relative overflow-hidden rounded-[32px] border border-white/10 bg-gradient-to-br from-purple-900/60 via-indigo-950/70 to-slate-900/60 p-8 text-white shadow-2xl backdrop-blur-xl sm:p-10"
             >
-              {/* Decorative glows */}
-              <div className="absolute -top-16 -right-16 h-80 w-80 rounded-full bg-purple-500/20 blur-3xl" />
-              <div className="absolute -bottom-20 -left-20 h-80 w-80 rounded-full bg-indigo-500/20 blur-3xl" />
+              {/* Glowing animated background blobs */}
+              <motion.div
+                animate={{
+                  x: [0, 15, -10, 0],
+                  y: [0, -20, 15, 0],
+                  scale: [1, 1.1, 0.95, 1],
+                }}
+                transition={{
+                  duration: 8,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+                className="absolute -top-20 -right-20 h-96 w-96 rounded-full bg-purple-500/20 blur-3xl pointer-events-none"
+              />
+              <motion.div
+                animate={{
+                  x: [0, -15, 10, 0],
+                  y: [0, 20, -15, 0],
+                  scale: [1, 0.9, 1.05, 1],
+                }}
+                transition={{
+                  duration: 10,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+                className="absolute -bottom-24 -left-24 h-96 w-96 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none"
+              />
 
               <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-                <div className="min-w-0 flex-1 space-y-3.5">
-                  <div className="space-y-1">
+                <div className="min-w-0 flex-1 space-y-4">
+                  <div className="space-y-1.5">
                     <span className="flex items-center gap-1.5 text-[9px] font-extrabold tracking-widest text-purple-300 uppercase">
-                      <Sparkles className="h-3 w-3 shrink-0" />
+                      <Sparkles className="h-3.5 w-3.5 shrink-0" />
                       Workspace Home
                     </span>
-                    <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
-                      {dynamicGreeting}, {user?.displayName || 'Reader'}
+                    <h1 className="text-3xl font-black tracking-tight sm:text-4xl flex items-center gap-3">
+                      <span className="animate-pulse">{greetingIcon}</span>
+                      <span>{dynamicGreeting}, {user?.displayName || 'Reader'}</span>
                     </h1>
                   </div>
 
@@ -516,21 +547,28 @@ export const DashboardPage: React.FC = () => {
                   </h3>
 
                   {continueReadingBook ? (
-                    <div className="group flex flex-col items-start gap-6 rounded-3xl border border-slate-100 bg-white p-6 shadow-sm transition-all duration-300 hover:border-purple-500/20 hover:shadow-md sm:flex-row sm:items-center dark:border-slate-800 dark:bg-slate-900">
+                    <div className="group premium-card relative flex flex-col justify-between overflow-hidden rounded-[28px] border border-slate-100/80 bg-white/70 p-6 shadow-sm backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-900/70 md:flex-row md:items-center gap-6">
                       <div className="flex min-w-0 flex-1 items-start gap-6">
                         <div className="relative shrink-0">
                           <img
                             src={continueReadingBook.coverPath}
                             alt={continueReadingBook.title}
-                            className="border-slate-150 aspect-[0.7/1] w-24 rounded-2xl border object-cover shadow-md transition-transform duration-300 group-hover:scale-[1.02] group-hover:-rotate-1 dark:border-slate-800"
+                            className="aspect-[0.7/1] w-28 rounded-2xl border border-slate-200/60 object-cover shadow-lg transition-all duration-300 group-hover:scale-[1.04] group-hover:-rotate-1 dark:border-slate-800/60"
                           />
                           <div className="pointer-events-none absolute inset-0 rounded-2xl shadow-inner" />
                         </div>
                         <div className="min-w-0 flex-1 space-y-2.5">
-                          <span className="text-purple-750 inline-block rounded bg-purple-50 px-2 py-0.5 text-[8px] font-bold tracking-wider uppercase dark:bg-purple-950/30 dark:text-purple-400">
-                            {getCollectionName(continueReadingBook.collectionId)}
-                          </span>
-                          <h4 className="truncate text-base font-extrabold text-slate-950 dark:text-white">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-purple-750 inline-block rounded bg-purple-50 px-2.5 py-0.5 text-[8.5px] font-bold tracking-wider uppercase dark:bg-purple-950/30 dark:text-purple-400">
+                              {getCollectionName(continueReadingBook.collectionId)}
+                            </span>
+                            {continueReadingBook.lastReadAt && (
+                              <span className="text-[9px] text-slate-400 font-semibold">
+                                Opened {new Date(continueReadingBook.lastReadAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            )}
+                          </div>
+                          <h4 className="truncate text-lg font-black tracking-tight text-slate-950 dark:text-white">
                             {continueReadingBook.title}
                           </h4>
                           <p className="truncate text-xs font-semibold text-slate-500 dark:text-slate-400">
@@ -547,12 +585,13 @@ export const DashboardPage: React.FC = () => {
                             </div>
                             <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                               <div
-                                className="to-indigo-650 h-full rounded-full bg-gradient-to-r from-purple-500 transition-all duration-500"
+                                className="progress-bar-fill to-indigo-650 h-full rounded-full bg-gradient-to-r from-purple-500"
                                 style={{ width: `${continueReadingBook.progress}%` }}
                               />
                             </div>
-                            <p className="text-[8.5px] font-bold text-purple-600 dark:text-purple-400">
-                              ⏱ {pagesRemaining} pages left • {estTimeStr}
+                            <p className="text-[9px] font-extrabold text-purple-600 dark:text-purple-400 flex items-center gap-1">
+                              <span>⏱</span>
+                              <span>{pagesRemaining} pages remaining • approx. {estTimeStr}</span>
                             </p>
                           </div>
                         </div>
@@ -564,9 +603,9 @@ export const DashboardPage: React.FC = () => {
                           className="w-full sm:w-auto"
                         >
                           <Button
-                            size="sm"
-                            className="bg-purple-650 w-full rounded-xl font-bold text-white shadow-xs transition-all hover:bg-purple-700 sm:w-auto"
-                            leftIcon={<Play className="h-3.5 w-3.5 fill-current stroke-current" />}
+                            size="md"
+                            className="bg-purple-650 w-full rounded-2xl font-bold text-white shadow-md hover:bg-purple-700 sm:w-auto"
+                            leftIcon={<Play className="h-4 w-4 fill-current stroke-current" />}
                           >
                             Resume Study
                           </Button>
@@ -674,7 +713,7 @@ export const DashboardPage: React.FC = () => {
                       Recent Notes
                     </h3>
                     <Link
-                      to={ROUTES.PROFILE}
+                      to={ROUTES.NOTES}
                       className="hover:text-purple-750 text-[10px] font-extrabold tracking-wider text-purple-600 uppercase"
                     >
                       View All
