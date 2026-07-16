@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { PageWrapper } from '../../components/common/PageWrapper'
 import { ROUTES } from '../../constants/routes'
 import { useToast } from '../../context/ToastContext'
+import { aiService, type AiActionType } from '../../services/ai'
+
 
 import {
   ArrowLeft,
@@ -25,7 +27,6 @@ import {
   CheckCircle,
   Edit2,
   Plus,
-  Copy,
 } from 'lucide-react'
 import { booksService, type Book } from '../../services/books'
 import { notesService, type Note } from '../../services/notes'
@@ -46,7 +47,7 @@ export const ReaderPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const [searchParams] = useSearchParams()
   const pageParam = searchParams.get('page')
-  const { showInfo } = useToast()
+  const { showInfo, showSuccess } = useToast()
 
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -92,6 +93,103 @@ export const ReaderPage: React.FC = () => {
   const [modalBookmark, setModalBookmark] = useState(false)
   const [modalTags, setModalTags] = useState<string[]>([])
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
+
+  // Right sidebar tab state & AI variables
+  const [rightSidebarTab, setRightSidebarTab] = useState<'journal' | 'ai'>('journal')
+  const [selectedTextForAi, setSelectedTextForAi] = useState('')
+  const [customAiText, setCustomAiText] = useState('')
+  const [aiAction, setAiAction] = useState<AiActionType | null>(null)
+  const [aiResponse, setAiResponse] = useState<string | null>(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+  const [sidebarWidth, setSidebarWidth] = useState(320)
+
+  const isResizingRef = useRef(false)
+
+  const startResizing = useCallback((mouseDownEvent: React.MouseEvent) => {
+    mouseDownEvent.preventDefault()
+    isResizingRef.current = true
+    document.body.style.cursor = 'ew-resize'
+    document.body.style.userSelect = 'none'
+  }, [])
+
+  const stopResizing = useCallback(() => {
+    isResizingRef.current = false
+    document.body.style.cursor = 'default'
+    document.body.style.userSelect = 'auto'
+  }, [])
+
+  const resize = useCallback((mouseMoveEvent: MouseEvent) => {
+    if (!isResizingRef.current) return
+    const newWidth = window.innerWidth - mouseMoveEvent.clientX
+    if (newWidth >= 280 && newWidth <= 600) {
+      setSidebarWidth(newWidth)
+    }
+  }, [])
+
+  useEffect(() => {
+    window.addEventListener('mousemove', resize)
+    window.addEventListener('mouseup', stopResizing)
+    return () => {
+      window.removeEventListener('mousemove', resize)
+      window.removeEventListener('mouseup', stopResizing)
+    }
+  }, [resize, stopResizing])
+
+  // AI helper actions trigger
+  const handleAiAction = async (action: AiActionType) => {
+    const selection = window.getSelection()?.toString().trim() || modalHighlightText
+    if (!selection) return
+
+    setSelectedTextForAi(selection)
+    setAiAction(action)
+    setAiLoading(true)
+    setAiError(null)
+    setAiResponse(null)
+    setRightSidebarTab('ai')
+    setRightSidebarOpen(true)
+    setFloatingToolbarPos(null)
+
+    try {
+      const result = await aiService.runAiAction(selection, action, 'en-US')
+      setAiResponse(result)
+    } catch (err: any) {
+      setAiError('AI is currently unavailable. Please try again.')
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
+  const handleAiActionDirect = async (textToUse: string, action: AiActionType) => {
+    setAiAction(action)
+    setAiLoading(true)
+    setAiError(null)
+    setAiResponse(null)
+
+    try {
+      const result = await aiService.runAiAction(textToUse, action, 'en-US')
+      setAiResponse(result)
+    } catch (err: any) {
+      setAiError('AI is currently unavailable. Please try again.')
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
+  const handleCopyAiResponse = () => {
+    if (!aiResponse) return
+    const cleanText = aiResponse.replace(/[#*`]/g, '')
+    navigator.clipboard.writeText(cleanText)
+    showSuccess('AI response copied to clipboard!')
+  }
+
+  const handleCopySelection = () => {
+    const selection = window.getSelection()?.toString().trim() || modalHighlightText
+    if (!selection) return
+    navigator.clipboard.writeText(selection)
+    showSuccess('Selected text copied to clipboard!')
+    setFloatingToolbarPos(null)
+  }
 
   // Sticky Notes states
   const [stickyNotePromptPos, setStickyNotePromptPos] = useState<{
@@ -598,36 +696,7 @@ export const ReaderPage: React.FC = () => {
     window.getSelection()?.removeAllRanges()
   }
 
-  // Quick Highlights creation
-  const handleQuickHighlight = async () => {
-    if (!id || !modalHighlightText.trim()) return
-    try {
-      const payload = {
-        bookId: id,
-        pageNumber: page,
-        noteText: '',
-        rating: undefined,
-        highlightedText: modalHighlightText.trim(),
-        isBookmarked: false,
-        tags: [],
-      }
-      const saved = await notesService.saveNote(payload)
-      setBookNotes((prev) => [...prev, saved])
-      window.getSelection()?.removeAllRanges()
-      setFloatingToolbarPos(null)
-      showNotification('Text highlighted! 🖍')
-    } catch (err) {
-      console.error(err)
-    }
-  }
 
-  const handleQuickCopy = () => {
-    if (!modalHighlightText.trim()) return
-    navigator.clipboard.writeText(modalHighlightText)
-    window.getSelection()?.removeAllRanges()
-    setFloatingToolbarPos(null)
-    showNotification('Text copied! 📋')
-  }
 
   // Sticky Note click detector on page
   const handlePageClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -1455,135 +1524,276 @@ export const ReaderPage: React.FC = () => {
           </button>
         </div>
 
-        {/* Collapsible Right Sidebar: 📒 Reading Journal */}
+        {/* Collapsible Right Sidebar: 📒 Reading Journal / ✨ Notion AI */}
         <AnimatePresence>
           {rightSidebarOpen && (
             <motion.div
               initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 280, opacity: 1 }}
+              animate={{ width: sidebarWidth, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
-              className="relative z-10 flex w-70 flex-col overflow-y-auto border-l border-slate-100 bg-white text-left transition-all duration-300 dark:border-slate-800 dark:bg-slate-900"
+              className="relative z-10 flex flex-col border-l border-slate-100 bg-white text-left transition-all duration-300 dark:border-slate-800 dark:bg-slate-900 h-full shrink-0 overflow-hidden"
             >
+              {/* Resize Handle */}
+              <div
+                onMouseDown={startResizing}
+                className="absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-purple-500/30 transition-colors z-30"
+              />
+
               <div className="dark:bg-slate-850 flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50/45 px-4 py-3 dark:border-slate-800">
-                <span className="flex items-center gap-1.5 text-[10px] font-bold tracking-widest text-purple-600 uppercase">
-                  <Bookmark className="h-4 w-4" />
-                  Reading Journal
-                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setRightSidebarTab('journal')}
+                    className={`text-[9px] font-extrabold tracking-widest uppercase py-1 px-2.5 rounded-lg transition-all ${
+                      rightSidebarTab === 'journal'
+                        ? 'bg-purple-50 text-purple-650 dark:bg-purple-950/20 dark:text-purple-400 font-black'
+                        : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    Journal
+                  </button>
+                  <button
+                    onClick={() => setRightSidebarTab('ai')}
+                    className={`text-[9px] font-extrabold tracking-widest uppercase py-1 px-2.5 rounded-lg transition-all ${
+                      rightSidebarTab === 'ai'
+                        ? 'bg-purple-50 text-purple-650 dark:bg-purple-950/20 dark:text-purple-400 font-black'
+                        : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    ✨ Ask AI
+                  </button>
+                </div>
                 <button
                   onClick={() => setRightSidebarOpen(false)}
-                  className="animate-pulse cursor-pointer font-bold text-slate-400 hover:animate-none hover:text-slate-600"
+                  className="cursor-pointer font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm"
                 >
                   ✕
                 </button>
               </div>
 
-              <div className="flex-1 space-y-4 p-4">
-                {bookNotes.length === 0 ? (
-                  <p className="py-8 text-center text-[10px] leading-relaxed text-slate-400">
-                    No annotations saved. Select text on a page to highlight or click "+ Add Note"
-                    inside the panel.
-                  </p>
-                ) : (
-                  bookNotes.map((n) => (
-                    <div
-                      key={n.id}
-                      onClick={() => setPage(n.pageNumber)}
-                      className={`hover:border-purple-550/35 cursor-pointer space-y-2 rounded-2xl border border-slate-100 bg-slate-50/40 p-3 text-xs shadow-xs transition-all hover:bg-white dark:border-slate-800 dark:bg-slate-950/20 ${
-                        n.pageNumber === page
-                          ? 'border-purple-500/40 bg-white ring-1 ring-purple-500/10'
-                          : ''
-                      }`}
-                    >
-                      <div className="text-purple-655 flex items-center justify-between text-[9px] font-extrabold uppercase">
-                        <span className="flex items-center gap-1">
-                          {n.xPosition !== undefined ? '📌 Sticky Note' : '📄 Page Note'} (p.{' '}
-                          {n.pageNumber})
-                        </span>
-                        {n.isBookmarked && (
-                          <Bookmark className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+              {rightSidebarTab === 'journal' ? (
+                <div className="flex-1 space-y-4 p-4 overflow-y-auto">
+                  {bookNotes.length === 0 ? (
+                    <p className="py-8 text-center text-[10px] leading-relaxed text-slate-400">
+                      No annotations saved. Select text on a page to highlight or click "+ Add Note"
+                      inside the panel.
+                    </p>
+                  ) : (
+                    bookNotes.map((n) => (
+                      <div
+                        key={n.id}
+                        onClick={() => setPage(n.pageNumber)}
+                        className={`hover:border-purple-550/35 cursor-pointer space-y-2 rounded-2xl border border-slate-100 bg-slate-50/40 p-3 text-xs shadow-xs transition-all hover:bg-white dark:border-slate-800 dark:bg-slate-950/20 ${
+                          n.pageNumber === page
+                            ? 'border-purple-500/40 bg-white ring-1 ring-purple-500/10'
+                            : ''
+                        }`}
+                      >
+                        <div className="text-purple-655 flex items-center justify-between text-[9px] font-extrabold uppercase">
+                          <span className="flex items-center gap-1">
+                            {n.xPosition !== undefined ? '📌 Sticky Note' : '📄 Page Note'} (p.{' '}
+                            {n.pageNumber})
+                          </span>
+                          {n.isBookmarked && (
+                            <Bookmark className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                          )}
+                        </div>
+
+                        {n.noteTitle && (
+                          <h4 className="truncate text-[11px] font-bold text-slate-900 dark:text-white">
+                            {n.noteTitle}
+                          </h4>
                         )}
-                      </div>
 
-                      {n.noteTitle && (
-                        <h4 className="truncate text-[11px] font-bold text-slate-900 dark:text-white">
-                          {n.noteTitle}
-                        </h4>
-                      )}
+                        {n.rating && (
+                          <div className="flex gap-0.5 text-amber-400">
+                            {Array.from({ length: 5 }).map((_, idx) => (
+                              <Star
+                                key={idx}
+                                className={`h-3 w-3 ${idx < n.rating! ? 'fill-current' : 'text-slate-200 dark:text-slate-800'}`}
+                              />
+                            ))}
+                          </div>
+                        )}
 
-                      {n.rating && (
-                        <div className="flex gap-0.5 text-amber-400">
-                          {Array.from({ length: 5 }).map((_, idx) => (
-                            <Star
-                              key={idx}
-                              className={`h-3 w-3 ${idx < n.rating! ? 'fill-current' : 'text-slate-200 dark:text-slate-800'}`}
-                            />
-                          ))}
+                        {n.highlightedText && (
+                          <p className="line-clamp-3 border-l-2 border-purple-400 bg-slate-50 py-0.5 pl-2 font-serif text-[9px] leading-relaxed italic dark:bg-slate-800">
+                            "{n.highlightedText}"
+                          </p>
+                        )}
+
+                        {n.noteText && (
+                          <p className="leading-relaxed font-semibold text-slate-800 dark:text-slate-200">
+                            {n.noteText}
+                          </p>
+                        )}
+
+                        {n.tags && n.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {n.tags.map((t) => (
+                              <span
+                                key={t}
+                                className="rounded bg-slate-100 px-1.5 py-0.5 text-[8px] font-bold tracking-wider text-slate-500 uppercase dark:bg-slate-800 dark:text-slate-400"
+                              >
+                                {t}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="dark:border-slate-850 flex shrink-0 justify-end gap-2 border-t border-slate-50 pt-2 text-[10px] font-bold tracking-wider uppercase">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setEditingNoteId(n.id)
+                              setModalNoteTitle(n.noteTitle || '')
+                              setModalRating(n.rating)
+                              setModalNoteText(n.noteText)
+                              setModalHighlightText(n.highlightedText || '')
+                              setModalBookmark(n.isBookmarked)
+                              setModalTags(n.tags)
+                              if (n.xPosition !== undefined) {
+                                setStickyNotePromptPos({
+                                  top: 0,
+                                  left: 0,
+                                  percentX: n.xPosition,
+                                  percentY: n.yPosition || 0,
+                                })
+                              } else {
+                                setStickyNotePromptPos(null)
+                              }
+                              setIsNotesModalOpen(true)
+                            }}
+                            className="hover:text-slate-655 text-slate-400"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={(e) => handleDeleteNote(n.id, e)}
+                            className="text-slate-400 hover:text-red-500"
+                          >
+                            Delete
+                          </button>
                         </div>
-                      )}
-
-                      {n.highlightedText && (
-                        <p className="line-clamp-3 border-l-2 border-purple-400 bg-slate-50 py-0.5 pl-2 font-serif text-[9px] leading-relaxed italic dark:bg-slate-800">
-                          "{n.highlightedText}"
-                        </p>
-                      )}
-
-                      {n.noteText && (
-                        <p className="leading-relaxed font-semibold text-slate-800 dark:text-slate-200">
-                          {n.noteText}
-                        </p>
-                      )}
-
-                      {n.tags && n.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {n.tags.map((t) => (
-                            <span
-                              key={t}
-                              className="rounded bg-slate-100 px-1.5 py-0.5 text-[8px] font-bold tracking-wider text-slate-500 uppercase dark:bg-slate-800 dark:text-slate-400"
+                      </div>
+                    ))
+                  )}
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-slate-900 overflow-hidden">
+                  {/* Selected Text Excerpt Card */}
+                  <div className="p-4 border-b border-slate-100 dark:border-slate-800 space-y-2 bg-slate-50/40 dark:bg-slate-950/20 shrink-0">
+                    <span className="text-[8px] font-extrabold tracking-widest text-slate-400 uppercase">
+                      Selected Excerpt
+                    </span>
+                    {selectedTextForAi ? (
+                      <p className="line-clamp-4 font-serif text-[10px] leading-relaxed italic text-slate-600 dark:text-slate-400 border-l-2 border-purple-400 pl-2">
+                        "{selectedTextForAi}"
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        <textarea
+                          placeholder="Type or paste text here to ask the AI assistant..."
+                          value={customAiText}
+                          onChange={(e) => setCustomAiText(e.target.value)}
+                          className="w-full text-[10.5px] p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-850 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-purple-500 font-sans resize-none"
+                          rows={3}
+                        />
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {(['explain', 'summarize', 'key-points', 'simplify'] as const).map((act) => (
+                            <button
+                              key={act}
+                              onClick={() => {
+                                if (customAiText.trim()) {
+                                  setSelectedTextForAi(customAiText.trim())
+                                  handleAiActionDirect(customAiText.trim(), act)
+                                }
+                              }}
+                              disabled={!customAiText.trim()}
+                              className="text-[8px] font-extrabold uppercase py-1 px-2 rounded-md bg-purple-50 hover:bg-purple-100 text-purple-650 dark:bg-purple-950/20 dark:text-purple-400 transition-all disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
                             >
-                              {t}
-                            </span>
+                              {act === 'key-points' ? '💡 Key Points' : act === 'explain' ? '✨ Explain' : act === 'summarize' ? '📝 Summarize' : '📚 Simplify'}
+                            </button>
                           ))}
                         </div>
-                      )}
-
-                      <div className="dark:border-slate-850 flex shrink-0 justify-end gap-2 border-t border-slate-50 pt-2 text-[10px] font-bold tracking-wider uppercase">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setEditingNoteId(n.id)
-                            setModalNoteTitle(n.noteTitle || '')
-                            setModalRating(n.rating)
-                            setModalNoteText(n.noteText)
-                            setModalHighlightText(n.highlightedText || '')
-                            setModalBookmark(n.isBookmarked)
-                            setModalTags(n.tags)
-                            if (n.xPosition !== undefined) {
-                              setStickyNotePromptPos({
-                                top: 0,
-                                left: 0,
-                                percentX: n.xPosition,
-                                percentY: n.yPosition || 0,
-                              })
-                            } else {
-                              setStickyNotePromptPos(null)
-                            }
-                            setIsNotesModalOpen(true)
-                          }}
-                          className="hover:text-slate-655 text-slate-400"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={(e) => handleDeleteNote(n.id, e)}
-                          className="text-slate-400 hover:text-red-500"
-                        >
-                          Delete
-                        </button>
                       </div>
+                    )}
+                  </div>
+
+                  {/* Response Block */}
+                  <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                    {aiLoading ? (
+                      <div className="space-y-4 py-4">
+                        <span className="text-[10px] font-extrabold tracking-widest text-purple-650 animate-pulse uppercase block">
+                          ✨ Thinking...
+                        </span>
+                        <div className="space-y-2.5 animate-pulse">
+                          <div className="h-3 w-full rounded-md shimmer-placeholder bg-slate-100 dark:bg-slate-800" />
+                          <div className="h-3 w-[92%] rounded-md shimmer-placeholder bg-slate-100 dark:bg-slate-800" />
+                          <div className="h-3 w-[95%] rounded-md shimmer-placeholder bg-slate-100 dark:bg-slate-800" />
+                          <div className="h-3 w-[78%] rounded-md shimmer-placeholder bg-slate-100 dark:bg-slate-800" />
+                        </div>
+                      </div>
+                    ) : aiError ? (
+                      <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-center">
+                        <span className="text-xs font-bold text-red-500">{aiError}</span>
+                      </div>
+                    ) : aiResponse ? (
+                      <div className="prose prose-sm dark:prose-invert font-sans text-xs leading-relaxed text-slate-800 dark:text-slate-350 space-y-3">
+                        {aiResponse.split('\n').map((line, idx) => {
+                          if (line.startsWith('###')) {
+                            return (
+                              <h4 key={idx} className="text-xs font-black uppercase text-purple-650 tracking-wider pt-2">
+                                {line.replace('###', '')}
+                              </h4>
+                            )
+                          }
+                          if (line.startsWith('*')) {
+                            return (
+                              <li key={idx} className="list-disc pl-1 ml-4 text-slate-700 dark:text-slate-300">
+                                {line.replace('*', '').trim()}
+                              </li>
+                            )
+                          }
+                          if (line.startsWith('**')) {
+                            return (
+                              <p key={idx} className="font-semibold text-slate-900 dark:text-white">
+                                {line}
+                              </p>
+                            )
+                          }
+                          return (
+                            <p key={idx} className="text-slate-700 dark:text-slate-300">
+                              {line}
+                            </p>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <div className="py-12 text-center text-xs text-slate-400">
+                        No active AI prompts. Highlight text inside the book to trigger AI tools.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer controls inside AI Panel */}
+                  {aiResponse && !aiLoading && (
+                    <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex gap-2 shrink-0 bg-slate-50/20">
+                      <button
+                        onClick={handleCopyAiResponse}
+                        className="flex-1 cursor-pointer rounded-xl bg-purple-600 text-white font-bold text-xs py-2 transition-all hover:bg-purple-750 active:scale-95 text-center shadow-md"
+                      >
+                        Copy Output
+                      </button>
+                      <button
+                        onClick={() => handleAiAction(aiAction!)}
+                        className="cursor-pointer rounded-xl border border-slate-200 bg-white text-slate-700 font-bold text-xs py-2 px-3 transition-all hover:bg-slate-50 active:scale-95 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+                      >
+                        Regenerate
+                      </button>
                     </div>
-                  ))
-                )}
-              </div>
+                  )}
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -1640,28 +1850,40 @@ export const ReaderPage: React.FC = () => {
             className="z-50 flex items-center gap-1 rounded-xl border border-slate-100 bg-slate-900/95 p-1 text-white shadow-2xl backdrop-blur-xs dark:border-slate-800"
           >
             <button
-              onClick={handleQuickHighlight}
-              className="text-yellow-350 flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] font-bold uppercase transition-colors hover:bg-white/10"
+              onClick={() => handleAiAction('explain')}
+              className="text-purple-300 flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase transition-colors hover:bg-white/10"
             >
-              🖍 Highlight
+              ✨ Explain
             </button>
             <button
-              onClick={handleOpenNoteModal}
-              className="flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] font-bold text-purple-300 uppercase transition-colors hover:bg-white/10"
+              onClick={() => handleAiAction('summarize')}
+              className="text-purple-300 flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase transition-colors hover:bg-white/10"
             >
-              💬 Note
+              📝 Summarize
             </button>
             <button
-              onClick={toggleBookmark}
-              className="flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] font-bold text-amber-300 uppercase transition-colors hover:bg-white/10"
+              onClick={() => handleAiAction('key-points')}
+              className="text-purple-300 flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase transition-colors hover:bg-white/10"
             >
-              🔖 Save
+              💡 Key Points
             </button>
             <button
-              onClick={handleQuickCopy}
-              className="flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] font-bold text-slate-300 uppercase transition-colors hover:bg-white/10"
+              onClick={() => handleAiAction('simplify')}
+              className="text-purple-300 flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase transition-colors hover:bg-white/10"
             >
-              <Copy className="h-3 w-3" /> Copy
+              📚 Simplify
+            </button>
+            <button
+              onClick={() => handleAiAction('translate')}
+              className="text-purple-300 flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase transition-colors hover:bg-white/10"
+            >
+              🌍 Translate
+            </button>
+            <button
+              onClick={handleCopySelection}
+              className="text-slate-300 flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase transition-colors hover:bg-white/10"
+            >
+              📋 Copy
             </button>
           </motion.div>
         )}
