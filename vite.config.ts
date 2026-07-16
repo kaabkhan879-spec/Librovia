@@ -44,22 +44,66 @@ export default defineConfig(({ mode }) => {
 
                   switch (action) {
                     case 'explain':
-                      prompt = `Explain the following text excerpt in a clear, educational, and engaging manner. Break it down into Core Concepts, Context/Relevance, and Practical Takeaways. Use bold text, lists, and headings starting with ###.\n\nText:\n"${text}"`
+                      prompt = `You are a world-class educational AI assistant.
+Explain the following text excerpt in a clear, highly educational, and engaging manner.
+Instructions:
+- If the text is a programming code snippet, wrap explanations with appropriate language-specific markdown code blocks (e.g. \`\`\`typescript) and explain the control flow.
+- If the text is a single number, statistics, or isolated name, explain what this entity represents contextually or educational relevance.
+- Break down the explanation using clean headers starting with ###:
+  ### 🔑 Core Concepts
+  ### 📖 Context & Relevance
+  ### 💡 Practical Takeaways
+- Use bold text, bullet points, and clean syntax tags. Maintain a professional, encouraging tone.
+
+Text excerpt:
+"${text}"`
                       break
                     case 'summarize':
-                      prompt = `Provide a concise, high-level summary of the following excerpt. Capture the main ideas and core takeaways in markdown.\n\nText:\n"${text}"`
+                      prompt = `You are a world-class research assistant.
+Provide a concise, high-level summary of the following excerpt.
+Instructions:
+- Capture the main argument, core takeaways, and evidence/examples in a clean structured markdown format.
+- Use bullet points and bold headers. Keep it compact, professional, and dense with information.
+- If the text contains codes or tables, keep them intact within markdown syntax.
+
+Text excerpt:
+"${text}"`
                       break
                     case 'key-points':
-                      prompt = `Extract the most important bullet points and key takeaways from the following text using markdown list formatting.\n\nText:\n"${text}"`
+                      prompt = `You are an executive summary writer.
+Extract the most important bullet points and key takeaways from the following text.
+Instructions:
+- List 3-7 core points.
+- Use standard markdown list formatting (e.g. * **Key concept**: explanation).
+- Keep each point brief, actionable, and independent.
+
+Text excerpt:
+"${text}"`
                       break
                     case 'simplify':
-                      prompt = `Simplify the language of the following excerpt so it's extremely easy to understand, similar to explaining it to a beginner or child. Use analogies if appropriate.\n\nText:\n"${text}"`
+                      prompt = `You are a master teacher who explains complex topics simply.
+Simplify the language of the following excerpt so it is extremely easy to understand.
+Instructions:
+- Target a reading level of a beginner or child (e.g., explain it like I'm 5 years old).
+- Use vivid analogies, everyday examples, and simple vocabulary.
+- Keep structural layouts, tables, and codes formatted cleanly but demystified in simple terms.
+
+Text excerpt:
+"${text}"`
                       break
                     case 'translate':
-                      prompt = `Translate the following text excerpt accurately into ${language || 'the active app languageSetting'}. Maintain the original tone and context.\n\nText:\n"${text}"`
+                      prompt = `You are a professional polyglot translator.
+Translate the following text excerpt accurately into ${language || 'the active app language'}.
+Instructions:
+- Maintain the original tone, context, formatting, and markdown tags (e.g. bold, code snippets, lists, tables).
+- Do not translate technical terms or variable names if translating programming code snippets.
+- Ensure the output text flow is natural and grammatically correct in the target language.
+
+Text excerpt:
+"${text}"`
                       break
                     default:
-                      prompt = `Process this text excerpt:\n"${text}"`
+                      prompt = `Process this text excerpt using markdown formatting:\n"${text}"`
                   }
 
                   const apiKey = env.GEMINI_API_KEY || process.env.GEMINI_API_KEY
