@@ -63,7 +63,7 @@ export default defineConfig(({ mode }) => {
                   }
 
                   const apiKey = env.GEMINI_API_KEY || process.env.GEMINI_API_KEY
-                  const model = env.GEMINI_MODEL || process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+                  const model = env.GEMINI_MODEL || process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite'
 
                   if (!apiKey) {
                     console.warn('GEMINI_API_KEY is not defined. Using mock AI response fallback.')
