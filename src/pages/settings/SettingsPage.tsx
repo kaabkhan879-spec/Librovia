@@ -15,6 +15,7 @@ import { Toggle } from '../../components/common/Toggle'
 import { Avatar } from '../../components/common/Avatar'
 import { ImageCropperModal } from '../../components/common/ImageCropperModal'
 import {
+  Crown,
   User as UserIcon,
   Shield,
   Sliders,
@@ -607,19 +608,19 @@ export const SettingsPage: React.FC = () => {
                         />
 
                         <div className="space-y-1 text-center sm:text-left">
-                          <div className="flex items-center justify-center gap-2 sm:justify-start">
+                          <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
                             <h3 className="text-xl font-black text-slate-900 dark:text-white">
                               {displayName}
                             </h3>
-                            <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[9px] font-bold text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">
-                              <Sparkles className="h-3 w-3" /> Pro Member
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-purple-200/70 bg-gradient-to-r from-purple-50 via-indigo-50 to-purple-50 px-2.5 py-1 text-[10px] font-extrabold tracking-wide text-purple-700 shadow-2xs dark:border-purple-800/60 dark:from-purple-950/60 dark:via-indigo-950/60 dark:to-purple-950/60 dark:text-purple-300">
+                              <Crown className="h-3.5 w-3.5 fill-amber-400 text-amber-500" /> Pro Member
                             </span>
                           </div>
                           <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                             {user?.email || 'kaab@librovia.com'}
                           </p>
-                          <p className="font-mono text-[10px] text-slate-400">
-                            ID: {user?.id || 'usr_849204829'}
+                          <p className="font-mono text-[10.5px] font-bold text-slate-400 dark:text-slate-400">
+                            Member ID <span className="text-purple-600 dark:text-purple-400">#{user?.id ? user.id.replace(/-/g, '').toUpperCase().substring(0, 6) : '90D279'}</span>
                           </p>
                         </div>
                       </div>
