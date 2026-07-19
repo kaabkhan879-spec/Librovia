@@ -28,6 +28,7 @@ import {
   CheckCircle,
   Edit2,
   Plus,
+  Sparkles,
 } from 'lucide-react'
 import { booksService, type Book } from '../../services/books'
 import { notesService, type Note } from '../../services/notes'
@@ -1967,11 +1968,39 @@ export const ReaderPage: React.FC = () => {
 
                     {/* Empty State */}
                     {aiConversations.length === 0 && !aiLoading && !isTyping && !aiError && (
-                      <div className="flex flex-col items-center justify-center p-8 text-center text-slate-450 space-y-3 py-20">
-                        <span className="text-2xl animate-bounce">✨</span>
-                        <p className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400">
-                          Select text from the PDF and ask AI to start learning.
-                        </p>
+                      <div className="flex flex-col items-center justify-center p-6 text-center text-slate-450 space-y-4 py-8">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-400 shadow-2xs">
+                          <Sparkles className="h-6 w-6" />
+                        </div>
+                        <div className="space-y-1">
+                          <h4 className="text-xs font-black text-slate-900 dark:text-white">
+                            💡 Ask AI about this book
+                          </h4>
+                          <p className="text-[10px] font-semibold text-slate-400 leading-relaxed max-w-xs">
+                            Ask questions, summarize chapters, explain difficult concepts, or analyze selected text.
+                          </p>
+                        </div>
+                        <div className="w-full space-y-2 pt-2 text-left">
+                          <span className="text-[8.5px] font-extrabold text-slate-400 uppercase tracking-wider block">
+                            Suggested Prompts
+                          </span>
+                          {[
+                            'Summarize this chapter',
+                            'Explain key concepts in simple terms',
+                            'Extract 3 main takeaways',
+                            'Generate study flashcards',
+                          ].map((promptText) => (
+                            <button
+                              key={promptText}
+                              onClick={() => {
+                                setCustomAiText(promptText)
+                              }}
+                              className="w-full text-left rounded-xl border border-slate-200/80 bg-white p-2.5 text-[10.5px] font-bold text-slate-700 shadow-2xs hover:border-purple-300 hover:text-purple-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-purple-800 dark:hover:text-purple-400 transition-all cursor-pointer"
+                            >
+                              ✨ "{promptText}"
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     )}
 
@@ -2079,40 +2108,48 @@ export const ReaderPage: React.FC = () => {
         </AnimatePresence>
       </div>
 
-      {/* Bottom Bar Controls */}
+      {/* Bottom Bar Reading Progress Toolbar */}
       <footer
-        className={`flex h-14 shrink-0 items-center justify-between border-t px-6 ${
+        className={`flex h-12 shrink-0 items-center justify-between border-t px-6 transition-colors ${
           theme === 'dark'
-            ? 'border-neutral-800 bg-neutral-900'
-            : 'border-slate-200 bg-white shadow-inner'
+            ? 'border-neutral-800 bg-neutral-900 text-neutral-200'
+            : theme === 'sepia'
+              ? 'border-[#e4dcc4] bg-[#f4ecd8] text-[#5b4636]'
+              : 'border-slate-200/80 bg-white text-slate-800 shadow-xs'
         }`}
       >
-        {/* Left progress indicators */}
-        <div className="flex items-center gap-3 text-left">
-          <Clock className="text-primary-600 h-4 w-4 shrink-0" />
-          <span className="text-text-sub text-[10px] font-bold tracking-wider uppercase">
-            {(totalPages - page) * 2} minutes remaining
+        {/* Left: Page Count & Progress Percentage */}
+        <div className="flex items-center gap-2 font-mono text-[11px] font-bold">
+          <span>
+            Page {page} of {totalPages}
+          </span>
+          <span className="text-slate-300 dark:text-slate-700">•</span>
+          <span className="font-extrabold text-purple-600 dark:text-purple-400">
+            {Math.round((page / (totalPages || 1)) * 100)}%
           </span>
         </div>
 
-        {/* Center Progress Slider bar */}
-        <div className="mx-8 flex max-w-xl flex-1 items-center gap-4">
-          <span className="text-text-muted text-[10px] font-bold select-none">p. 1</span>
+        {/* Center: Thin Premium Interactive Slider & Progress Bar */}
+        <div className="mx-8 hidden max-w-md flex-1 items-center gap-3 sm:flex">
           <input
             type="range"
             min={1}
             max={totalPages}
             value={page}
             onChange={(e) => setPage(Number(e.target.value))}
-            className="bg-border-light accent-primary-600 h-1 flex-1 cursor-pointer appearance-none rounded-lg"
+            className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-slate-100 accent-purple-600 dark:bg-slate-800"
           />
-          <span className="text-text-muted text-[10px] font-bold select-none">p. {totalPages}</span>
         </div>
 
-        {/* Right page display indicator */}
-        <span className="text-text-main font-mono text-xs font-bold">
-          {page} / {totalPages} ({Math.round((page / totalPages) * 100)}%)
-        </span>
+        {/* Right: Estimated Reading Time Remaining */}
+        <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 dark:text-slate-400">
+          <Clock className="h-3.5 w-3.5 shrink-0 text-purple-600 dark:text-purple-400" />
+          <span>
+            {totalPages - page > 0
+              ? `${Math.max(1, Math.round((totalPages - page) * 1.5))} mins left`
+              : 'Finished 🎉'}
+          </span>
+        </div>
       </footer>
 
       {/* Selection Floating Action Toolbar */}
