@@ -11,7 +11,6 @@ import {
   Folder,
   MessageSquare,
   BarChart3,
-  Cloud,
   Settings,
   LogOut,
   X,
@@ -66,7 +65,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { name: 'Notes', to: ROUTES.NOTES, icon: MessageSquare },
     { name: 'AI Flashcards', to: ROUTES.FLASHCARDS, icon: Layers },
     { name: 'Analytics', to: ROUTES.ANALYTICS, icon: BarChart3 },
-    { name: 'Storage', to: ROUTES.STORAGE, icon: Cloud },
     { name: 'Settings', to: ROUTES.SETTINGS, icon: Settings },
   ]
 

@@ -12,9 +12,9 @@ import {
   FolderOpen,
   Users,
   ChevronRight,
-  Sparkles,
   BarChart3,
   Calendar,
+  FileText,
 } from 'lucide-react'
 import { Button } from '../../components/common/Button'
 import { PageWrapper } from '../../components/common/PageWrapper'
@@ -224,26 +224,19 @@ export const DashboardPage: React.FC = () => {
                 ================================================== */}
             <motion.div
               variants={itemVariants}
-              className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xs sm:p-8 dark:border-slate-800 dark:bg-slate-900"
+              className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs sm:p-6 dark:border-slate-800 dark:bg-slate-900"
             >
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">{greetingIcon}</span>
-                    <span className="text-xs font-bold tracking-wider text-slate-400 uppercase">
-                      Librovia Reading Workspace
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <h1 className="flex items-center gap-2 text-xl font-black tracking-tight text-slate-900 sm:text-2xl dark:text-white">
+                    <span>{greetingIcon}</span>
+                    <span>
+                      {greetingText}, {user?.displayName || 'Reader'}
                     </span>
-                  </div>
-                  <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl dark:text-white">
-                    {greetingText}, {user?.displayName || 'Reader'}
                   </h1>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="inline-flex items-center gap-2 rounded-2xl border border-purple-100 bg-purple-50/70 px-4 py-2 text-xs font-bold text-purple-700 dark:border-purple-900/40 dark:bg-purple-950/30 dark:text-purple-300">
-                    <Sparkles className="h-4 w-4 text-purple-600" />
-                    <span>Active Workspace</span>
-                  </div>
+                  <p className="text-xs font-semibold text-slate-400">
+                    Welcome to your digital reading hub
+                  </p>
                 </div>
               </div>
             </motion.div>
@@ -355,7 +348,7 @@ export const DashboardPage: React.FC = () => {
                         <img
                           src={continueReadingBook.coverPath}
                           alt={continueReadingBook.title}
-                          className="aspect-[0.7/1] w-24 shrink-0 rounded-2xl border border-slate-200 object-cover shadow-md transition-transform duration-300 group-hover:scale-[1.02] sm:w-28 dark:border-slate-800"
+                          className="aspect-[0.7/1] w-28 shrink-0 rounded-2xl border border-slate-200 object-cover shadow-md transition-transform duration-300 group-hover:scale-[1.02] sm:w-32 dark:border-slate-800"
                         />
 
                         {/* Center Content Area */}
@@ -516,8 +509,16 @@ export const DashboardPage: React.FC = () => {
 
                   <div className="space-y-3">
                     {recentNotesFeed.length === 0 ? (
-                      <div className="rounded-3xl border border-slate-200/70 bg-white p-6 text-center text-xs font-semibold text-slate-400 dark:border-slate-800 dark:bg-slate-900">
-                        No notes written yet. Create notes while reading!
+                      <div className="flex flex-col items-center justify-center rounded-3xl border border-slate-200/80 bg-white p-8 text-center shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50 text-purple-600 dark:bg-purple-950/30 dark:text-purple-400">
+                          <FileText className="h-6 w-6" />
+                        </div>
+                        <h4 className="mt-3 text-xs font-bold text-slate-900 dark:text-white">
+                          No notes yet
+                        </h4>
+                        <p className="mt-0.5 text-[11px] font-medium text-slate-400">
+                          Your reading notes will appear here.
+                        </p>
                       </div>
                     ) : (
                       recentNotesFeed.map((note) => (
