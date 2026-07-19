@@ -255,7 +255,7 @@ export const DashboardPage: React.FC = () => {
           : new Date(b.createdAt).getTime()
         return timeB - timeA
       })
-      .slice(0, 4)
+      .slice(0, 3)
   }, [books])
 
   // Estimated pages & minutes remaining for Continue Reading
@@ -609,63 +609,82 @@ export const DashboardPage: React.FC = () => {
                 </motion.div>
 
                 {/* ==================================================
-                    SECTION 4: RECENTLY OPENED BOOKS SHELF
+                    SECTION 4: RECENTLY OPENED BOOKS (COMPACT ROW LIST)
                     ================================================== */}
                 <motion.div variants={itemVariants} className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h3 className="text-xs font-extrabold tracking-widest text-slate-400 uppercase">
                       Recently Opened Books
                     </h3>
-                    <Link
-                      to={ROUTES.LIBRARY}
-                      className="flex items-center gap-1 text-xs font-extrabold text-purple-600 hover:text-purple-700"
-                    >
-                      View All Library <ChevronRight className="h-3.5 w-3.5" />
-                    </Link>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="space-y-2.5">
                     {recentlyOpenedBooks.map((book) => (
                       <div
                         key={book.id}
                         onClick={() => navigate(ROUTES.READER.replace(':id', book.id))}
-                        className="group flex cursor-pointer flex-col justify-between rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs transition-all duration-200 hover:-translate-y-1 hover:border-purple-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
+                        className="group flex cursor-pointer items-center justify-between rounded-2xl border border-slate-200/80 bg-white p-3 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-purple-300 hover:bg-slate-50/80 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-purple-900/60 dark:hover:bg-slate-800/60"
                       >
-                        <div className="space-y-3">
-                          <div className="relative aspect-[0.75/1] overflow-hidden rounded-2xl bg-slate-100 dark:bg-slate-800">
-                            <img
-                              src={book.coverPath}
-                              alt={book.title}
-                              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                            />
-                            <div className="absolute top-2 right-2 rounded-lg bg-slate-900/80 px-2 py-0.5 font-mono text-[9px] font-bold text-white backdrop-blur-xs">
-                              {book.progress}%
-                            </div>
-                          </div>
+                        {/* 48x72 Cover Thumbnail */}
+                        <div className="h-[72px] w-[48px] shrink-0 overflow-hidden rounded-xl border border-slate-200/60 bg-slate-100 shadow-2xs dark:border-slate-700/60 dark:bg-slate-800">
+                          <img
+                            src={book.coverPath}
+                            alt={book.title}
+                            className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                          />
+                        </div>
 
-                          <div>
-                            <h5 className="truncate text-xs font-bold text-slate-900 dark:text-white">
-                              {book.title}
-                            </h5>
-                            <p className="truncate text-[10.5px] font-semibold text-slate-400">
+                        {/* Metadata Details */}
+                        <div className="min-w-0 flex-1 space-y-1 px-4">
+                          <h5 className="truncate text-xs font-bold text-slate-900 transition-colors group-hover:text-purple-600 dark:text-white dark:group-hover:text-purple-400">
+                            {book.title}
+                          </h5>
+
+                          <div className="flex items-center gap-2 text-[10.5px] font-semibold text-slate-400">
+                            <span className="max-w-[140px] truncate sm:max-w-none">
                               {book.author}
-                            </p>
+                            </span>
+                            {book.lastReadAt && (
+                              <>
+                                <span>•</span>
+                                <span>
+                                  {new Date(book.lastReadAt).toLocaleDateString(undefined, {
+                                    month: 'short',
+                                    day: 'numeric',
+                                  })}
+                                </span>
+                              </>
+                            )}
+                          </div>
+
+                          {/* Progress Bar & Pages */}
+                          <div className="flex items-center gap-3 pt-1">
+                            <div className="h-1.5 max-w-[160px] flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                              <div
+                                className="h-full rounded-full bg-purple-600 transition-all duration-300"
+                                style={{ width: `${book.progress}%` }}
+                              />
+                            </div>
+                            <span className="font-mono text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                              {book.progress}% (Page {book.currentPage} of {book.totalPages || 320})
+                            </span>
                           </div>
                         </div>
 
-                        <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 dark:border-slate-800">
-                          <span className="text-[9.5px] font-semibold text-slate-400">
-                            Page {book.currentPage}
-                          </span>
-                          <button
-                            type="button"
-                            className="flex items-center gap-0.5 text-[10px] font-extrabold text-purple-600 hover:text-purple-700"
-                          >
-                            Resume <ChevronRight className="h-3 w-3" />
-                          </button>
-                        </div>
+                        {/* Chevron right indicator */}
+                        <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 transition-all duration-200 group-hover:translate-x-1 group-hover:text-purple-600 dark:text-slate-600 dark:group-hover:text-purple-400" />
                       </div>
                     ))}
+                  </div>
+
+                  {/* View All Bottom Link */}
+                  <div className="pt-1 text-right">
+                    <Link
+                      to={ROUTES.LIBRARY}
+                      className="inline-flex items-center gap-1 text-xs font-extrabold text-purple-600 transition-colors hover:text-purple-700"
+                    >
+                      View All Library <ChevronRight className="h-3.5 w-3.5" />
+                    </Link>
                   </div>
                 </motion.div>
               </div>
