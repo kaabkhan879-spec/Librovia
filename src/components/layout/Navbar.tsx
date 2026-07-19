@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { Button } from '../common/Button'
 import { Avatar } from '../common/Avatar'
+import { DownloadsManagerModal } from '../common/DownloadsManagerModal'
 
 // --- MARKETING NAVBAR (For Public Layout) ---
 export const MarketingNavbar: React.FC = () => {
@@ -114,6 +115,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
   const [showAllNotifs, setShowAllNotifs] = useState(false)
+  const [isDownloadsModalOpen, setIsDownloadsModalOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const headerSearchRef = useRef<HTMLInputElement>(null)
 
@@ -313,6 +315,15 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           )}
         </button>
 
+        {/* Offline Downloads Manager Button */}
+        <button
+          onClick={() => setIsDownloadsModalOpen(true)}
+          className="border-border-base bg-bg-surface text-text-sub hover:bg-bg-app hover:text-text-main flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border transition-all"
+          title="Offline Downloads Manager"
+        >
+          <HardDrive className="h-4.5 w-4.5" />
+        </button>
+
         {/* Notifications Bell with Dropdown Container */}
         <div className="relative" ref={dropdownRef}>
           <button
@@ -428,6 +439,11 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           </Link>
         )}
       </div>
+
+      <DownloadsManagerModal
+        isOpen={isDownloadsModalOpen}
+        onClose={() => setIsDownloadsModalOpen(false)}
+      />
     </header>
   )
 }

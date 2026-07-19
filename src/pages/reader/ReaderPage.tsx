@@ -29,11 +29,14 @@ import {
   Edit2,
   Plus,
   Sparkles,
+  Download,
+  HardDrive,
 } from 'lucide-react'
 import { booksService, type Book } from '../../services/books'
 import { notesService, type Note } from '../../services/notes'
 import { notificationsService } from '../../services/notifications'
 import { flashcardsService } from '../../services/flashcards'
+import { offlineStorageService } from '../../services/offlineStorage'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/TextLayer.css'
 
@@ -461,22 +464,61 @@ export const ReaderPage: React.FC = () => {
     }
   }, [fetchNotes, showSuccess])
 
-  // Query Supabase for book path on mount
+  // Offline download states
+  const [isDownloaded, setIsDownloaded] = useState(false)
+  const [isDownloading, setIsDownloading] = useState(false)
+  const [downloadProgress, setDownloadProgress] = useState(0)
+
+  // Query Supabase or local IndexedDB blob on mount
   useEffect(() => {
     if (!id) return
 
-    booksService
-      .getBookById(id)
-      .then((data) => {
+    async function loadBookData() {
+      try {
+        const downloaded = await offlineStorageService.isBookDownloaded(id!)
+        setIsDownloaded(downloaded)
+
+        const localBlobUrl = await offlineStorageService.getOfflineBookUrl(id!)
+
+        // Fetch book metadata from database (or fallback if offline)
+        let data: Book | null = null
+        try {
+          data = await booksService.getBookById(id!)
+        } catch {
+          // If offline and database call fails, reconstruct minimal Book object from local download metadata
+          const meta = await offlineStorageService.getDownloadMeta(id!)
+          if (meta) {
+            data = {
+              id: meta.bookId,
+              title: meta.title,
+              author: meta.author,
+              coverPath: meta.coverPath || '',
+              filePath: '',
+              format: 'PDF',
+              progress: 0,
+              currentPage: 1,
+              totalPages: 320,
+              createdAt: meta.downloadedAt,
+              updatedAt: meta.downloadedAt,
+            }
+          }
+        }
+
         if (!data) {
-          setErrorMsg('This book is no longer available.')
+          if (!navigator.onLine && !localBlobUrl) {
+            setErrorMsg('This book is not available offline.\n\nPlease connect to the internet or download it before going offline.')
+          } else {
+            setErrorMsg('This book is no longer available.')
+          }
           setLoading(false)
           return
         }
 
-        const isPdf = data.filePath.toLowerCase().split('?')[0].endsWith('.pdf')
-        if (!isPdf) {
-          setErrorMsg('Only PDF files are supported in this reader mode.')
+        // If local offline blob URL exists, use local blob URL
+        if (localBlobUrl) {
+          data = { ...data, filePath: localBlobUrl }
+        } else if (!navigator.onLine) {
+          setErrorMsg('This book is not available offline.\n\nPlease connect to the internet or download it before going offline.')
           setLoading(false)
           return
         }
@@ -491,20 +533,59 @@ export const ReaderPage: React.FC = () => {
         lastSavedPageRef.current = targetPage
         setLoading(false)
         fetchNotes()
-
-        // Pre-create reading log on first open
-        booksService
-          .updateReadingProgress(data.id, targetPage, data.totalPages || 320, 0)
-          .catch((err) => {
-            console.error('Failed to initialize reading progress log:', err)
-          })
-      })
-      .catch((err) => {
+      } catch (err: any) {
         console.error(err)
-        setErrorMsg('Failed to load secure PDF from Supabase storage.')
+        setErrorMsg(
+          !navigator.onLine
+            ? 'This book is not available offline.\n\nPlease connect to the internet or download it before going offline.'
+            : 'Failed to load PDF document.'
+        )
         setLoading(false)
-      })
+      }
+    }
+
+    loadBookData()
   }, [id, pageParam, fetchNotes])
+
+  const handleToggleDownload = async () => {
+    if (!rawBook || !id) return
+
+    if (isDownloaded) {
+      if (
+        confirm(
+          `Remove local offline download for "${rawBook.title}"? (Cloud copy will remain untouched)`
+        )
+      ) {
+        await offlineStorageService.deleteOfflineBook(id)
+        setIsDownloaded(false)
+        showSuccess('Offline download removed safely. 🗑️')
+      }
+      return
+    }
+
+    if (!isOnline) {
+      showInfo('Internet connection required to download books for offline reading.')
+      return
+    }
+
+    try {
+      setIsDownloading(true)
+      setDownloadProgress(0)
+      showInfo(`Starting offline download for "${rawBook.title}"... ⬇️`)
+
+      await offlineStorageService.downloadBookForOffline(rawBook, (percent) => {
+        setDownloadProgress(percent)
+      })
+
+      setIsDownloaded(true)
+      setIsDownloading(false)
+      showSuccess(`"${rawBook.title}" is now available offline! 💾`)
+    } catch (err: any) {
+      console.error(err)
+      setIsDownloading(false)
+      showError(err.message || 'Failed to download book for offline reading.')
+    }
+  }
 
   // Auto highlight overlay DOM injector
   const injectHighlights = useCallback(() => {
@@ -1200,6 +1281,45 @@ export const ReaderPage: React.FC = () => {
               </button>
             ))}
           </div>
+
+          {/* Offline Download button */}
+          <button
+            onClick={handleToggleDownload}
+            disabled={isDownloading}
+            className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-all ${
+              isDownloading
+                ? 'bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300'
+                : isDownloaded
+                  ? 'border border-emerald-200/60 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300'
+                  : 'bg-slate-100 text-slate-700 hover:bg-purple-50 hover:text-purple-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
+            }`}
+            title={
+              isDownloaded
+                ? 'Available Offline (Click to remove local copy)'
+                : 'Download for Offline Reading'
+            }
+          >
+            {isDownloading ? (
+              <>
+                <div className="h-3 w-3 animate-spin rounded-full border-2 border-purple-600 border-t-transparent" />
+                <span className="font-mono text-[10px]">{downloadProgress}%</span>
+              </>
+            ) : isDownloaded ? (
+              <>
+                <CheckCircle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span className="hidden text-[10px] font-extrabold uppercase tracking-wider sm:inline">
+                  Offline
+                </span>
+              </>
+            ) : (
+              <>
+                <Download className="h-3.5 w-3.5" />
+                <span className="hidden text-[10px] font-extrabold uppercase tracking-wider sm:inline">
+                  Download
+                </span>
+              </>
+            )}
+          </button>
 
           {/* Custom Journal Note Modal triggers */}
           <button

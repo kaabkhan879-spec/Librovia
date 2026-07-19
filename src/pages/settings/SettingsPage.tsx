@@ -14,6 +14,7 @@ import { Button } from '../../components/common/Button'
 import { Toggle } from '../../components/common/Toggle'
 import { Avatar } from '../../components/common/Avatar'
 import { ImageCropperModal } from '../../components/common/ImageCropperModal'
+import { DownloadsManagerModal } from '../../components/common/DownloadsManagerModal'
 import {
   Crown,
   User as UserIcon,
@@ -80,6 +81,7 @@ export const SettingsPage: React.FC = () => {
   const [cropperOpen, setCropperOpen] = useState(false)
   const [cropperImageSrc, setCropperImageSrc] = useState<string>('')
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
+  const [showDownloadsModal, setShowDownloadsModal] = useState(false)
 
   const [prevUserId, setPrevUserId] = useState(user?.id)
 
@@ -1088,7 +1090,16 @@ export const SettingsPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="pt-2">
+                  <div className="flex flex-wrap items-center gap-3 pt-2">
+                    <Button
+                      size="sm"
+                      onClick={() => setShowDownloadsModal(true)}
+                      className="rounded-2xl bg-purple-600 font-bold text-white shadow-xs hover:bg-purple-700"
+                    >
+                      <HardDrive className="mr-1.5 h-3.5 w-3.5" />
+                      <span>Manage Offline Downloads</span>
+                    </Button>
+
                     <Button
                       size="sm"
                       onClick={handleClearCache}
@@ -1342,6 +1353,12 @@ export const SettingsPage: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Downloads Manager Modal */}
+      <DownloadsManagerModal
+        isOpen={showDownloadsModal}
+        onClose={() => setShowDownloadsModal(false)}
+      />
     </PageWrapper>
   )
 }
