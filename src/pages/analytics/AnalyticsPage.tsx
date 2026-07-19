@@ -20,7 +20,6 @@ import {
   Star,
   Moon,
   BookMarked,
-  Plus,
 } from 'lucide-react'
 import { Button } from '../../components/common/Button'
 
