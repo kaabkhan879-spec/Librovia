@@ -1,16 +1,30 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Sidebar } from '../components/layout/Sidebar'
 import { DashboardHeader } from '../components/layout/Navbar'
 import { useLocalStorage } from '../hooks/useLocalStorage'
+import { UniversalSearchModal } from '../components/search/UniversalSearchModal'
 
 export const AppLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage<boolean>(
     'sidebar-collapsed',
     false
   )
   const location = useLocation()
+
+  // Global Ctrl+K / Cmd+K listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        setIsSearchOpen((prev) => !prev)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   // Derive dynamic page titles based on the path
   const getPageTitle = (pathname: string): string => {
@@ -32,18 +46,21 @@ export const AppLayout: React.FC = () => {
 
   const isReaderPage = location.pathname.startsWith('/reader/')
 
-  // If we are on the Reader page, we want a clean distraction-free layout (maybe no header/sidebar, or customized).
-  // But standard digital libraries show the book full screen with a custom header. We can handle it dynamically.
+  // If we are on the Reader page, render clean distraction-free layout with search modal available
   if (isReaderPage) {
     return (
       <div className="flex h-screen w-screen overflow-hidden bg-slate-900 text-white">
         <Outlet />
+        <UniversalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
       </div>
     )
   }
 
   return (
     <div className="bg-bg-app flex h-screen w-screen overflow-hidden">
+      {/* Universal Search Overlay Modal */}
+      <UniversalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+
       {/* Sidebar navigation */}
       <Sidebar
         isOpen={sidebarOpen}
@@ -56,6 +73,7 @@ export const AppLayout: React.FC = () => {
       <div className="flex flex-1 flex-col overflow-hidden">
         <DashboardHeader
           onToggleSidebar={() => setSidebarOpen(true)}
+          onOpenSearch={() => setIsSearchOpen(true)}
           pageTitle={getPageTitle(location.pathname)}
         />
 

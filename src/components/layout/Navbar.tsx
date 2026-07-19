@@ -84,11 +84,13 @@ export const MarketingNavbar: React.FC = () => {
 // --- DASHBOARD HEADER (For App Layout) ---
 interface DashboardHeaderProps {
   onToggleSidebar: () => void
+  onOpenSearch?: () => void
   pageTitle?: string
 }
 
 export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   onToggleSidebar,
+  onOpenSearch,
   pageTitle = 'Dashboard',
 }) => {
   const { user } = useAuth()
@@ -120,15 +122,17 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         const activeElem = document.activeElement
         if (activeElem && (activeElem.tagName === 'INPUT' || activeElem.tagName === 'TEXTAREA')) {
-          return // Don't interrupt users typing in other inputs
+          return
         }
         e.preventDefault()
-        headerSearchRef.current?.focus()
+        if (onOpenSearch) {
+          onOpenSearch()
+        }
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [onOpenSearch])
 
   // Fetch notifications from service inside effect to avoid cascading state warnings
   useEffect(() => {
@@ -270,8 +274,11 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         </div>
       </div>
 
-      {/* Center Search Bar */}
-      <div className="mx-4 hidden max-w-md flex-1 md:block">
+      {/* Center Search Bar Trigger */}
+      <div
+        onClick={() => onOpenSearch?.()}
+        className="mx-4 hidden max-w-md flex-1 cursor-pointer md:block"
+      >
         <div className="relative rounded-xl shadow-xs">
           <div className="text-text-muted pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
             <Search className="h-4 w-4" />
@@ -279,8 +286,9 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           <input
             ref={headerSearchRef}
             type="text"
-            placeholder="Search books, collections... (Ctrl + K)"
-            className="border-border-base bg-bg-app text-text-main placeholder:text-text-muted focus:border-primary-500 focus:ring-primary-500/10 block w-full rounded-xl border py-2 pr-12 pl-10 text-xs transition-all focus:shadow-md focus:ring-2 focus:outline-none"
+            readOnly
+            placeholder="Search books, authors, notes, highlights... (Ctrl + K)"
+            className="border-border-base bg-bg-app text-text-main placeholder:text-text-muted block w-full cursor-pointer rounded-xl border py-2 pr-12 pl-10 text-xs transition-all focus:shadow-md focus:ring-2 focus:outline-none"
           />
           <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5">
             <kbd className="border-border-light bg-bg-surface text-text-muted inline-flex items-center gap-0.5 rounded border px-1.5 font-sans text-[9px] font-bold shadow-2xs">
