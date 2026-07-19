@@ -41,6 +41,9 @@ import {
   Sun,
   Moon,
   Monitor,
+  Save,
+  Check,
+  BookOpen,
 } from 'lucide-react'
 
 type SettingsTab = 'profile' | 'security' | 'appearance' | 'notifications' | 'storage' | 'about'
@@ -65,7 +68,6 @@ export const SettingsPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile')
-  const [isUpdating, setIsUpdating] = useState(false)
 
   // ----------------------------------------------------
   // SECTION 1 — PROFILE STATES
@@ -74,6 +76,8 @@ export const SettingsPage: React.FC = () => {
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || '')
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [editName, setEditName] = useState(displayName)
+  const [isSavingProfile, setIsSavingProfile] = useState(false)
+  const [isProfileSaved, setIsProfileSaved] = useState(false)
 
   // Cropper Modal state
   const [cropperOpen, setCropperOpen] = useState(false)
@@ -95,10 +99,12 @@ export const SettingsPage: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [newEmail, setNewEmail] = useState(user?.email || '')
   const [isChangingPassword, setIsChangingPassword] = useState(false)
+  const [isPasswordSaved, setIsPasswordSaved] = useState(false)
   const [isChangingEmail, setIsChangingEmail] = useState(false)
+  const [isEmailSaved, setIsEmailSaved] = useState(false)
 
   // ----------------------------------------------------
-  // SECTION 3 — APPEARANCE STATES
+  // SECTION 3 — APPEARANCE & STUDY PREFERENCES
   // ----------------------------------------------------
   const [themeMode, setThemeMode] = useLocalStorage<'light' | 'dark' | 'system'>(
     'librovia_theme_mode',
@@ -114,7 +120,10 @@ export const SettingsPage: React.FC = () => {
     }
   )
 
-  // Handle Theme switching logic
+  const [isSavingAppearance, setIsSavingAppearance] = useState(false)
+  const [isAppearanceSaved, setIsAppearanceSaved] = useState(false)
+
+  // Theme effect
   useEffect(() => {
     const root = document.documentElement
     if (themeMode === 'dark') {
@@ -147,6 +156,9 @@ export const SettingsPage: React.FC = () => {
     }
   )
 
+  const [isSavingNotifs, setIsSavingNotifs] = useState(false)
+  const [isNotifsSaved, setIsNotifsSaved] = useState(false)
+
   // ----------------------------------------------------
   // SECTION 5 — STORAGE STATES
   // ----------------------------------------------------
@@ -171,7 +183,7 @@ export const SettingsPage: React.FC = () => {
     return books.reduce((acc, b) => acc + (b.fileSize || 0), 0)
   }, [books])
 
-  const maxStorageLimitBytes = 1073741824 // 1 GB allocation limit
+  const maxStorageLimitBytes = 1073741824 // 1 GB allocation
   const storagePercentage = useMemo(() => {
     return Math.min(100, Math.round((totalUsedBytes / maxStorageLimitBytes) * 100))
   }, [totalUsedBytes])
@@ -190,48 +202,46 @@ export const SettingsPage: React.FC = () => {
     }
   }, [])
 
-  // ----------------------------------------------------
-  // SECTION 6 & 7 — MODALS & LOGOUT
-  // ----------------------------------------------------
+  // Modals & Logout
   const [showLogoutModal, setShowLogoutModal] = useState(false)
   const [activeModal, setActiveModal] = useState<
     'privacy' | 'terms' | 'support' | 'licenses' | null
   >(null)
 
   // ----------------------------------------------------
-  // HANDLERS
+  // FORM SAVE HANDLERS WITH 2-SECOND FEEDBACK STATE
   // ----------------------------------------------------
   const handleSaveProfileName = async () => {
     if (!editName.trim()) {
-      showError('Display name cannot be empty')
+      showError('Display name cannot be empty.')
       return
     }
-    setIsUpdating(true)
+    setIsSavingProfile(true)
     try {
       await updateProfile({ displayName: editName.trim() })
       setDisplayName(editName.trim())
       setIsEditingProfile(false)
-      showSuccess('Profile display name updated successfully!')
+      showSuccess('Profile display name updated!')
+
+      // Trigger temporary 2-second "Settings Saved" state
+      setIsProfileSaved(true)
+      setTimeout(() => setIsProfileSaved(false), 2000)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to update display name'
       showError(message)
     } finally {
-      setIsUpdating(false)
+      setIsSavingProfile(false)
     }
   }
 
-  // Handle Profile File Picker with 5 MB Guard
   const handleAvatarFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-
-    // 5 MB max limit validation
     if (file.size > 5 * 1024 * 1024) {
       showError('Please select an image smaller than 5 MB.')
       if (fileInputRef.current) fileInputRef.current.value = ''
       return
     }
-
     const reader = new FileReader()
     reader.onload = (event) => {
       const result = event.target?.result as string
@@ -241,11 +251,9 @@ export const SettingsPage: React.FC = () => {
       }
     }
     reader.readAsDataURL(file)
-    // Clear file input value to allow selecting the same file again
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  // Handle Cropped WebP output upload
   const handleCropComplete = async (croppedWebpDataUrl: string) => {
     setIsUploadingPhoto(true)
     try {
@@ -261,9 +269,8 @@ export const SettingsPage: React.FC = () => {
     }
   }
 
-  // Remove Photo handler (restores default initials avatar)
   const handleRemoveAvatar = async () => {
-    setIsUpdating(true)
+    setIsSavingProfile(true)
     try {
       await updateProfile({ avatarUrl: '' })
       setAvatarUrl('')
@@ -272,7 +279,7 @@ export const SettingsPage: React.FC = () => {
       const message = err instanceof Error ? err.message : 'Failed to remove picture'
       showError(message)
     } finally {
-      setIsUpdating(false)
+      setIsSavingProfile(false)
     }
   }
 
@@ -293,6 +300,9 @@ export const SettingsPage: React.FC = () => {
       showSuccess('Password updated successfully!')
       setNewPassword('')
       setConfirmPassword('')
+
+      setIsPasswordSaved(true)
+      setTimeout(() => setIsPasswordSaved(false), 2000)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to update password'
       showError(message)
@@ -311,13 +321,36 @@ export const SettingsPage: React.FC = () => {
     try {
       const { error } = await supabase.auth.updateUser({ email: newEmail })
       if (error) throw error
-      showSuccess('Confirmation email sent to new address! Please verify to complete.')
+      showSuccess('Confirmation email sent to new address!')
+
+      setIsEmailSaved(true)
+      setTimeout(() => setIsEmailSaved(false), 2000)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to change email'
       showError(message)
     } finally {
       setIsChangingEmail(false)
     }
+  }
+
+  const handleSaveAppearance = () => {
+    setIsSavingAppearance(true)
+    setTimeout(() => {
+      setIsSavingAppearance(false)
+      setIsAppearanceSaved(true)
+      showSuccess('Appearance & study preferences saved!')
+      setTimeout(() => setIsAppearanceSaved(false), 2000)
+    }, 400)
+  }
+
+  const handleSaveNotifications = () => {
+    setIsSavingNotifs(true)
+    setTimeout(() => {
+      setIsSavingNotifs(false)
+      setIsNotifsSaved(true)
+      showSuccess('Notification preferences saved!')
+      setTimeout(() => setIsNotifsSaved(false), 2000)
+    }, 400)
   }
 
   const handleClearCache = () => {
@@ -352,9 +385,7 @@ export const SettingsPage: React.FC = () => {
     }
   }
 
-  // ----------------------------------------------------
-  // NAVIGATION MENU GROUPS
-  // ----------------------------------------------------
+  // Navigation Menu Tabs
   const tabs: {
     id: SettingsTab
     label: string
@@ -370,37 +401,80 @@ export const SettingsPage: React.FC = () => {
     {
       id: 'security',
       label: 'Security',
-      description: 'Password, email & 2FA',
+      description: 'Passcode & email security',
       icon: Shield,
     },
     {
       id: 'appearance',
-      label: 'Appearance',
-      description: 'Theme & reader choices',
+      label: 'Study Preferences',
+      description: 'Appearance & reading defaults',
       icon: Sliders,
     },
     {
       id: 'notifications',
       label: 'Notifications',
-      description: 'Alerts & updates',
+      description: 'Alerts & daily reminders',
       icon: Bell,
     },
     {
       id: 'storage',
       label: 'Storage',
-      description: 'Cloud space & cache',
+      description: 'Cloud space & cache size',
       icon: HardDrive,
     },
     {
       id: 'about',
-      label: 'About',
-      description: 'Version, legal & help',
+      label: 'About & Support',
+      description: 'Version, terms & help',
       icon: Info,
     },
   ]
 
+  // Reusable Save Button Component with Loading & 2s "✓ Settings Saved" feedback
+  const RenderSaveButton = ({
+    isSaving,
+    isSaved,
+    onClick,
+    disabled = false,
+  }: {
+    isSaving: boolean
+    isSaved: boolean
+    onClick?: () => void
+    disabled?: boolean
+  }) => (
+    <Button
+      type={onClick ? 'button' : 'submit'}
+      size="md"
+      onClick={onClick}
+      disabled={disabled || isSaving}
+      aria-label={isSaved ? 'Settings Saved' : isSaving ? 'Saving Changes' : 'Save Changes'}
+      className={`flex items-center gap-2 rounded-2xl font-bold shadow-xs transition-all duration-200 focus:ring-2 focus:ring-purple-600/30 focus:outline-none ${
+        isSaved
+          ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+          : 'bg-purple-600 text-white hover:bg-purple-700'
+      }`}
+    >
+      {isSaving ? (
+        <>
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+          <span>Saving Changes...</span>
+        </>
+      ) : isSaved ? (
+        <>
+          <Check className="h-4 w-4 stroke-[3]" />
+          <span>Settings Saved</span>
+        </>
+      ) : (
+        <>
+          <Save className="h-4 w-4" />
+          <span>Save Changes</span>
+        </>
+      )}
+    </Button>
+  )
+
   return (
-    <PageWrapper className="relative min-h-screen space-y-8 pb-24 text-left select-none">
+    <PageWrapper className="relative min-h-screen space-y-6 pb-24 text-left select-none">
       {/* Hidden File Input for Avatar Selection */}
       <input
         ref={fileInputRef}
@@ -419,25 +493,23 @@ export const SettingsPage: React.FC = () => {
         isUploading={isUploadingPhoto}
       />
 
-      {/* Main Settings Header */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
-            Account & Settings
-          </h1>
-          <p className="text-xs font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">
-            Manage your personal profile, security credentials, appearance, and library storage.
-          </p>
-        </div>
+      {/* Main Settings Title */}
+      <div className="space-y-1">
+        <h1 className="font-sans text-2xl font-black tracking-tight text-slate-900 sm:text-3xl dark:text-white">
+          Settings
+        </h1>
+        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+          Manage your personal profile, security credentials, appearance, and library storage.
+        </p>
       </div>
 
-      {/* Settings Grid Layout */}
-      <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-4">
+      {/* Main Grid Layout */}
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-4">
         {/* Left Navigation Sidebar */}
-        <div className="rounded-3xl border border-slate-200/80 bg-white p-4 text-left shadow-xs lg:col-span-1 dark:border-slate-800 dark:bg-slate-900">
+        <div className="rounded-3xl border border-slate-200/80 bg-white p-3.5 text-left shadow-xs lg:col-span-1 dark:border-slate-800 dark:bg-slate-900">
           <div className="space-y-1">
             <span className="mb-2 block px-3 text-[9px] font-extrabold tracking-widest text-slate-400 uppercase">
-              Settings Navigation
+              Navigation
             </span>
             <div className="space-y-1">
               {tabs.map((tab) => {
@@ -445,10 +517,11 @@ export const SettingsPage: React.FC = () => {
                 return (
                   <button
                     key={tab.id}
+                    type="button"
                     onClick={() => setActiveTab(tab.id)}
                     className={`group relative flex w-full cursor-pointer items-center justify-between rounded-2xl p-3 text-left transition-all ${
                       isActive
-                        ? 'text-purple-650 bg-purple-50 shadow-2xs dark:bg-purple-950/30 dark:text-purple-400'
+                        ? 'bg-purple-50 text-purple-700 shadow-2xs dark:bg-purple-950/40 dark:text-purple-300'
                         : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-white'
                     }`}
                   >
@@ -485,6 +558,7 @@ export const SettingsPage: React.FC = () => {
 
           <div className="mt-6 border-t border-slate-100 pt-4 dark:border-slate-800">
             <button
+              type="button"
               onClick={() => setShowLogoutModal(true)}
               className="flex w-full cursor-pointer items-center gap-3 rounded-2xl p-3 text-xs font-bold text-rose-600 transition-colors hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/20"
             >
@@ -501,31 +575,31 @@ export const SettingsPage: React.FC = () => {
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
-              initial={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18 }}
               className="rounded-3xl border border-slate-200/80 bg-white p-6 text-left shadow-xs sm:p-8 dark:border-slate-800 dark:bg-slate-900"
             >
               {/* ======================================================== */}
-              {/* SECTION 1 — PROFILE */}
+              {/* SECTION 1 — PROFILE CENTER */}
               {/* ======================================================== */}
               {activeTab === 'profile' && (
-                <div className="space-y-8">
-                  <div>
-                    <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                <div className="space-y-6">
+                  {/* Section Header */}
+                  <div className="space-y-0.5 border-b border-slate-100 pb-4 dark:border-slate-800">
+                    <h2 className="text-lg font-black text-slate-900 dark:text-white">
                       Profile Center
                     </h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                    <p className="text-xs font-normal text-slate-500 dark:text-slate-400">
                       Manage your public identity, display name, and avatar picture.
                     </p>
                   </div>
 
-                  {/* Top Profile Card */}
-                  <div className="relative overflow-hidden rounded-3xl border border-purple-100 bg-gradient-to-br from-purple-50/70 via-white to-slate-50 p-6 shadow-xs dark:border-purple-950/30 dark:from-purple-950/20 dark:via-slate-900 dark:to-slate-900">
+                  {/* Profile Card */}
+                  <div className="relative overflow-hidden rounded-3xl border border-purple-100 bg-gradient-to-br from-purple-50/60 via-white to-slate-50 p-6 shadow-xs dark:border-purple-950/30 dark:from-purple-950/20 dark:via-slate-900 dark:to-slate-900">
                     <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start sm:justify-between">
                       <div className="flex flex-col items-center gap-5 sm:flex-row">
-                        {/* Circular Profile Avatar */}
                         <Avatar
                           src={avatarUrl}
                           name={displayName}
@@ -538,10 +612,10 @@ export const SettingsPage: React.FC = () => {
 
                         <div className="space-y-1 text-center sm:text-left">
                           <div className="flex items-center justify-center gap-2 sm:justify-start">
-                            <h3 className="text-xl font-extrabold text-slate-900 dark:text-white">
+                            <h3 className="text-xl font-black text-slate-900 dark:text-white">
                               {displayName}
                             </h3>
-                            <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[9px] font-bold text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[9px] font-bold text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">
                               <Sparkles className="h-3 w-3" /> Pro Member
                             </span>
                           </div>
@@ -560,7 +634,7 @@ export const SettingsPage: React.FC = () => {
                           setEditName(displayName)
                           setIsEditingProfile(!isEditingProfile)
                         }}
-                        className="rounded-xl"
+                        className="rounded-xl border border-purple-200 bg-purple-50 font-bold text-purple-700 hover:bg-purple-100 dark:border-purple-900/60 dark:bg-purple-950/40 dark:text-purple-300"
                       >
                         {isEditingProfile ? 'Cancel Edit' : 'Edit Profile'}
                       </Button>
@@ -584,32 +658,32 @@ export const SettingsPage: React.FC = () => {
                                 type="text"
                                 value={editName}
                                 onChange={(e) => setEditName(e.target.value)}
-                                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-900 focus:border-purple-600 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-900 transition-all focus:border-purple-600 focus:outline-none dark:border-slate-800 dark:bg-slate-800/60 dark:text-white dark:focus:border-purple-500"
                                 placeholder="Enter full name"
                               />
                             </div>
 
                             <div className="flex flex-wrap items-center gap-3 pt-2">
-                              <Button
-                                size="sm"
+                              <RenderSaveButton
+                                isSaving={isSavingProfile}
+                                isSaved={isProfileSaved}
                                 onClick={handleSaveProfileName}
-                                disabled={isUpdating}
-                              >
-                                {isUpdating ? 'Saving...' : 'Save Display Name'}
-                              </Button>
+                              />
+
                               <button
                                 type="button"
                                 onClick={() => fileInputRef.current?.click()}
-                                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                                className="inline-flex cursor-pointer items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                               >
                                 <Camera className="h-3.5 w-3.5 text-purple-600" />
                                 <span>Upload New Picture</span>
                               </button>
+
                               {avatarUrl && (
                                 <button
                                   type="button"
                                   onClick={handleRemoveAvatar}
-                                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3.5 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 dark:border-rose-950/40 dark:bg-slate-800 dark:text-rose-400 dark:hover:bg-rose-950/20"
+                                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-2xl border border-rose-200 bg-white px-4 py-2.5 text-xs font-bold text-rose-600 transition-colors hover:bg-rose-50 dark:border-rose-950/40 dark:bg-slate-800 dark:text-rose-400 dark:hover:bg-rose-950/20"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                   <span>Remove Picture</span>
@@ -622,9 +696,9 @@ export const SettingsPage: React.FC = () => {
                     </AnimatePresence>
                   </div>
 
-                  {/* Profile Quick Settings Details */}
+                  {/* Profile Cards Grid */}
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-800/30">
+                    <div className="rounded-2xl border border-slate-200/70 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-800/30">
                       <span className="block text-[10px] font-extrabold tracking-wider text-slate-400 uppercase">
                         Account Verification
                       </span>
@@ -636,7 +710,7 @@ export const SettingsPage: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-800/30">
+                    <div className="rounded-2xl border border-slate-200/70 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-800/30">
                       <span className="block text-[10px] font-extrabold tracking-wider text-slate-400 uppercase">
                         Member Since
                       </span>
@@ -652,26 +726,27 @@ export const SettingsPage: React.FC = () => {
               )}
 
               {/* ======================================================== */}
-              {/* SECTION 2 — SECURITY */}
+              {/* SECTION 2 — SECURITY & CREDENTIALS */}
               {/* ======================================================== */}
               {activeTab === 'security' && (
-                <div className="space-y-8">
-                  <div>
-                    <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                <div className="space-y-6">
+                  {/* Section Header */}
+                  <div className="space-y-0.5 border-b border-slate-100 pb-4 dark:border-slate-800">
+                    <h2 className="text-lg font-black text-slate-900 dark:text-white">
                       Security & Authentication
                     </h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Update login passcodes, change primary email, and view active sessions.
+                    <p className="text-xs font-normal text-slate-500 dark:text-slate-400">
+                      Update login passcodes, change registered email address, and view security settings.
                     </p>
                   </div>
 
                   {/* Change Password Form */}
                   <form
                     onSubmit={handleChangePasswordSubmit}
-                    className="space-y-4 rounded-3xl border border-slate-200/70 p-5 dark:border-slate-800"
+                    className="space-y-4 rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900"
                   >
-                    <div className="flex items-center gap-2 text-xs font-bold text-slate-900 uppercase dark:text-white">
-                      <Lock className="h-4 w-4 text-purple-600" />
+                    <div className="flex items-center gap-2 text-xs font-extrabold tracking-wider text-slate-900 uppercase dark:text-white">
+                      <Lock className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                       <span>Change Password</span>
                     </div>
 
@@ -685,7 +760,7 @@ export const SettingsPage: React.FC = () => {
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
                           placeholder="••••••••"
-                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-900 focus:border-purple-600 focus:bg-white focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:bg-slate-800"
+                          className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-xs font-semibold text-slate-900 transition-all focus:border-purple-600 focus:bg-white focus:outline-none dark:border-slate-800 dark:bg-slate-800/40 dark:text-white dark:focus:border-purple-500"
                         />
                       </div>
 
@@ -698,24 +773,28 @@ export const SettingsPage: React.FC = () => {
                           value={confirmPassword}
                           onChange={(e) => setConfirmPassword(e.target.value)}
                           placeholder="••••••••"
-                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-900 focus:border-purple-600 focus:bg-white focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:bg-slate-800"
+                          className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-xs font-semibold text-slate-900 transition-all focus:border-purple-600 focus:bg-white focus:outline-none dark:border-slate-800 dark:bg-slate-800/40 dark:text-white dark:focus:border-purple-500"
                         />
                       </div>
                     </div>
 
-                    <Button type="submit" size="sm" disabled={isChangingPassword}>
-                      {isChangingPassword ? 'Updating Password...' : 'Update Password'}
-                    </Button>
+                    <div className="pt-2">
+                      <RenderSaveButton
+                        isSaving={isChangingPassword}
+                        isSaved={isPasswordSaved}
+                        disabled={!newPassword}
+                      />
+                    </div>
                   </form>
 
                   {/* Change Email Form */}
                   <form
                     onSubmit={handleChangeEmailSubmit}
-                    className="space-y-4 rounded-3xl border border-slate-200/70 p-5 dark:border-slate-800"
+                    className="space-y-4 rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900"
                   >
-                    <div className="flex items-center gap-2 text-xs font-bold text-slate-900 uppercase dark:text-white">
-                      <Mail className="h-4 w-4 text-purple-600" />
-                      <span>Change Registered Email</span>
+                    <div className="flex items-center gap-2 text-xs font-extrabold tracking-wider text-slate-900 uppercase dark:text-white">
+                      <Mail className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                      <span>Change Primary Email</span>
                     </div>
 
                     <div className="space-y-1.5">
@@ -727,93 +806,39 @@ export const SettingsPage: React.FC = () => {
                         value={newEmail}
                         onChange={(e) => setNewEmail(e.target.value)}
                         placeholder="newemail@example.com"
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-900 focus:border-purple-600 focus:bg-white focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:bg-slate-800"
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-xs font-semibold text-slate-900 transition-all focus:border-purple-600 focus:bg-white focus:outline-none dark:border-slate-800 dark:bg-slate-800/40 dark:text-white dark:focus:border-purple-500"
                       />
                     </div>
 
-                    <Button type="submit" size="sm" disabled={isChangingEmail}>
-                      {isChangingEmail ? 'Updating Email...' : 'Update Email Address'}
-                    </Button>
-                  </form>
-
-                  {/* Future Placeholders */}
-                  <div className="space-y-3 pt-2">
-                    <span className="block text-[10px] font-extrabold tracking-widest text-slate-400 uppercase">
-                      Advanced Security (Coming Soon)
-                    </span>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                      <div className="flex flex-col justify-between rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-4 opacity-75 dark:border-slate-800 dark:bg-slate-800/20">
-                        <div className="flex items-center justify-between">
-                          <Smartphone className="h-4 w-4 text-slate-400" />
-                          <span className="rounded-md bg-slate-200 px-1.5 py-0.5 text-[8px] font-extrabold text-slate-600 dark:bg-slate-800 dark:text-slate-400">
-                            Coming Soon
-                          </span>
-                        </div>
-                        <div className="mt-3">
-                          <span className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                            Two-Factor Auth (2FA)
-                          </span>
-                          <span className="block text-[9.5px] text-slate-400">
-                            Authenticator app TOTP
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col justify-between rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-4 opacity-75 dark:border-slate-800 dark:bg-slate-800/20">
-                        <div className="flex items-center justify-between">
-                          <Monitor className="h-4 w-4 text-slate-400" />
-                          <span className="rounded-md bg-slate-200 px-1.5 py-0.5 text-[8px] font-extrabold text-slate-600 dark:bg-slate-800 dark:text-slate-400">
-                            Coming Soon
-                          </span>
-                        </div>
-                        <div className="mt-3">
-                          <span className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                            Active Devices
-                          </span>
-                          <span className="block text-[9.5px] text-slate-400">
-                            Session management
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col justify-between rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-4 opacity-75 dark:border-slate-800 dark:bg-slate-800/20">
-                        <div className="flex items-center justify-between">
-                          <History className="h-4 w-4 text-slate-400" />
-                          <span className="rounded-md bg-slate-200 px-1.5 py-0.5 text-[8px] font-extrabold text-slate-600 dark:bg-slate-800 dark:text-slate-400">
-                            Coming Soon
-                          </span>
-                        </div>
-                        <div className="mt-3">
-                          <span className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                            Login History
-                          </span>
-                          <span className="block text-[9.5px] text-slate-400">
-                            Audit security logs
-                          </span>
-                        </div>
-                      </div>
+                    <div className="pt-2">
+                      <RenderSaveButton
+                        isSaving={isChangingEmail}
+                        isSaved={isEmailSaved}
+                        disabled={!newEmail}
+                      />
                     </div>
-                  </div>
+                  </form>
                 </div>
               )}
 
               {/* ======================================================== */}
-              {/* SECTION 3 — APPEARANCE */}
+              {/* SECTION 3 — STUDY PREFERENCES & APPEARANCE */}
               {/* ======================================================== */}
               {activeTab === 'appearance' && (
-                <div className="space-y-8">
-                  <div>
-                    <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                      Appearance & Reader Preferences
+                <div className="space-y-6">
+                  {/* Section Header */}
+                  <div className="space-y-0.5 border-b border-slate-100 pb-4 dark:border-slate-800">
+                    <h2 className="text-lg font-black text-slate-900 dark:text-white">
+                      Study Preferences
                     </h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Customize dark/light theme options and reading defaults.
+                    <p className="text-xs font-normal text-slate-500 dark:text-slate-400">
+                      Customize your reading experience, visual theme, and study workflow defaults.
                     </p>
                   </div>
 
-                  {/* Theme Mode Selector */}
-                  <div className="space-y-3">
-                    <label className="block text-xs font-bold tracking-wider text-slate-700 uppercase dark:text-slate-300">
+                  {/* Application Theme Card */}
+                  <div className="space-y-3 rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                    <label className="block text-xs font-extrabold tracking-wider text-slate-700 uppercase dark:text-slate-300">
                       Application Theme
                     </label>
                     <div className="grid grid-cols-3 gap-3">
@@ -830,7 +855,7 @@ export const SettingsPage: React.FC = () => {
                             onClick={() => setThemeMode(t.id as 'light' | 'dark' | 'system')}
                             className={`flex cursor-pointer flex-col items-center gap-2.5 rounded-2xl border p-4 text-center transition-all ${
                               isSelected
-                                ? 'text-purple-650 border-purple-600 bg-purple-50/50 ring-2 ring-purple-600/20 dark:bg-purple-950/30 dark:text-purple-400'
+                                ? 'border-purple-600 bg-purple-50/50 text-purple-700 ring-2 ring-purple-600/20 dark:bg-purple-950/30 dark:text-purple-300'
                                 : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400'
                             }`}
                           >
@@ -842,15 +867,15 @@ export const SettingsPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Reader Preferences Controls */}
-                  <div className="space-y-6 border-t border-slate-100 pt-4 dark:border-slate-800">
-                    <h3 className="text-xs font-extrabold tracking-wider text-slate-400 uppercase">
-                      Reader Display Defaults
+                  {/* Reader Display Defaults Card */}
+                  <div className="space-y-5 rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                    <h3 className="text-xs font-extrabold tracking-wider text-slate-700 uppercase dark:text-slate-300">
+                      Reader Defaults
                     </h3>
 
                     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-slate-900 dark:text-white">
                           Font Size
                         </label>
                         <select
@@ -861,7 +886,7 @@ export const SettingsPage: React.FC = () => {
                               fontSize: e.target.value as ReaderPreferences['fontSize'],
                             })
                           }
-                          className="w-full cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:border-purple-600 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                          className="w-full cursor-pointer rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-xs font-bold text-slate-800 transition-all focus:border-purple-600 focus:outline-none dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-200"
                         >
                           <option value="sm">Small (12px)</option>
                           <option value="base">Medium (14px - Default)</option>
@@ -870,9 +895,9 @@ export const SettingsPage: React.FC = () => {
                         </select>
                       </div>
 
-                      <div className="space-y-2">
-                        <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
-                          Reading Width
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-slate-900 dark:text-white">
+                          Reading Canvas Width
                         </label>
                         <select
                           value={readerPrefs.readingWidth}
@@ -882,7 +907,7 @@ export const SettingsPage: React.FC = () => {
                               readingWidth: e.target.value as ReaderPreferences['readingWidth'],
                             })
                           }
-                          className="w-full cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:border-purple-600 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                          className="w-full cursor-pointer rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-xs font-bold text-slate-800 transition-all focus:border-purple-600 focus:outline-none dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-200"
                         >
                           <option value="narrow">Narrow (Comfortable reading)</option>
                           <option value="medium">Medium (Standard)</option>
@@ -892,16 +917,10 @@ export const SettingsPage: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between pt-2">
-                      <div>
-                        <span className="block text-xs font-bold text-slate-800 dark:text-slate-200">
-                          Smooth Page Animations
-                        </span>
-                        <span className="block text-[10px] text-slate-400">
-                          Enable smooth transitions and page flip motions
-                        </span>
-                      </div>
+                    <div className="border-t border-slate-100 pt-4 dark:border-slate-800">
                       <Toggle
+                        label="Smooth Page Animations"
+                        description="Enable smooth page transitions and responsive reader motions"
                         checked={readerPrefs.smoothAnimations}
                         onChange={(checked) =>
                           setReaderPrefs({
@@ -911,25 +930,34 @@ export const SettingsPage: React.FC = () => {
                         }
                       />
                     </div>
+
+                    <div className="pt-2">
+                      <RenderSaveButton
+                        isSaving={isSavingAppearance}
+                        isSaved={isAppearanceSaved}
+                        onClick={handleSaveAppearance}
+                      />
+                    </div>
                   </div>
                 </div>
               )}
 
               {/* ======================================================== */}
-              {/* SECTION 4 — NOTIFICATIONS */}
+              {/* SECTION 4 — NOTIFICATIONS & REMINDERS */}
               {/* ======================================================== */}
               {activeTab === 'notifications' && (
-                <div className="space-y-8">
-                  <div>
-                    <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                      Notifications & Reminders
+                <div className="space-y-6">
+                  {/* Section Header */}
+                  <div className="space-y-0.5 border-b border-slate-100 pb-4 dark:border-slate-800">
+                    <h2 className="text-lg font-black text-slate-900 dark:text-white">
+                      Notifications & Alerts
                     </h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Control which notifications and alerts you receive.
+                    <p className="text-xs font-normal text-slate-500 dark:text-slate-400">
+                      Manage alerts, daily study reminders, and system notifications.
                     </p>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-3 rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900">
                     {[
                       {
                         key: 'readingReminder' as const,
@@ -954,48 +982,52 @@ export const SettingsPage: React.FC = () => {
                     ].map((item, idx) => (
                       <div
                         key={item.key}
-                        className={`flex items-center justify-between rounded-2xl border border-slate-100 p-4 dark:border-slate-800/80 ${
-                          idx > 0 ? 'mt-2' : ''
+                        className={`rounded-2xl border border-slate-100 p-4 dark:border-slate-800 ${
+                          idx > 0 ? 'mt-3' : ''
                         }`}
                       >
-                        <div>
-                          <span className="block text-xs font-bold text-slate-900 dark:text-white">
-                            {item.label}
-                          </span>
-                          <span className="block text-[10px] text-slate-400">{item.desc}</span>
-                        </div>
                         <Toggle
+                          label={item.label}
+                          description={item.desc}
                           checked={notifPrefs[item.key]}
                           onChange={(val) => {
                             setNotifPrefs({
                               ...notifPrefs,
                               [item.key]: val,
                             })
-                            showSuccess(`${item.label} ${val ? 'enabled' : 'disabled'}`)
                           }}
                         />
                       </div>
                     ))}
+
+                    <div className="pt-4">
+                      <RenderSaveButton
+                        isSaving={isSavingNotifs}
+                        isSaved={isNotifsSaved}
+                        onClick={handleSaveNotifications}
+                      />
+                    </div>
                   </div>
                 </div>
               )}
 
               {/* ======================================================== */}
-              {/* SECTION 5 — STORAGE */}
+              {/* SECTION 5 — STORAGE & CLOUD USAGE */}
               {/* ======================================================== */}
               {activeTab === 'storage' && (
-                <div className="space-y-8">
-                  <div>
-                    <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                      Storage & Cloud Usage
+                <div className="space-y-6">
+                  {/* Section Header */}
+                  <div className="space-y-0.5 border-b border-slate-100 pb-4 dark:border-slate-800">
+                    <h2 className="text-lg font-black text-slate-900 dark:text-white">
+                      Storage & Cloud Quota
                     </h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Monitor your library storage, books count, and cache memory.
+                    <p className="text-xs font-normal text-slate-500 dark:text-slate-400">
+                      Monitor cloud library storage usage, book counts, and application cache.
                     </p>
                   </div>
 
                   {/* Storage Meter Card */}
-                  <div className="rounded-3xl border border-slate-200/80 bg-slate-50/50 p-6 dark:border-slate-800 dark:bg-slate-800/30">
+                  <div className="rounded-3xl border border-slate-200/80 bg-slate-50/50 p-6 shadow-xs dark:border-slate-800 dark:bg-slate-800/30">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex items-center gap-3">
                         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-600 text-white shadow-xs">
@@ -1003,7 +1035,7 @@ export const SettingsPage: React.FC = () => {
                         </div>
                         <div>
                           <span className="block text-[10px] font-extrabold tracking-wider text-slate-400 uppercase">
-                            Cloud Storage Used
+                            Cloud Storage Allocation
                           </span>
                           <h3 className="text-xl font-extrabold text-slate-900 dark:text-white">
                             {formatBytes(totalUsedBytes)}{' '}
@@ -1019,7 +1051,6 @@ export const SettingsPage: React.FC = () => {
                       </span>
                     </div>
 
-                    {/* Progress Bar */}
                     <div className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
                       <motion.div
                         initial={{ width: 0 }}
@@ -1030,9 +1061,9 @@ export const SettingsPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Storage Details Cards */}
-                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                    <div className="rounded-2xl border border-slate-100 p-4 dark:border-slate-800">
+                  {/* Storage Stats Grid */}
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                    <div className="rounded-2xl border border-slate-200/70 p-4 dark:border-slate-800">
                       <span className="block text-[9px] font-extrabold tracking-wider text-slate-400 uppercase">
                         Books Count
                       </span>
@@ -1041,7 +1072,7 @@ export const SettingsPage: React.FC = () => {
                       </span>
                     </div>
 
-                    <div className="rounded-2xl border border-slate-100 p-4 dark:border-slate-800">
+                    <div className="rounded-2xl border border-slate-200/70 p-4 dark:border-slate-800">
                       <span className="block text-[9px] font-extrabold tracking-wider text-slate-400 uppercase">
                         Collections
                       </span>
@@ -1050,7 +1081,7 @@ export const SettingsPage: React.FC = () => {
                       </span>
                     </div>
 
-                    <div className="rounded-2xl border border-slate-100 p-4 dark:border-slate-800">
+                    <div className="rounded-2xl border border-slate-200/70 p-4 dark:border-slate-800">
                       <span className="block text-[9px] font-extrabold tracking-wider text-slate-400 uppercase">
                         Cache Size
                       </span>
@@ -1058,53 +1089,33 @@ export const SettingsPage: React.FC = () => {
                         {cacheSizeStr}
                       </span>
                     </div>
-
-                    <div className="rounded-2xl border border-dashed border-slate-200 p-4 opacity-75 dark:border-slate-800">
-                      <span className="block text-[9px] font-extrabold tracking-wider text-slate-400 uppercase">
-                        Offline Downloads
-                      </span>
-                      <span className="mt-1 block text-xs font-bold text-purple-600 dark:text-purple-400">
-                        Coming Soon
-                      </span>
-                    </div>
                   </div>
 
-                  {/* Storage Buttons */}
-                  <div className="flex flex-wrap items-center gap-3 pt-2">
+                  <div className="pt-2">
                     <Button
                       size="sm"
                       onClick={handleClearCache}
-                      className="rounded-xl border border-slate-200 bg-white text-slate-800 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700"
+                      className="rounded-2xl border border-slate-200 bg-white font-bold text-slate-800 shadow-xs hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700"
                     >
                       <Trash2 className="mr-1.5 h-3.5 w-3.5 text-rose-500" />
-                      <span>Clear Application Cache</span>
+                      <span>Clear Cache</span>
                     </Button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        showInfo('Offline downloads manager will be released in Phase 5!')
-                      }
-                      className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-400 dark:border-slate-800 dark:bg-slate-800/40"
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      <span>Manage Downloads (Coming Soon)</span>
-                    </button>
                   </div>
                 </div>
               )}
 
               {/* ======================================================== */}
-              {/* SECTION 6 — ABOUT */}
+              {/* SECTION 6 — ABOUT & LEGAL */}
               {/* ======================================================== */}
               {activeTab === 'about' && (
-                <div className="space-y-8">
-                  <div>
-                    <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                <div className="space-y-6">
+                  {/* Section Header */}
+                  <div className="space-y-0.5 border-b border-slate-100 pb-4 dark:border-slate-800">
+                    <h2 className="text-lg font-black text-slate-900 dark:text-white">
                       About Librovia
                     </h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Application metadata, legal terms, and support info.
+                    <p className="text-xs font-normal text-slate-500 dark:text-slate-400">
+                      Application metadata, legal terms, and support channels.
                     </p>
                   </div>
 
@@ -1126,7 +1137,7 @@ export const SettingsPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setActiveModal('privacy')}
-                      className="flex cursor-pointer items-center justify-between rounded-2xl border border-slate-100 p-4 text-left hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                      className="flex cursor-pointer items-center justify-between rounded-2xl border border-slate-200/80 p-4 text-left shadow-2xs transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
                     >
                       <div className="flex items-center gap-3">
                         <FileText className="h-4.5 w-4.5 text-purple-600" />
@@ -1140,7 +1151,7 @@ export const SettingsPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setActiveModal('terms')}
-                      className="flex cursor-pointer items-center justify-between rounded-2xl border border-slate-100 p-4 text-left hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                      className="flex cursor-pointer items-center justify-between rounded-2xl border border-slate-200/80 p-4 text-left shadow-2xs transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
                     >
                       <div className="flex items-center gap-3">
                         <Shield className="h-4.5 w-4.5 text-purple-600" />
@@ -1154,7 +1165,7 @@ export const SettingsPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setActiveModal('support')}
-                      className="flex cursor-pointer items-center justify-between rounded-2xl border border-slate-100 p-4 text-left hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                      className="flex cursor-pointer items-center justify-between rounded-2xl border border-slate-200/80 p-4 text-left shadow-2xs transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
                     >
                       <div className="flex items-center gap-3">
                         <HelpCircle className="h-4.5 w-4.5 text-purple-600" />
@@ -1168,7 +1179,7 @@ export const SettingsPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setActiveModal('licenses')}
-                      className="flex cursor-pointer items-center justify-between rounded-2xl border border-slate-100 p-4 text-left hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                      className="flex cursor-pointer items-center justify-between rounded-2xl border border-slate-200/80 p-4 text-left shadow-2xs transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
                     >
                       <div className="flex items-center gap-3">
                         <Code2 className="h-4.5 w-4.5 text-purple-600" />
@@ -1186,9 +1197,7 @@ export const SettingsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ======================================================== */}
-      {/* SECTION 7 — LOGOUT CONFIRMATION DIALOG */}
-      {/* ======================================================== */}
+      {/* Logout Dialog Modal */}
       <AnimatePresence>
         {showLogoutModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -1214,7 +1223,7 @@ export const SettingsPage: React.FC = () => {
                   <h3 className="text-base font-bold text-slate-900 dark:text-white">
                     Sign Out Confirmation
                   </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <p className="text-xs font-semibold text-slate-400">
                     Are you sure you want to log out?
                   </p>
                 </div>
@@ -1224,13 +1233,13 @@ export const SettingsPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowLogoutModal(false)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
                 >
                   Cancel
                 </button>
                 <Button
                   onClick={handleConfirmLogout}
-                  className="rounded-xl bg-rose-600 text-white hover:bg-rose-700"
+                  className="rounded-xl bg-rose-600 font-bold text-white hover:bg-rose-700"
                 >
                   Logout
                 </Button>
@@ -1240,9 +1249,7 @@ export const SettingsPage: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* ======================================================== */}
-      {/* INFORMATIONAL LEGAL MODALS */}
-      {/* ======================================================== */}
+      {/* Informational Legal Modals */}
       <AnimatePresence>
         {activeModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -1268,6 +1275,7 @@ export const SettingsPage: React.FC = () => {
                   {activeModal === 'licenses' && 'Open Source Licenses'}
                 </h3>
                 <button
+                  type="button"
                   onClick={() => setActiveModal(null)}
                   className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
