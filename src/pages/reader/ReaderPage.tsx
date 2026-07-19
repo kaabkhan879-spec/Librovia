@@ -496,6 +496,9 @@ export const ReaderPage: React.FC = () => {
               progress: 0,
               currentPage: 1,
               totalPages: 320,
+              isFavorite: false,
+              tags: [],
+              fileSize: meta.fileSize || 0,
               createdAt: meta.downloadedAt,
               updatedAt: meta.downloadedAt,
             }
