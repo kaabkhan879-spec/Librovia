@@ -22,12 +22,13 @@ import {
   Calendar,
   X,
   Info,
+  FilterX,
 } from 'lucide-react'
 import { Button } from '../../components/common/Button'
 
-export type SortType = 'a-z' | 'newest' | 'recently-opened' | 'progress' | 'size'
-export type FilterChip =
-  'all' | 'pdf' | 'epub' | 'recently-added' | 'recently-read' | 'alphabetical'
+export type SortType = 'recently-opened' | 'newest' | 'a-z' | 'z-a' | 'progress' | 'size'
+export type FormatFilter = 'all' | 'pdf' | 'epub'
+export type StatusTab = 'all' | 'reading' | 'completed' | 'favorites'
 
 export const LibraryPage: React.FC = () => {
   const navigate = useNavigate()
@@ -39,18 +40,18 @@ export const LibraryPage: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
-  // Search & Debounce
+  // Search & 300ms Debounce
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
 
-  // Filter Chips & Sort state
-  const [activeFilterChip, setActiveFilterChip] = useState<FilterChip>('all')
+  // Compact Dropdown Filter States
+  const [selectedFormat, setSelectedFormat] = useState<FormatFilter>('all')
   const [selectedCollectionId, setSelectedCollectionId] = useState<string>('all')
   const [selectedAuthor, setSelectedAuthor] = useState<string>('all')
   const [sortBy, setSortBy] = useState<SortType>('recently-opened')
 
-  // Tab filter (from header or URL)
-  const [activeTab, setActiveTab] = useState<'all' | 'favorites' | 'reading' | 'completed'>(() => {
+  // Status Tab Filter
+  const [activeTab, setActiveTab] = useState<StatusTab>(() => {
     if (tabParam === 'favorites') return 'favorites'
     if (tabParam === 'reading') return 'reading'
     if (tabParam === 'completed') return 'completed'
@@ -58,7 +59,7 @@ export const LibraryPage: React.FC = () => {
   })
   const [prevTabParam, setPrevTabParam] = useState<string | null>(tabParam)
 
-  // Sync state if URL search param updates dynamically during render
+  // Sync state if URL search param updates dynamically
   if (tabParam !== prevTabParam) {
     setPrevTabParam(tabParam)
     if (tabParam === 'favorites') setActiveTab('favorites')
@@ -85,7 +86,7 @@ export const LibraryPage: React.FC = () => {
     return () => clearTimeout(timer)
   }, [searchQuery])
 
-  // Keyboard shortcut Ctrl+K to focus search bar
+  // Keyboard shortcut Ctrl+K / Cmd+K to focus search bar
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
@@ -222,14 +223,14 @@ export const LibraryPage: React.FC = () => {
   // Extract unique authors list
   const uniqueAuthors = useMemo(() => {
     const authorsSet = new Set(books.map((b) => b.author).filter(Boolean))
-    return Array.from(authorsSet)
+    return Array.from(authorsSet) as string[]
   }, [books])
 
-  // Filter & Sort Engine (300ms Debounced & Optimized)
+  // Filter & Sort Engine
   const filteredBooks = useMemo(() => {
     let result = [...books]
 
-    // 1. Tab Filter
+    // 1. Status Tab Filter
     if (activeTab === 'favorites') {
       result = result.filter((b) => b.isFavorite)
     } else if (activeTab === 'reading') {
@@ -238,22 +239,11 @@ export const LibraryPage: React.FC = () => {
       result = result.filter((b) => b.progress === 100)
     }
 
-    // 2. Filter Chip
-    if (activeFilterChip === 'pdf') {
+    // 2. Format Dropdown Filter
+    if (selectedFormat === 'pdf') {
       result = result.filter((b) => getFileType(b.filePath) === 'PDF')
-    } else if (activeFilterChip === 'epub') {
+    } else if (selectedFormat === 'epub') {
       result = result.filter((b) => getFileType(b.filePath) === 'EPUB')
-    } else if (activeFilterChip === 'recently-added') {
-      result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    } else if (activeFilterChip === 'recently-read') {
-      result = result.filter((b) => b.progress > 0)
-      result.sort((a, b) => {
-        const timeA = new Date(a.lastReadAt || a.createdAt).getTime()
-        const timeB = new Date(b.lastReadAt || b.createdAt).getTime()
-        return timeB - timeA
-      })
-    } else if (activeFilterChip === 'alphabetical') {
-      result.sort((a, b) => a.title.localeCompare(b.title))
     }
 
     // 3. Search Query (debounced)
@@ -282,6 +272,7 @@ export const LibraryPage: React.FC = () => {
     // 6. Sort Dropdown Logic
     return result.sort((a, b) => {
       if (sortBy === 'a-z') return a.title.localeCompare(b.title)
+      if (sortBy === 'z-a') return b.title.localeCompare(a.title)
       if (sortBy === 'newest')
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       if (sortBy === 'recently-opened') {
@@ -296,7 +287,7 @@ export const LibraryPage: React.FC = () => {
   }, [
     books,
     debouncedQuery,
-    activeFilterChip,
+    selectedFormat,
     selectedCollectionId,
     selectedAuthor,
     sortBy,
@@ -304,50 +295,98 @@ export const LibraryPage: React.FC = () => {
     getCollectionName,
   ])
 
+  const hasActiveFilters = useMemo(() => {
+    return (
+      searchQuery.trim() !== '' ||
+      activeTab !== 'all' ||
+      selectedFormat !== 'all' ||
+      selectedCollectionId !== 'all' ||
+      selectedAuthor !== 'all' ||
+      sortBy !== 'recently-opened'
+    )
+  }, [searchQuery, activeTab, selectedFormat, selectedCollectionId, selectedAuthor, sortBy])
+
+  const handleClearFilters = useCallback(() => {
+    setSearchQuery('')
+    setActiveTab('all')
+    setSelectedFormat('all')
+    setSelectedCollectionId('all')
+    setSelectedAuthor('all')
+    setSortBy('recently-opened')
+  }, [])
+
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     e.currentTarget.src =
       'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=300&q=80'
   }
 
   return (
-    <PageWrapper className="relative min-h-screen space-y-8 pb-20 text-left select-none">
-      {/* Header Section */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-1">
-          <h1 className="font-sans text-2xl font-black tracking-tight text-slate-900 sm:text-3xl dark:text-white">
-            My Library
-          </h1>
-          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-            Your personal digital bookshelf ({books.length} {books.length === 1 ? 'book' : 'books'})
-          </p>
+    <PageWrapper className="relative min-h-screen space-y-6 pb-20 text-left select-none">
+      {/* Header Title Section */}
+      <div className="space-y-1">
+        <h1 className="font-sans text-2xl font-black tracking-tight text-slate-900 sm:text-3xl dark:text-white">
+          My Library
+        </h1>
+        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+          Your personal digital bookshelf ({books.length} {books.length === 1 ? 'book' : 'books'})
+        </p>
+      </div>
+
+      {/* TOP ROW: Search Bar (Primary Focus) + Upload Book Button (Secondary) */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative max-w-2xl flex-1">
+          <Search className="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-purple-600 dark:text-purple-400" />
+          <input
+            ref={searchBarRef}
+            type="text"
+            placeholder="Search books by title, author, collection, or tag... (Ctrl + K)"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full rounded-2xl border border-slate-200/90 bg-white py-3 pr-12 pl-10 text-xs font-semibold text-slate-900 placeholder:text-slate-400 shadow-xs transition-all focus:border-purple-600 focus:outline-none focus:ring-2 focus:ring-purple-600/10 dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:focus:border-purple-500 dark:focus:ring-purple-500/10"
+          />
+          {searchQuery ? (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute inset-y-0 right-3 flex items-center text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-200"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : (
+            <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+              <kbd className="inline-flex items-center gap-0.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 font-sans text-[10px] font-bold text-slate-400 shadow-2xs dark:border-slate-700 dark:bg-slate-800">
+                <span>⌘</span>K
+              </kbd>
+            </div>
+          )}
         </div>
 
-        <Link to={ROUTES.UPLOAD}>
+        <Link to={ROUTES.UPLOAD} className="shrink-0">
           <Button
-            size="sm"
+            size="md"
             leftIcon={<Plus className="h-4 w-4" />}
-            className="rounded-2xl bg-purple-600 font-bold text-white shadow-xs transition-all hover:bg-purple-700"
+            className="w-full rounded-2xl bg-purple-600 font-bold text-white shadow-xs transition-all hover:bg-purple-700 sm:w-auto"
           >
             Upload Book
           </Button>
         </Link>
       </div>
 
-      {/* Main Tab Selectors & Filter Chips Bar */}
-      <div className="space-y-4">
-        {/* Tab Selectors */}
-        <div className="flex max-w-lg self-start rounded-2xl bg-slate-100 p-1.5 dark:bg-slate-900/60">
+      {/* SECOND ROW: Status Filters (Left) & Compact Dropdown Menus (Right) */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4 dark:border-slate-800/80">
+        {/* Status Filters */}
+        <div className="flex items-center rounded-2xl bg-slate-100 p-1 dark:bg-slate-900/80">
           {[
-            { id: 'all' as const, label: 'All Books' },
-            { id: 'favorites' as const, label: 'Favorites ⭐' },
-            { id: 'reading' as const, label: 'Reading 📖' },
-            { id: 'completed' as const, label: 'Completed ✅' },
+            { id: 'all' as const, label: 'All' },
+            { id: 'reading' as const, label: 'Reading' },
+            { id: 'completed' as const, label: 'Completed' },
+            { id: 'favorites' as const, label: '⭐ Favorites' },
           ].map((tab) => (
             <button
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`relative cursor-pointer rounded-xl px-4 py-2 text-xs font-bold transition-all duration-200 ${
+              className={`relative cursor-pointer rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all duration-200 ${
                 activeTab === tab.id
                   ? 'text-purple-600 dark:text-purple-400'
                   : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
@@ -356,7 +395,7 @@ export const LibraryPage: React.FC = () => {
               <span className="relative z-10">{tab.label}</span>
               {activeTab === tab.id && (
                 <motion.div
-                  layoutId="library-active-tab"
+                  layoutId="library-active-status"
                   transition={{ type: 'spring', stiffness: 380, damping: 30 }}
                   className="absolute inset-0 rounded-xl bg-white shadow-xs dark:bg-slate-800"
                 />
@@ -365,32 +404,101 @@ export const LibraryPage: React.FC = () => {
           ))}
         </div>
 
-        {/* Filter Chips Bar */}
-        <div className="flex scrollbar-none items-center gap-2 overflow-x-auto pb-1">
-          {[
-            { id: 'all' as const, label: 'All Formats' },
-            { id: 'pdf' as const, label: 'PDF Documents' },
-            { id: 'epub' as const, label: 'EPUB E-Books' },
-            { id: 'recently-read' as const, label: 'Recently Read' },
-            { id: 'recently-added' as const, label: 'Recently Added' },
-            { id: 'alphabetical' as const, label: 'A – Z' },
-          ].map((chip) => {
-            const isSelected = activeFilterChip === chip.id
-            return (
-              <button
-                key={chip.id}
-                type="button"
-                onClick={() => setActiveFilterChip(chip.id)}
-                className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
-                  isSelected
-                    ? 'bg-purple-600 text-white shadow-xs'
-                    : 'border border-slate-200/70 bg-white text-slate-600 hover:border-purple-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
-                }`}
-              >
-                {chip.label}
-              </button>
-            )
-          })}
+        {/* Compact Dropdown Menus */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Format Dropdown */}
+          <select
+            value={selectedFormat}
+            onChange={(e) => setSelectedFormat(e.target.value as FormatFilter)}
+            className="cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-xs transition-all focus:border-purple-600 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:focus:border-purple-500"
+          >
+            <option value="all">Format: All</option>
+            <option value="pdf">Format: PDF</option>
+            <option value="epub">Format: EPUB</option>
+          </select>
+
+          {/* Collection Dropdown */}
+          <select
+            value={selectedCollectionId}
+            onChange={(e) => setSelectedCollectionId(e.target.value)}
+            className="cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-xs transition-all focus:border-purple-600 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:focus:border-purple-500"
+          >
+            <option value="all">Collection: All</option>
+            {collections.map((col) => (
+              <option key={col.id} value={col.id}>
+                {col.name}
+              </option>
+            ))}
+          </select>
+
+          {/* Author Dropdown */}
+          <select
+            value={selectedAuthor}
+            onChange={(e) => setSelectedAuthor(e.target.value)}
+            className="cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-xs transition-all focus:border-purple-600 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:focus:border-purple-500"
+          >
+            <option value="all">Author: All</option>
+            {uniqueAuthors.map((author) => (
+              <option key={author} value={author}>
+                {author}
+              </option>
+            ))}
+          </select>
+
+          {/* Sort Dropdown */}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortType)}
+            className="cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-xs transition-all focus:border-purple-600 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:focus:border-purple-500"
+          >
+            <option value="recently-opened">Sort: Recently Opened</option>
+            <option value="newest">Sort: Recently Added</option>
+            <option value="a-z">Sort: Title A – Z</option>
+            <option value="z-a">Sort: Title Z – A</option>
+            <option value="progress">Sort: Reading Progress</option>
+            <option value="size">Sort: File Size</option>
+          </select>
+
+          {/* Reset Filters (Visible if filters active) */}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={handleClearFilters}
+              className="flex cursor-pointer items-center gap-1 rounded-xl border border-purple-200 bg-purple-50 px-2.5 py-1.5 text-xs font-bold text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-900/60 dark:bg-purple-950/30 dark:text-purple-300 dark:hover:bg-purple-900/50"
+              title="Clear all active filters"
+            >
+              <FilterX className="h-3.5 w-3.5" />
+              <span>Reset</span>
+            </button>
+          )}
+
+          {/* View Mode Toggle */}
+          <div className="ml-1 flex rounded-xl border border-slate-200 bg-white p-1 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              className={`cursor-pointer rounded-lg p-1 transition-all ${
+                viewMode === 'grid'
+                  ? 'bg-purple-600 text-white shadow-xs'
+                  : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+              }`}
+              title="Grid View"
+            >
+              <Grid className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              className={`cursor-pointer rounded-lg p-1 transition-all ${
+                viewMode === 'list'
+                  ? 'bg-purple-600 text-white shadow-xs'
+                  : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+              }`}
+              title="List View"
+            >
+              <List className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -407,7 +515,7 @@ export const LibraryPage: React.FC = () => {
             {Array.from({ length: 8 }).map((_, idx) => (
               <div
                 key={idx}
-                className="flex h-[360px] flex-col justify-between rounded-3xl border border-slate-100 bg-white p-4 text-left shadow-xs dark:border-slate-800 dark:bg-slate-900"
+                className="flex h-[380px] flex-col justify-between rounded-3xl border border-slate-100 bg-white p-4 text-left shadow-xs dark:border-slate-800 dark:bg-slate-900"
               >
                 <div className="relative aspect-[0.72/1] w-full flex-1 animate-pulse overflow-hidden rounded-2xl bg-slate-100 dark:bg-slate-800" />
                 <div className="mt-4 space-y-2.5">
@@ -422,15 +530,15 @@ export const LibraryPage: React.FC = () => {
             ))}
           </motion.div>
         ) : books.length === 0 ? (
-          /* Premium Empty State */
+          /* Initial Empty State (No Books Uploaded Yet) */
           <motion.div
-            key="empty"
+            key="empty-library"
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0 }}
-            className="mx-auto max-w-lg space-y-6 rounded-3xl border border-slate-200/80 bg-white p-12 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900"
+            className="mx-auto max-w-md space-y-6 rounded-3xl border border-slate-200/80 bg-white p-10 text-center shadow-xs dark:border-slate-800 dark:bg-slate-900"
           >
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-purple-50 text-purple-600 dark:bg-purple-950/30 dark:text-purple-400">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-400">
               <BookOpen className="h-8 w-8" />
             </div>
             <div className="space-y-1.5">
@@ -444,11 +552,41 @@ export const LibraryPage: React.FC = () => {
             <Link to={ROUTES.UPLOAD} className="inline-block pt-2">
               <Button
                 leftIcon={<Plus className="h-4 w-4" />}
-                className="rounded-2xl bg-purple-600 font-bold text-white hover:bg-purple-700"
+                className="rounded-2xl bg-purple-600 font-bold text-white shadow-xs hover:bg-purple-700"
               >
                 Upload Your First Book
               </Button>
             </Link>
+          </motion.div>
+        ) : filteredBooks.length === 0 ? (
+          /* Premium Filtered Empty State */
+          <motion.div
+            key="empty-filtered"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            className="mx-auto max-w-md space-y-5 rounded-3xl border border-slate-200/80 bg-white p-10 text-center shadow-xs dark:border-slate-800 dark:bg-slate-900"
+          >
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-400">
+              <Search className="h-7 w-7" />
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-base font-black text-slate-900 dark:text-white">
+                No books found.
+              </h3>
+              <p className="mx-auto max-w-xs text-xs font-semibold text-slate-400">
+                Try changing your filters or clearing your search query.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleClearFilters}
+              leftIcon={<X className="h-3.5 w-3.5" />}
+              className="rounded-xl border-purple-200 font-bold text-purple-700 hover:bg-purple-50 dark:border-purple-900 dark:text-purple-300 dark:hover:bg-purple-950/50"
+            >
+              Clear Filters
+            </Button>
           </motion.div>
         ) : (
           /* Real Library Grid / List Interface */
@@ -458,124 +596,9 @@ export const LibraryPage: React.FC = () => {
             animate={{ opacity: 1 }}
             className="space-y-6"
           >
-            {/* Toolbar: Search, Collection, Author, Sort & View Mode */}
-            <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-                {/* Search Bar with 300ms Debounce */}
-                <div className="relative w-full max-w-xs shrink-0">
-                  <Search className="absolute top-2.5 left-3.5 h-4 w-4 text-slate-400" />
-                  <input
-                    ref={searchBarRef}
-                    type="text"
-                    placeholder="Search title, author, tags... (Ctrl + K)"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 py-2 pr-12 pl-10 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:border-purple-600 focus:bg-white focus:outline-none dark:border-slate-800 dark:bg-slate-800/40 dark:text-white"
-                  />
-                  {searchQuery ? (
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery('')}
-                      className="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  ) : (
-                    <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
-                      <kbd className="inline-flex items-center gap-0.5 rounded border border-slate-200 bg-white px-1.5 font-sans text-[8px] font-bold text-slate-400 shadow-2xs dark:border-slate-700 dark:bg-slate-800">
-                        <span className="text-[9px]">⌘</span>K
-                      </kbd>
-                    </div>
-                  )}
-                </div>
-
-                {/* Collection Filter Dropdown */}
-                <select
-                  value={selectedCollectionId}
-                  onChange={(e) => setSelectedCollectionId(e.target.value)}
-                  className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300"
-                >
-                  <option value="all">📁 All Collections</option>
-                  {collections.map((col) => (
-                    <option key={col.id} value={col.id}>
-                      {col.name}
-                    </option>
-                  ))}
-                </select>
-
-                {/* Author Filter Dropdown */}
-                <select
-                  value={selectedAuthor}
-                  onChange={(e) => setSelectedAuthor(e.target.value)}
-                  className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300"
-                >
-                  <option value="all">✍ All Authors</option>
-                  {uniqueAuthors.map((author) => (
-                    <option key={author} value={author}>
-                      {author}
-                    </option>
-                  ))}
-                </select>
-
-                {/* Sort Dropdown */}
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as SortType)}
-                  className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300"
-                >
-                  <option value="recently-opened">↕ Recently Opened</option>
-                  <option value="newest">↕ Recently Uploaded</option>
-                  <option value="a-z">↕ Alphabetical (A–Z)</option>
-                  <option value="progress">↕ Reading Progress</option>
-                  <option value="size">↕ File Size</option>
-                </select>
-              </div>
-
-              {/* View Toggle */}
-              <div className="flex items-center gap-2">
-                <div className="flex rounded-2xl border border-slate-200 bg-slate-50/50 p-1 dark:border-slate-800 dark:bg-slate-800/40">
-                  <button
-                    type="button"
-                    onClick={() => setViewMode('grid')}
-                    className={`cursor-pointer rounded-xl p-1.5 transition-all ${
-                      viewMode === 'grid'
-                        ? 'bg-white text-purple-600 shadow-xs dark:bg-slate-800 dark:text-white'
-                        : 'text-slate-400 hover:text-slate-600'
-                    }`}
-                    title="Grid View"
-                  >
-                    <Grid className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setViewMode('list')}
-                    className={`cursor-pointer rounded-xl p-1.5 transition-all ${
-                      viewMode === 'list'
-                        ? 'bg-white text-purple-600 shadow-xs dark:bg-slate-800 dark:text-white'
-                        : 'text-slate-400 hover:text-slate-600'
-                    }`}
-                    title="List View"
-                  >
-                    <List className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Display Books Grid or List */}
-            {filteredBooks.length === 0 ? (
-              <div className="flex h-48 flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-white p-6 text-center dark:border-slate-800 dark:bg-slate-900">
-                <Search className="mb-2 h-6 w-6 text-slate-300" />
-                <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                  No books match your current filters or search query.
-                </p>
-                <p className="mt-1 text-[11px] text-slate-400">
-                  Try clearing search terms or selecting another category filter.
-                </p>
-              </div>
-            ) : viewMode === 'grid' ? (
+            {viewMode === 'grid' ? (
               /* ==================================================
-                 REDESIGNED BOOK GRID CARDS
+                 PREMIUM EQUAL-HEIGHT BOOK GRID CARDS
                  ================================================== */
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                 {filteredBooks.map((book) => {
@@ -586,11 +609,11 @@ export const LibraryPage: React.FC = () => {
                     <div
                       key={book.id}
                       onClick={() => navigate(ROUTES.READER.replace(':id', book.id))}
-                      className="group/card relative flex h-full cursor-pointer flex-col justify-between rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs transition-all duration-200 hover:-translate-y-1 hover:border-purple-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-purple-900/60"
+                      className="group/card relative flex h-full cursor-pointer flex-col justify-between rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs transition-all duration-200 hover:-translate-y-1 hover:border-purple-300 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900 dark:hover:border-purple-900/60"
                     >
                       {/* Top Cover Section */}
                       <div className="space-y-3">
-                        <div className="relative aspect-[0.72/1] w-full overflow-hidden rounded-2xl border border-slate-200/60 bg-slate-100 shadow-xs dark:border-slate-800 dark:bg-slate-950/20">
+                        <div className="relative aspect-[0.72/1] w-full overflow-hidden rounded-2xl border border-slate-200/60 bg-slate-100 shadow-xs dark:border-slate-800 dark:bg-slate-950/40">
                           <img
                             src={book.coverPath}
                             alt={book.title}
@@ -598,12 +621,12 @@ export const LibraryPage: React.FC = () => {
                             className="h-full w-full object-cover transition-transform duration-300 group-hover/card:scale-105"
                           />
 
-                          {/* Top Right Quick Action & Favorite Drawer */}
-                          <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5">
+                          {/* Top Right Actions */}
+                          <div className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1.5">
                             <button
                               type="button"
                               onClick={(e) => toggleStar(book.id, e)}
-                              className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200/60 bg-white/95 text-slate-400 shadow-sm backdrop-blur-xs hover:text-amber-500 dark:border-slate-800/60 dark:bg-slate-900/95"
+                              className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200/60 bg-white/95 text-slate-400 backdrop-blur-xs transition-colors hover:text-amber-500 dark:border-slate-800/60 dark:bg-slate-900/95"
                             >
                               <Star
                                 className={`h-4 w-4 ${
@@ -612,15 +635,16 @@ export const LibraryPage: React.FC = () => {
                               />
                             </button>
 
-                            {/* Quick Actions Hover Menu Trigger */}
                             <div className="relative">
                               <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  setActiveMenuBookId(activeMenuBookId === book.id ? null : book.id)
+                                  setActiveMenuBookId(
+                                    activeMenuBookId === book.id ? null : book.id
+                                  )
                                 }}
-                                className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200/60 bg-white/95 text-slate-600 shadow-sm backdrop-blur-xs hover:text-purple-600 dark:border-slate-800/60 dark:bg-slate-900/95 dark:text-slate-300 dark:hover:text-white"
+                                className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200/60 bg-white/95 text-slate-600 backdrop-blur-xs transition-colors hover:text-purple-600 dark:border-slate-800/60 dark:bg-slate-900/95 dark:text-slate-300 dark:hover:text-white"
                               >
                                 <MoreVertical className="h-4 w-4" />
                               </button>
@@ -632,29 +656,26 @@ export const LibraryPage: React.FC = () => {
                                   onClick={(e) => e.stopPropagation()}
                                   className="absolute top-9 right-0 z-40 w-48 rounded-2xl border border-slate-200 bg-white p-1.5 text-xs font-semibold shadow-xl dark:border-slate-800 dark:bg-slate-950"
                                 >
-                                  {/* Read */}
                                   <Link to={ROUTES.READER.replace(':id', book.id)}>
                                     <button
                                       type="button"
-                                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-slate-700 transition-colors hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
                                     >
                                       <Play className="h-3.5 w-3.5 fill-current text-purple-600" />
                                       <span>Read</span>
                                     </button>
                                   </Link>
 
-                                  {/* Book Details */}
                                   <Link to={ROUTES.BOOK_DETAILS.replace(':id', book.id)}>
                                     <button
                                       type="button"
-                                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-slate-700 transition-colors hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
                                     >
                                       <Info className="h-3.5 w-3.5 text-indigo-600" />
                                       <span>Book Details</span>
                                     </button>
                                   </Link>
 
-                                  {/* Move to Collection */}
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -662,13 +683,12 @@ export const LibraryPage: React.FC = () => {
                                       setMovingCollectionId(book.collectionId || 'none')
                                       setActiveMenuBookId(null)
                                     }}
-                                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-slate-700 transition-colors hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
                                   >
                                     <FolderOpen className="h-3.5 w-3.5 text-blue-600" />
                                     <span>Move to Collection</span>
                                   </button>
 
-                                  {/* Rename */}
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -676,13 +696,12 @@ export const LibraryPage: React.FC = () => {
                                       setRenameTitleInput(book.title)
                                       setActiveMenuBookId(null)
                                     }}
-                                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-slate-700 transition-colors hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
                                   >
                                     <Edit2 className="h-3.5 w-3.5 text-emerald-600" />
                                     <span>Rename</span>
                                   </button>
 
-                                  {/* Download (Offline) */}
                                   <a
                                     href={book.filePath}
                                     download
@@ -691,20 +710,19 @@ export const LibraryPage: React.FC = () => {
                                   >
                                     <button
                                       type="button"
-                                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-slate-700 transition-colors hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
                                     >
                                       <Download className="h-3.5 w-3.5 text-cyan-600" />
-                                      <span>Download (Offline)</span>
+                                      <span>Download</span>
                                     </button>
                                   </a>
 
                                   <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
 
-                                  {/* Delete */}
                                   <button
                                     type="button"
                                     onClick={(e) => handleDeleteBook(book.id, e)}
-                                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/30"
+                                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-rose-600 transition-colors hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/30"
                                   >
                                     <Trash2 className="h-3.5 w-3.5 text-rose-500" />
                                     <span>Delete</span>
@@ -714,8 +732,8 @@ export const LibraryPage: React.FC = () => {
                             </div>
                           </div>
 
-                          {/* File Type Badge (PDF / EPUB) */}
-                          <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5">
+                          {/* File Type & Size Badges */}
+                          <div className="absolute bottom-2.5 left-2.5 z-10 flex items-center gap-1.5">
                             <span className="rounded-md bg-slate-900/80 px-2 py-0.5 font-mono text-[9px] font-bold text-white backdrop-blur-xs">
                               {fileType}
                             </span>
@@ -725,15 +743,13 @@ export const LibraryPage: React.FC = () => {
                           </div>
                         </div>
 
-                        {/* Title & Author (STRICT 2-LINE CLAMPING) */}
+                        {/* Title & Author (Strict 2-line title clamping) */}
                         <div className="space-y-1">
-                          <div className="flex items-center justify-between">
-                            <span className="rounded-md bg-purple-50 px-2 py-0.5 text-[8.5px] font-extrabold text-purple-700 dark:bg-purple-950/40 dark:text-purple-300">
-                              {getCollectionName(book.collectionId)}
-                            </span>
-                          </div>
+                          <span className="inline-block rounded-md bg-purple-50 px-2 py-0.5 text-[8.5px] font-extrabold text-purple-700 dark:bg-purple-950/40 dark:text-purple-300">
+                            {getCollectionName(book.collectionId)}
+                          </span>
 
-                          <h4 className="line-clamp-2 text-xs leading-snug font-bold text-slate-900 transition-colors group-hover/card:text-purple-600 dark:text-white dark:group-hover/card:text-purple-400">
+                          <h4 className="line-clamp-2 text-xs font-bold leading-snug text-slate-900 transition-colors group-hover/card:text-purple-600 dark:text-white dark:group-hover/card:text-purple-400">
                             {book.title}
                           </h4>
 
@@ -743,8 +759,8 @@ export const LibraryPage: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Bottom Section: Progress Bar & Last Opened */}
-                      <div className="mt-4 space-y-2 border-t border-slate-100 pt-2 dark:border-slate-800/60">
+                      {/* Bottom Progress & Last Read Date */}
+                      <div className="mt-4 space-y-2 border-t border-slate-100 pt-2.5 dark:border-slate-800/80">
                         <div className="space-y-1">
                           <div className="flex justify-between text-[9.5px] font-bold text-slate-400">
                             <span>{book.progress}% Completed</span>
@@ -762,10 +778,13 @@ export const LibraryPage: React.FC = () => {
                           <Calendar className="h-3 w-3 shrink-0" />
                           <span className="truncate">
                             {book.lastReadAt
-                              ? `Opened ${new Date(book.lastReadAt).toLocaleDateString(undefined, {
-                                  month: 'short',
-                                  day: 'numeric',
-                                })}`
+                              ? `Opened ${new Date(book.lastReadAt).toLocaleDateString(
+                                  undefined,
+                                  {
+                                    month: 'short',
+                                    day: 'numeric',
+                                  }
+                                )}`
                               : 'Not opened yet'}
                           </span>
                         </div>
@@ -776,11 +795,11 @@ export const LibraryPage: React.FC = () => {
               </div>
             ) : (
               /* ==================================================
-                 REDESIGNED LIST VIEW
+                 PREMIUM LIST VIEW
                  ================================================== */
               <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
                 <table className="w-full border-collapse text-left text-xs text-slate-500 dark:text-slate-400">
-                  <thead className="border-b border-slate-100 bg-slate-50/60 text-[10px] font-extrabold tracking-wider text-slate-400 uppercase dark:border-slate-800 dark:bg-slate-800/40">
+                  <thead className="border-b border-slate-100 bg-slate-50/60 text-[10px] font-extrabold tracking-wider uppercase text-slate-400 dark:border-slate-800 dark:bg-slate-800/40">
                     <tr>
                       <th className="px-6 py-4">Book Details</th>
                       <th className="px-6 py-4">Format & Size</th>
