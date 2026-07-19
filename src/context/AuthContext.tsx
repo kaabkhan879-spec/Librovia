@@ -16,6 +16,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string, displayName: string) => Promise<void>
   logout: () => Promise<void>
+  updateProfile: (data: { displayName?: string; avatarUrl?: string }) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -105,6 +106,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }
 
+  const updateProfile = async (data: { displayName?: string; avatarUrl?: string }) => {
+    const updatePayload: Record<string, unknown> = {}
+    if (data.displayName !== undefined) updatePayload.display_name = data.displayName
+    if (data.avatarUrl !== undefined) updatePayload.avatar_url = data.avatarUrl
+
+    const { error } = await supabase.auth.updateUser({
+      data: updatePayload,
+    })
+    if (error) {
+      throw error
+    }
+    // Optimistic local user update
+    setUser((prev) => {
+      if (!prev) return null
+      return {
+        ...prev,
+        displayName: data.displayName !== undefined ? data.displayName : prev.displayName,
+        avatarUrl: data.avatarUrl !== undefined ? data.avatarUrl : prev.avatarUrl,
+      }
+    })
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -114,6 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         register,
         logout,
+        updateProfile,
       }}
     >
       {children}
