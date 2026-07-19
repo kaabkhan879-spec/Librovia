@@ -349,35 +349,37 @@ export const DashboardPage: React.FC = () => {
                   </h3>
 
                   {continueReadingBook ? (
-                    <div className="group rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xs transition-all duration-200 hover:shadow-md sm:p-7 dark:border-slate-800 dark:bg-slate-900">
-                      <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+                    <div className="group rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all duration-200 hover:shadow-md sm:p-6 dark:border-slate-800 dark:bg-slate-900">
+                      <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+                        {/* Fixed Aspect Ratio Cover */}
                         <img
                           src={continueReadingBook.coverPath}
                           alt={continueReadingBook.title}
-                          className="aspect-[0.7/1] w-28 rounded-2xl border border-slate-200 object-cover shadow-md transition-transform duration-300 group-hover:scale-[1.03] dark:border-slate-800"
+                          className="aspect-[0.7/1] w-24 shrink-0 rounded-2xl border border-slate-200 object-cover shadow-md transition-transform duration-300 group-hover:scale-[1.02] sm:w-28 dark:border-slate-800"
                         />
 
-                        <div className="flex-1 space-y-3">
+                        {/* Center Content Area */}
+                        <div className="min-w-0 flex-1 space-y-2.5 text-left">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="rounded-lg bg-purple-50 px-2.5 py-1 text-[10px] font-extrabold text-purple-700 dark:bg-purple-950/40 dark:text-purple-300">
                               {getCollectionName(continueReadingBook.collectionId)}
                             </span>
-                            <span className="text-[10px] font-semibold text-slate-400">
+                            <span className="text-[10.5px] font-semibold text-slate-400">
                               {estTimeStr}
                             </span>
                           </div>
 
                           <div>
-                            <h4 className="truncate text-lg font-black text-slate-900 dark:text-white">
+                            <h4 className="line-clamp-2 text-base leading-snug font-black tracking-tight text-slate-900 sm:text-lg dark:text-white">
                               {continueReadingBook.title}
                             </h4>
-                            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                            <p className="mt-0.5 truncate text-xs font-semibold text-slate-500 dark:text-slate-400">
                               By {continueReadingBook.author}
                             </p>
                           </div>
 
                           <div className="space-y-1.5 pt-1">
-                            <div className="flex justify-between text-[10px] font-bold text-slate-400">
+                            <div className="flex items-center justify-between text-[10.5px] font-bold text-slate-500 dark:text-slate-400">
                               <span>{continueReadingBook.progress}% Completed</span>
                               <span>
                                 Page {continueReadingBook.currentPage} of{' '}
@@ -386,19 +388,22 @@ export const DashboardPage: React.FC = () => {
                             </div>
                             <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                               <div
-                                className="h-full rounded-full bg-purple-600 transition-all duration-500"
+                                className="h-full rounded-full bg-purple-600 transition-all duration-300"
                                 style={{ width: `${continueReadingBook.progress}%` }}
                               />
                             </div>
                           </div>
                         </div>
 
-                        <div className="shrink-0">
+                        {/* Right Aligned Compact Resume Button (46px height) */}
+                        <div className="shrink-0 pt-2 sm:self-center sm:pt-0">
                           <Link to={ROUTES.READER.replace(':id', continueReadingBook.id)}>
                             <Button
                               size="md"
-                              className="w-full rounded-2xl bg-purple-600 text-white shadow-sm hover:bg-purple-700 sm:w-auto"
-                              leftIcon={<Play className="h-4 w-4 fill-current stroke-current" />}
+                              className="h-[46px] w-full rounded-2xl bg-purple-600 px-5 text-xs font-bold text-white shadow-xs transition-all duration-200 hover:scale-[1.02] hover:bg-purple-700 hover:shadow-md active:scale-[0.98] sm:w-auto sm:px-6"
+                              leftIcon={
+                                <Play className="h-3.5 w-3.5 fill-current stroke-current" />
+                              }
                             >
                               Resume
                             </Button>
