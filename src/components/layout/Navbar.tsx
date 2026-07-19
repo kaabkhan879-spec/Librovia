@@ -20,6 +20,7 @@ import {
   Moon,
 } from 'lucide-react'
 import { Button } from '../common/Button'
+import { Avatar } from '../common/Avatar'
 
 // --- MARKETING NAVBAR (For Public Layout) ---
 export const MarketingNavbar: React.FC = () => {
@@ -279,10 +280,10 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             ref={headerSearchRef}
             type="text"
             placeholder="Search books, collections... (Ctrl + K)"
-            className="border-border-base bg-bg-app text-text-main placeholder:text-text-muted focus:border-primary-500 focus:ring-primary-500/10 block w-full rounded-xl border py-2 pr-12 pl-10 text-xs transition-all focus:ring-2 focus:outline-none focus:shadow-md"
+            className="border-border-base bg-bg-app text-text-main placeholder:text-text-muted focus:border-primary-500 focus:ring-primary-500/10 block w-full rounded-xl border py-2 pr-12 pl-10 text-xs transition-all focus:shadow-md focus:ring-2 focus:outline-none"
           />
-          <div className="absolute inset-y-0 right-0 flex items-center pr-3.5 pointer-events-none">
-            <kbd className="inline-flex items-center gap-0.5 rounded border border-border-light bg-bg-surface px-1.5 font-sans text-[9px] font-bold text-text-muted shadow-2xs">
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5">
+            <kbd className="border-border-light bg-bg-surface text-text-muted inline-flex items-center gap-0.5 rounded border px-1.5 font-sans text-[9px] font-bold shadow-2xs">
               <span className="text-[10px]">⌘</span>K
             </kbd>
           </div>
@@ -415,14 +416,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         {/* Profile Avatar trigger */}
         {user && (
           <Link to={ROUTES.PROFILE} className="flex items-center">
-            <img
-              src={
-                user.avatarUrl ||
-                'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=facearea&facepad=2&w=100&h=100&q=80'
-              }
-              alt={user.displayName || 'Profile'}
-              className="ring-border-base hover:ring-primary-500 h-8.5 w-8.5 rounded-full object-cover shadow-sm ring-1 transition-shadow"
-            />
+            <Avatar src={user.avatarUrl} name={user.displayName} email={user.email} size="sm" />
           </Link>
         )}
       </div>

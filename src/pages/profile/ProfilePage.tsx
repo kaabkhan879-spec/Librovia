@@ -19,6 +19,7 @@ import {
   Layers,
 } from 'lucide-react'
 import { Button } from '../../components/common/Button'
+import { Avatar } from '../../components/common/Avatar'
 import { useAuth } from '../../context/AuthContext'
 import { booksService, type Book } from '../../services/books'
 import { collectionsService, type Collection } from '../../services/collections'
@@ -231,10 +232,11 @@ export const ProfilePage: React.FC = () => {
 
                 <div className="relative z-10 flex flex-col items-center">
                   <div className="relative">
-                    <img
-                      src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=facearea&facepad=2&w=200&h=200&q=80"
-                      alt="Kaab Khan"
-                      className="border-bg-surface h-20 w-20 rounded-full border-4 object-cover shadow-md"
+                    <Avatar
+                      src={user?.avatarUrl}
+                      name={profileName}
+                      email={user?.email}
+                      size="xl"
                     />
                     <div className="bg-primary-500 absolute right-0 bottom-0 rounded-full p-1.5 text-white shadow-xs">
                       <Sparkles className="h-3 w-3" />

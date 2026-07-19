@@ -12,6 +12,8 @@ import { ROUTES } from '../../constants/routes'
 import { formatBytes } from '../../utils/helpers'
 import { Button } from '../../components/common/Button'
 import { Toggle } from '../../components/common/Toggle'
+import { Avatar } from '../../components/common/Avatar'
+import { ImageCropperModal } from '../../components/common/ImageCropperModal'
 import {
   User as UserIcon,
   Shield,
@@ -69,19 +71,21 @@ export const SettingsPage: React.FC = () => {
   // SECTION 1 — PROFILE STATES
   // ----------------------------------------------------
   const [displayName, setDisplayName] = useState(user?.displayName || 'Kaab Khan')
-  const [avatarUrl, setAvatarUrl] = useState(
-    user?.avatarUrl ||
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80'
-  )
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || '')
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [editName, setEditName] = useState(displayName)
+
+  // Cropper Modal state
+  const [cropperOpen, setCropperOpen] = useState(false)
+  const [cropperImageSrc, setCropperImageSrc] = useState<string>('')
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
 
   const [prevUserId, setPrevUserId] = useState(user?.id)
 
   if (user && user.id !== prevUserId) {
     setPrevUserId(user.id)
     if (user.displayName) setDisplayName(user.displayName)
-    if (user.avatarUrl) setAvatarUrl(user.avatarUrl)
+    setAvatarUrl(user.avatarUrl || '')
   }
 
   // ----------------------------------------------------
@@ -120,7 +124,6 @@ export const SettingsPage: React.FC = () => {
       root.classList.remove('dark')
       localStorage.setItem('librovia-theme', 'light')
     } else {
-      // System mode preference
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
       if (prefersDark) {
         root.classList.add('dark')
@@ -217,43 +220,54 @@ export const SettingsPage: React.FC = () => {
     }
   }
 
-  const handleAvatarFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle Profile File Picker with 5 MB Guard
+  const handleAvatarFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
+    // 5 MB max limit validation
     if (file.size > 5 * 1024 * 1024) {
-      showError('Image size exceeds 5MB limit.')
+      showError('Please select an image smaller than 5 MB.')
+      if (fileInputRef.current) fileInputRef.current.value = ''
       return
     }
 
     const reader = new FileReader()
-    reader.onload = async (event) => {
+    reader.onload = (event) => {
       const result = event.target?.result as string
       if (result) {
-        setIsUpdating(true)
-        try {
-          await updateProfile({ avatarUrl: result })
-          setAvatarUrl(result)
-          showSuccess('Profile picture updated successfully!')
-        } catch (err: unknown) {
-          const message = err instanceof Error ? err.message : 'Failed to update profile picture'
-          showError(message)
-        } finally {
-          setIsUpdating(false)
-        }
+        setCropperImageSrc(result)
+        setCropperOpen(true)
       }
     }
     reader.readAsDataURL(file)
+    // Clear file input value to allow selecting the same file again
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
+  // Handle Cropped WebP output upload
+  const handleCropComplete = async (croppedWebpDataUrl: string) => {
+    setIsUploadingPhoto(true)
+    try {
+      await updateProfile({ avatarUrl: croppedWebpDataUrl })
+      setAvatarUrl(croppedWebpDataUrl)
+      setCropperOpen(false)
+      showSuccess('Profile picture updated successfully.')
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to update profile picture'
+      showError(message)
+    } finally {
+      setIsUploadingPhoto(false)
+    }
+  }
+
+  // Remove Photo handler (restores default initials avatar)
   const handleRemoveAvatar = async () => {
-    const defaultAvatar =
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80'
     setIsUpdating(true)
     try {
-      await updateProfile({ avatarUrl: defaultAvatar })
-      setAvatarUrl(defaultAvatar)
-      showSuccess('Profile picture removed')
+      await updateProfile({ avatarUrl: '' })
+      setAvatarUrl('')
+      showSuccess('Profile picture removed.')
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to remove picture'
       showError(message)
@@ -308,7 +322,6 @@ export const SettingsPage: React.FC = () => {
 
   const handleClearCache = () => {
     try {
-      // Clear non-essential items
       const keysToKeep = [
         'librovia_theme_mode',
         'librovia-theme',
@@ -351,7 +364,7 @@ export const SettingsPage: React.FC = () => {
     {
       id: 'profile',
       label: 'Profile',
-      description: 'Display name & picture',
+      description: 'Display name & avatar',
       icon: UserIcon,
     },
     {
@@ -388,13 +401,22 @@ export const SettingsPage: React.FC = () => {
 
   return (
     <PageWrapper className="relative min-h-screen space-y-8 pb-24 text-left select-none">
-      {/* Hidden File Input for Avatar Upload */}
+      {/* Hidden File Input for Avatar Selection */}
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/png, image/jpeg, image/webp"
+        accept="image/jpeg, image/jpg, image/png, image/webp"
         className="hidden"
-        onChange={handleAvatarFileUpload}
+        onChange={handleAvatarFileSelected}
+      />
+
+      {/* Image Cropper Modal */}
+      <ImageCropperModal
+        isOpen={cropperOpen}
+        imageSrc={cropperImageSrc}
+        onClose={() => setCropperOpen(false)}
+        onCropComplete={handleCropComplete}
+        isUploading={isUploadingPhoto}
       />
 
       {/* Main Settings Header */}
@@ -503,22 +525,16 @@ export const SettingsPage: React.FC = () => {
                   <div className="relative overflow-hidden rounded-3xl border border-purple-100 bg-gradient-to-br from-purple-50/70 via-white to-slate-50 p-6 shadow-xs dark:border-purple-950/30 dark:from-purple-950/20 dark:via-slate-900 dark:to-slate-900">
                     <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start sm:justify-between">
                       <div className="flex flex-col items-center gap-5 sm:flex-row">
-                        {/* Circular Profile Picture */}
-                        <div className="group relative">
-                          <img
-                            src={avatarUrl}
-                            alt={displayName}
-                            className="h-24 w-24 rounded-full border-4 border-white object-cover shadow-md dark:border-slate-800"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="absolute inset-0 flex items-center justify-center rounded-full bg-slate-950/40 text-white opacity-0 transition-opacity group-hover:opacity-100"
-                            title="Change photo"
-                          >
-                            <Camera className="h-6 w-6" />
-                          </button>
-                        </div>
+                        {/* Circular Profile Avatar */}
+                        <Avatar
+                          src={avatarUrl}
+                          name={displayName}
+                          email={user?.email}
+                          size="xl"
+                          showCameraOverlay
+                          onCameraClick={() => fileInputRef.current?.click()}
+                          isLoading={isUploadingPhoto}
+                        />
 
                         <div className="space-y-1 text-center sm:text-left">
                           <div className="flex items-center justify-center gap-2 sm:justify-start">
@@ -589,14 +605,16 @@ export const SettingsPage: React.FC = () => {
                                 <Camera className="h-3.5 w-3.5 text-purple-600" />
                                 <span>Upload New Picture</span>
                               </button>
-                              <button
-                                type="button"
-                                onClick={handleRemoveAvatar}
-                                className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3.5 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 dark:border-rose-950/40 dark:bg-slate-800 dark:text-rose-400 dark:hover:bg-rose-950/20"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                                <span>Remove Picture</span>
-                              </button>
+                              {avatarUrl && (
+                                <button
+                                  type="button"
+                                  onClick={handleRemoveAvatar}
+                                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3.5 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 dark:border-rose-950/40 dark:bg-slate-800 dark:text-rose-400 dark:hover:bg-rose-950/20"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                  <span>Remove Picture</span>
+                                </button>
+                              )}
                             </div>
                           </div>
                         </motion.div>
@@ -1299,12 +1317,12 @@ export const SettingsPage: React.FC = () => {
                 {activeModal === 'licenses' && (
                   <div className="space-y-2">
                     <p>Librovia is built using modern open source technologies:</p>
-                    <ul className="list-disc space-y-1 pl-4 font-mono text-[11px] text-slate-500 dark:text-slate-400">
-                      <li>React (MIT License)</li>
-                      <li>Supabase JavaScript SDK (Apache-2.0)</li>
-                      <li>TailwindCSS (MIT License)</li>
-                      <li>Framer Motion (MIT License)</li>
-                      <li>Lucide React (ISC License)</li>
+                    <ul className="space-y-1 pl-4 font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                      <li>• React (MIT License)</li>
+                      <li>• Supabase JavaScript SDK (Apache-2.0)</li>
+                      <li>• TailwindCSS (MIT License)</li>
+                      <li>• Framer Motion (MIT License)</li>
+                      <li>• Lucide React (ISC License)</li>
                     </ul>
                   </div>
                 )}

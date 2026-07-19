@@ -3,6 +3,7 @@ import { NavLink, Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { ROUTES } from '../../constants/routes'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Avatar } from '../common/Avatar'
 import {
   BookOpen,
   LayoutDashboard,
@@ -161,14 +162,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {/* User profile details (hidden if collapsed) */}
           {!isCollapsed && user && (
             <div className="bg-bg-app border-border-light flex items-center gap-3 rounded-xl border p-2 text-left">
-              <img
-                src={
-                  user.avatarUrl ||
-                  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=facearea&facepad=2&w=100&h=100&q=80'
-                }
-                alt={user.displayName || 'Profile'}
-                className="ring-border-base h-9 w-9 rounded-full object-cover shadow-sm ring-1"
-              />
+              <Avatar src={user.avatarUrl} name={user.displayName} email={user.email} size="sm" />
               <div className="min-w-0 flex-1">
                 <p className="text-text-main truncate text-xs font-bold">
                   {user.displayName || 'Kaab Khan'}
