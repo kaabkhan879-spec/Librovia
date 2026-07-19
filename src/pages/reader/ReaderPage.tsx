@@ -30,7 +30,6 @@ import {
   Plus,
   Sparkles,
   Download,
-  HardDrive,
 } from 'lucide-react'
 import { booksService, type Book } from '../../services/books'
 import { notesService, type Note } from '../../services/notes'
@@ -494,7 +493,6 @@ export const ReaderPage: React.FC = () => {
               author: meta.author,
               coverPath: meta.coverPath || '',
               filePath: '',
-              format: 'PDF',
               progress: 0,
               currentPage: 1,
               totalPages: 320,
