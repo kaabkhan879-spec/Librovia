@@ -26,12 +26,9 @@ import {
   Trash2,
   Lock,
   Mail,
-  Smartphone,
-  History,
   CheckCircle2,
   Sparkles,
   Database,
-  Download,
   X,
   FileText,
   HelpCircle,
@@ -43,7 +40,6 @@ import {
   Monitor,
   Save,
   Check,
-  BookOpen,
 } from 'lucide-react'
 
 type SettingsTab = 'profile' | 'security' | 'appearance' | 'notifications' | 'storage' | 'about'
