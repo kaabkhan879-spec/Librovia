@@ -8,7 +8,7 @@ interface PublicRouteProps {
 }
 
 export const PublicRoute: React.FC<PublicRouteProps> = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth()
+  const { user, isAuthenticated, loading } = useAuth()
 
   if (loading) {
     return (
@@ -18,8 +18,11 @@ export const PublicRoute: React.FC<PublicRouteProps> = ({ children }) => {
     )
   }
 
-  // Redirect to dashboard if user is already authenticated
+  // Redirect based on database role if user is already authenticated
   if (isAuthenticated) {
+    if (user?.role === 'super_admin') {
+      return <Navigate to={ROUTES.ADMIN} replace />
+    }
     return <Navigate to={ROUTES.DASHBOARD} replace />
   }
 
