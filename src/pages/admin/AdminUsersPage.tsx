@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { PageWrapper } from '../../components/common/PageWrapper'
+import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
 import { supabase } from '../../services/supabase'
 import {
@@ -37,6 +38,7 @@ export interface DBUserRecord {
 }
 
 export const AdminUsersPage: React.FC = () => {
+  const { user: currentUser } = useAuth()
   const { showSuccess, showError } = useToast()
 
   const [loading, setLoading] = useState(true)
@@ -78,7 +80,7 @@ export const AdminUsersPage: React.FC = () => {
           const mapped: DBUserRecord[] = data.map((row) => ({
             user_id: row.user_id,
             email: row.email || 'N/A',
-            role: row.role || 'user',
+            role: (row.role as any) || 'user',
             created_at: row.created_at || new Date().toISOString(),
             name: row.email ? row.email.split('@')[0] : 'Registered User',
             plan: row.role === 'super_admin' ? 'Family' : 'Free',
@@ -86,6 +88,21 @@ export const AdminUsersPage: React.FC = () => {
             storageLimitBytes: row.role === 'super_admin' ? 1000000000000 : 5000000000,
             status: 'Active',
           }))
+
+          if (currentUser?.id && !mapped.some((u) => u.user_id === currentUser.id)) {
+            mapped.unshift({
+              user_id: currentUser.id,
+              email: currentUser.email || 'N/A',
+              role: currentUser.role || 'user',
+              created_at: new Date().toISOString(),
+              name: currentUser.displayName || currentUser.email.split('@')[0],
+              plan: currentUser.role === 'super_admin' ? 'Family' : 'Free',
+              storageUsedBytes: currentUser.role === 'super_admin' ? 1450000 : 500000,
+              storageLimitBytes: currentUser.role === 'super_admin' ? 1000000000000 : 5000000000,
+              status: 'Active',
+            })
+          }
+
           setUsers(mapped)
         }
         setLoading(false)
@@ -96,7 +113,7 @@ export const AdminUsersPage: React.FC = () => {
     }
 
     fetchLiveUsers()
-  }, [])
+  }, [currentUser])
 
   // Calculations
   const totalUsers = users.length

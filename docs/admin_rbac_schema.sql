@@ -4,14 +4,14 @@
 -- Establishes role-based access control (RBAC) in Supabase.
 -- 1. Creates public.user_roles table.
 -- 2. Sets up automatic signup trigger (role = 'user' for new accounts).
--- 3. Seeds kaabkhan879@gmail.com with role = 'super_admin'.
+-- 3. Seeds kaabkhan879@gmail.com with role = 'super_admin' and populates ALL auth.users.
 -- 4. Uses non-recursive SECURITY DEFINER function to prevent RLS recursion errors.
 
 -- 1. USER ROLES TABLE
 CREATE TABLE IF NOT EXISTS public.user_roles (
     user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email VARCHAR(255),
-    role VARCHAR(30) NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'super_admin')),
+    role VARCHAR(30) NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'super_admin', 'moderator')),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -20,7 +20,6 @@ CREATE TABLE IF NOT EXISTS public.user_roles (
 CREATE INDEX IF NOT EXISTS idx_user_roles_role ON public.user_roles(role);
 
 -- 2. NON-RECURSIVE SECURITY DEFINER ROLE CHECK FUNCTION
--- Prevents RLS infinite recursion when querying user_roles
 CREATE OR REPLACE FUNCTION public.is_super_admin(lookup_uid UUID)
 RETURNS BOOLEAN AS $$
 BEGIN
@@ -61,20 +60,26 @@ CREATE TRIGGER on_auth_user_created_assign_role
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user_role();
 
--- 4. SEED INITIAL SUPER ADMIN ACCOUNT ROLE
--- Links kaabkhan879@gmail.com in auth.users to super_admin role
+-- 4. SEED ALL EXISTING ACCOUNTS FROM auth.users INTO public.user_roles
+-- Populates both Super Admins AND standard Users from auth.users
 INSERT INTO public.user_roles (user_id, email, role)
 SELECT 
     id, 
     email, 
-    'super_admin'
+    CASE 
+        WHEN LOWER(email) = 'kaabkhan879@gmail.com' THEN 'super_admin'
+        ELSE 'user'
+    END
 FROM auth.users 
-WHERE LOWER(email) = 'kaabkhan879@gmail.com'
 ON CONFLICT (user_id) DO UPDATE SET
-    role = 'super_admin',
+    email = EXCLUDED.email,
+    role = CASE 
+        WHEN LOWER(EXCLUDED.email) = 'kaabkhan879@gmail.com' THEN 'super_admin'
+        ELSE public.user_roles.role
+    END,
     updated_at = NOW();
 
--- 5. ROW-LEVEL SECURITY (RLS) POLICIES (PRODUCTION-SAFE & NON-RECURSIVE)
+-- 5. ROW-LEVEL SECURITY (RLS) POLICIES
 ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
 
 -- Clean up any existing policies
@@ -91,7 +96,7 @@ CREATE POLICY "Users can read own role"
 ON public.user_roles FOR SELECT
 USING (auth.uid() = user_id);
 
--- Policy 2: Super admins can read all user roles (uses SECURITY DEFINER function)
+-- Policy 2: Super admins can read all user roles
 CREATE POLICY "Super admins can read all roles"
 ON public.user_roles FOR SELECT
 USING (public.is_super_admin(auth.uid()));
@@ -102,7 +107,7 @@ ON public.user_roles FOR UPDATE
 USING (public.is_super_admin(auth.uid()))
 WITH CHECK (public.is_super_admin(auth.uid()));
 
--- Policy 4: Super admins can insert user roles (and system trigger can insert)
+-- Policy 4: Super admins can insert user roles
 CREATE POLICY "Super admins can insert roles"
 ON public.user_roles FOR INSERT
 WITH CHECK (public.is_super_admin(auth.uid()) OR auth.uid() = user_id);
