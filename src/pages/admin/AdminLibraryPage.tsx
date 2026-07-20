@@ -18,12 +18,7 @@ import {
   ShieldAlert,
   CheckCircle2,
   Clock,
-  Download,
-  Tag,
-  User,
-  Plus,
   RefreshCw,
-  FileText,
 } from 'lucide-react'
 
 export const AdminLibraryPage: React.FC = () => {
