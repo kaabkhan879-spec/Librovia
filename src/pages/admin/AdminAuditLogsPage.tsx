@@ -14,16 +14,10 @@ import {
   ChevronRight,
   ShieldCheck,
   ShieldAlert,
-  Lock,
-  Globe,
-  Smartphone,
   CheckCircle2,
   AlertTriangle,
   Clock,
   Code,
-  TrendingUp,
-  Inbox,
-  Filter,
 } from 'lucide-react'
 
 export interface AuditLogRecord {
@@ -103,7 +97,6 @@ export const AdminAuditLogsPage: React.FC = () => {
 
   // Filters & Controls
   const [searchQuery, setSearchQuery] = useState('')
-  const [dateRange, setDateRange] = useState<'24h' | '7d' | '30d' | '90d'>('30d')
   const [severityFilter, setSeverityFilter] = useState<'All' | 'Info' | 'Warning' | 'Medium' | 'Critical'>('All')
   const [categoryFilter, setCategoryFilter] = useState<string>('All')
   const [actorFilter, setActorFilter] = useState<string>('All')
