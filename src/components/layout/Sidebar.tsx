@@ -69,7 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { name: 'Analytics', to: ROUTES.ANALYTICS, icon: BarChart3 },
     { name: 'Subscription', to: ROUTES.SUBSCRIPTION, icon: Crown },
     ...(user?.role === 'super_admin'
-      ? [{ name: 'Admin Panel', to: ROUTES.ADMIN, icon: ShieldCheck }]
+      ? [{ name: 'Return to Admin Panel', to: ROUTES.ADMIN, icon: ShieldCheck }]
       : []),
     { name: 'Settings', to: ROUTES.SETTINGS, icon: Settings },
   ]

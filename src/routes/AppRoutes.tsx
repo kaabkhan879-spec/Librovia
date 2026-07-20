@@ -5,11 +5,11 @@ import { ROUTES } from '../constants/routes'
 // Layouts
 import { PublicLayout } from '../layouts/PublicLayout'
 import { AppLayout } from '../layouts/AppLayout'
+import { AdminLayout } from '../layouts/AdminLayout'
 
 // Guards
 import { PrivateRoute } from './PrivateRoute'
 import { PublicRoute } from './PublicRoute'
-
 import { AdminRoute } from './AdminRoute'
 
 // Pages
@@ -30,7 +30,18 @@ import { StoragePage } from '../pages/storage/StoragePage'
 import { AnalyticsPage } from '../pages/analytics/AnalyticsPage'
 import { FlashcardsPage } from '../pages/flashcards/FlashcardsPage'
 import { SubscriptionPage } from '../pages/subscription/SubscriptionPage'
+
+// Super Admin SaaS Pages
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage'
+import { AdminUsersPage } from '../pages/admin/AdminUsersPage'
+import { AdminSubscriptionsPage } from '../pages/admin/AdminSubscriptionsPage'
+import { AdminPaymentsPage } from '../pages/admin/AdminPaymentsPage'
+import { AdminStoragePage } from '../pages/admin/AdminStoragePage'
+import { AdminLibraryPage } from '../pages/admin/AdminLibraryPage'
+import { AdminReportsPage } from '../pages/admin/AdminReportsPage'
+import { AdminAnnouncementsPage } from '../pages/admin/AdminAnnouncementsPage'
+import { AdminSystemSettingsPage } from '../pages/admin/AdminSystemSettingsPage'
+import { AdminAuditLogsPage } from '../pages/admin/AdminAuditLogsPage'
 
 export const AppRoutes: React.FC = () => {
   return (
@@ -47,7 +58,7 @@ export const AppRoutes: React.FC = () => {
         </Route>
       </Route>
 
-      {/* Authenticated Dashboard Pages wrapped in PrivateRoute guard */}
+      {/* Authenticated Reader Dashboard Pages wrapped in PrivateRoute guard */}
       <Route element={<PrivateRoute />}>
         <Route element={<AppLayout />}>
           <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />
@@ -65,10 +76,21 @@ export const AppRoutes: React.FC = () => {
           <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />
           <Route path={ROUTES.STORAGE} element={<StoragePage />} />
           <Route path={ROUTES.SUBSCRIPTION} element={<SubscriptionPage />} />
+        </Route>
 
-          {/* Admin Protected Route */}
-          <Route element={<AdminRoute />}>
+        {/* Dedicated Super Admin SaaS Suite wrapped in AdminRoute guard + AdminLayout */}
+        <Route element={<AdminRoute />}>
+          <Route element={<AdminLayout />}>
             <Route path={ROUTES.ADMIN} element={<AdminDashboardPage />} />
+            <Route path={ROUTES.ADMIN_USERS} element={<AdminUsersPage />} />
+            <Route path={ROUTES.ADMIN_SUBSCRIPTIONS} element={<AdminSubscriptionsPage />} />
+            <Route path={ROUTES.ADMIN_PAYMENTS} element={<AdminPaymentsPage />} />
+            <Route path={ROUTES.ADMIN_STORAGE} element={<AdminStoragePage />} />
+            <Route path={ROUTES.ADMIN_LIBRARY} element={<AdminLibraryPage />} />
+            <Route path={ROUTES.ADMIN_REPORTS} element={<AdminReportsPage />} />
+            <Route path={ROUTES.ADMIN_ANNOUNCEMENTS} element={<AdminAnnouncementsPage />} />
+            <Route path={ROUTES.ADMIN_SETTINGS} element={<AdminSystemSettingsPage />} />
+            <Route path={ROUTES.ADMIN_AUDIT_LOGS} element={<AdminAuditLogsPage />} />
           </Route>
         </Route>
       </Route>

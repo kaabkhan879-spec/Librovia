@@ -20,4 +20,13 @@ export const ROUTES = {
   FLASHCARDS: '/flashcards',
   SUBSCRIPTION: '/subscription',
   ADMIN: '/admin',
+  ADMIN_USERS: '/admin/users',
+  ADMIN_SUBSCRIPTIONS: '/admin/subscriptions',
+  ADMIN_PAYMENTS: '/admin/payments',
+  ADMIN_STORAGE: '/admin/storage',
+  ADMIN_LIBRARY: '/admin/library',
+  ADMIN_REPORTS: '/admin/reports',
+  ADMIN_ANNOUNCEMENTS: '/admin/announcements',
+  ADMIN_SETTINGS: '/admin/settings',
+  ADMIN_AUDIT_LOGS: '/admin/audit-logs',
 } as const
