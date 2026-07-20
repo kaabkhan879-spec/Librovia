@@ -8,21 +8,15 @@ import {
   HardDrive,
   Search,
   RefreshCw,
-  SlidersHorizontal,
   X,
   ChevronLeft,
   ChevronRight,
   Inbox,
   AlertTriangle,
-  UserCheck,
-  ShieldCheck,
-  ShieldAlert,
-  ArrowUpRight,
   Plus,
   Minus,
   Crown,
   UserX,
-  Check,
 } from 'lucide-react'
 
 export interface DBUserStorageRecord {
@@ -39,7 +33,7 @@ export interface DBUserStorageRecord {
 
 export const AdminStoragePage: React.FC = () => {
   const { user: currentUser } = useAuth()
-  const { showSuccess, showError } = useToast()
+  const { showSuccess } = useToast()
 
   const [loading, setLoading] = useState(true)
   const [errorState, setErrorState] = useState<string | null>(null)
