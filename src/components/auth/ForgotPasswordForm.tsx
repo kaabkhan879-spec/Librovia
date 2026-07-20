@@ -29,7 +29,7 @@ export const ForgotPasswordForm: React.FC = () => {
 
     supabase.auth
       .resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}${ROUTES.LOGIN}`,
+        redirectTo: `${window.location.origin}${ROUTES.RESET_PASSWORD}`,
       })
       .then(({ error }) => {
         setIsLoading(false)
