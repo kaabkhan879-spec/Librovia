@@ -42,7 +42,7 @@ export const DEFAULT_PLANS: SubscriptionPlan[] = [
     id: 'free',
     plan_name: 'FREE',
     description: 'Perfect for casual readers getting started with digital book management.',
-    badge: undefined,
+    badge: 'Free Forever',
     price_monthly: 0,
     price_yearly: 0,
     storage_limit_bytes: 5 * 1024 * 1024 * 1024, // 5 GB

@@ -228,40 +228,93 @@ export const SubscriptionPage: React.FC = () => {
       {/* ==================================================================== */}
       {/* 2. CURRENT ACTIVE PLAN SUMMARY BANNER */}
       {/* ==================================================================== */}
-      <div className="rounded-3xl border border-purple-200/80 bg-white p-6 shadow-xs dark:border-purple-900/40 dark:bg-slate-900">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          {/* Active Plan details */}
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-purple-600 text-white shadow-md shadow-purple-600/20">
-              <Crown className="h-6 w-6" />
-            </div>
-            <div className="space-y-1">
-              <div className="flex flex-wrap items-center gap-2.5">
-                <span className="text-xs font-extrabold tracking-wider text-slate-400 uppercase">
-                  Current Active Plan
-                </span>
-                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[10.5px] font-extrabold text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300">
-                  <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                  {subscriptionStatus}
-                </span>
+      <div className="rounded-3xl border border-purple-200/80 bg-white p-6 shadow-xs transition-all duration-300 dark:border-purple-900/40 dark:bg-slate-900">
+        <div className="space-y-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-5 dark:border-slate-800">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-600/20">
+                <Crown className="h-6 w-6" />
               </div>
-              <h2 className="text-xl font-black text-slate-900 capitalize dark:text-white">
-                {currentPlan.plan_name} Plan
-              </h2>
-              {currentPlan.id !== 'free' && (
-                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                  Renews on <span className="font-bold text-slate-700 dark:text-slate-200">{renewalDate}</span> ({billingCycle === 'yearly' ? 'Yearly' : 'Monthly'})
-                </p>
-              )}
+              <div>
+                <span className="text-[10px] font-extrabold tracking-widest text-slate-400 uppercase">
+                  Current Plan
+                </span>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <h2 className="text-2xl font-black text-slate-900 capitalize dark:text-white">
+                    {currentPlan.plan_name} Plan
+                  </h2>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[10.5px] font-extrabold text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300">
+                    <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                    {subscriptionStatus}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {currentPlan.id !== 'free' && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (subscriptionStatus === 'Canceled') {
+                    reactivateSubscription()
+                    showSuccess('Auto-renewal reactivated!')
+                  } else {
+                    cancelSubscription()
+                    showInfo('Subscription canceled. You retain access until end of period.')
+                  }
+                }}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 transition-all duration-200 hover:bg-slate-50 active:scale-95 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+              >
+                {subscriptionStatus === 'Canceled' ? 'Reactivate Plan' : 'Cancel Renewal'}
+              </button>
+            )}
+          </div>
+
+          {/* Current Plan Details Grid */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+              <span className="block text-[10px] font-extrabold tracking-wider text-slate-400 uppercase">
+                Plan Name
+              </span>
+              <p className="mt-1 text-sm font-black text-slate-900 dark:text-white">
+                {currentPlan.plan_name}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+              <span className="block text-[10px] font-extrabold tracking-wider text-slate-400 uppercase">
+                Storage Limit
+              </span>
+              <p className="mt-1 text-sm font-black text-purple-600 dark:text-purple-400">
+                {storageLimitGBText}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+              <span className="block text-[10px] font-extrabold tracking-wider text-slate-400 uppercase">
+                Storage Used
+              </span>
+              <p className="mt-1 text-sm font-black text-slate-900 dark:text-white">
+                {storageUsedGB} GB <span className="text-xs font-semibold text-slate-400">({storagePercentage}% used)</span>
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+              <span className="block text-[10px] font-extrabold tracking-wider text-slate-400 uppercase">
+                Billing Status
+              </span>
+              <p className="mt-1 text-xs font-bold text-slate-800 dark:text-slate-200">
+                {billingCycle === 'yearly' ? 'Yearly Billing (Save 17%)' : 'Monthly Billing'}
+              </p>
             </div>
           </div>
 
-          {/* Storage Bar driven dynamically by database limit */}
-          <div className="min-w-[280px] flex-1 max-w-md rounded-2xl border border-slate-100 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+          {/* Storage usage progress bar */}
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-800/30">
             <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
               <span className="flex items-center gap-1.5">
                 <HardDrive className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                <span>Storage Usage</span>
+                <span>Cloud Storage Progress</span>
               </span>
               <span className="font-mono text-[11px]">
                 {storageUsedGB} GB / {storageLimitGBText}
@@ -279,31 +332,6 @@ export const SubscriptionPage: React.FC = () => {
               <span>{storageRemainingGB} GB remaining</span>
               <span>{storagePercentage}% used</span>
             </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex flex-wrap items-center gap-2">
-            {currentPlan.id !== 'free' ? (
-              <button
-                type="button"
-                onClick={() => {
-                  if (subscriptionStatus === 'Canceled') {
-                    reactivateSubscription()
-                    showSuccess('Auto-renewal reactivated!')
-                  } else {
-                    cancelSubscription()
-                    showInfo('Subscription canceled. You retain access until end of period.')
-                  }
-                }}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-              >
-                {subscriptionStatus === 'Canceled' ? 'Reactivate Plan' : 'Cancel Renewal'}
-              </button>
-            ) : (
-              <span className="text-xs font-semibold text-slate-500">
-                Upgrade to unlock higher limits
-              </span>
-            )}
           </div>
         </div>
       </div>
@@ -331,97 +359,107 @@ export const SubscriptionPage: React.FC = () => {
                 : '/ month'
             const Icon = getPlanIcon(plan.id)
 
+            // Badge formatting
+            const badgeText =
+              plan.id === 'free'
+                ? 'Free Forever'
+                : plan.id === 'pro'
+                ? '⭐ Most Popular'
+                : '👨‍👩‍👧 Best Value'
+
             return (
               <div
                 key={plan.id}
-                className={`premium-card relative flex flex-col justify-between rounded-3xl p-8 transition-all duration-300 ${
+                className={`premium-card relative flex h-full flex-col justify-between rounded-3xl p-8 transition-all duration-300 ${
                   isPro
                     ? 'border-2 border-purple-600 bg-white shadow-xl shadow-purple-500/10 ring-4 ring-purple-600/10 lg:-translate-y-2 dark:border-purple-500 dark:bg-slate-900 dark:shadow-purple-950/30'
                     : 'border border-slate-200/90 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900'
                 }`}
               >
                 {/* Badge from DB record */}
-                {plan.badge && (
-                  <div
-                    className={`absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full px-4 py-1 text-[11px] font-black tracking-wide uppercase shadow-md ${
-                      isPro
-                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white'
-                        : 'bg-emerald-500 text-white'
-                    }`}
-                  >
-                    {plan.badge}
-                  </div>
-                )}
+                <div
+                  className={`absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full px-4 py-1 text-[11px] font-black tracking-wide uppercase shadow-md ${
+                    isPro
+                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white'
+                      : plan.id === 'family'
+                      ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white'
+                      : 'bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+                  }`}
+                >
+                  {badgeText}
+                </div>
 
                 {/* Card Header */}
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div
-                      className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
-                        isPro
-                          ? 'bg-purple-600 text-white shadow-md'
-                          : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                      }`}
-                    >
-                      <Icon className="h-6 w-6" />
+                <div className="space-y-6 flex-1 flex flex-col justify-between">
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <div
+                        className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
+                          isPro
+                            ? 'bg-purple-600 text-white shadow-md'
+                            : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                        }`}
+                      >
+                        <Icon className="h-6 w-6" />
+                      </div>
+
+                      {billingCycle === 'yearly' && plan.price_yearly > 0 && (
+                        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+                          Save 17%
+                        </span>
+                      )}
                     </div>
 
-                    {billingCycle === 'yearly' && plan.price_yearly > 0 && (
-                      <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-                        Save 17%
-                      </span>
-                    )}
-                  </div>
-
-                  <div>
-                    <h3 className="font-sans text-xl font-black text-slate-900 dark:text-white">
-                      {plan.plan_name}
-                    </h3>
-                    <p className="mt-1 text-xs font-normal text-slate-500 dark:text-slate-400">
-                      {plan.description}
-                    </p>
-                  </div>
-
-                  {/* Price Display */}
-                  <div className="border-b border-slate-100 pb-6 dark:border-slate-800">
-                    <div className="flex items-baseline gap-1">
-                      <span className="font-sans text-3xl font-black tracking-tight text-slate-900 dark:text-white">
-                        {displayPrice}
-                      </span>
-                      <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                        {billingSuffix}
-                      </span>
-                    </div>
-                    {billingCycle === 'yearly' && plan.price_yearly > 0 && (
-                      <p className="mt-1 text-[11px] font-semibold text-purple-600 dark:text-purple-400">
-                        Billed annually (Save 17%)
+                    <div>
+                      <h3 className="font-sans text-xl font-black text-slate-900 dark:text-white">
+                        {plan.plan_name}
+                      </h3>
+                      <p className="mt-1 text-xs font-normal text-slate-500 dark:text-slate-400">
+                        {plan.description}
                       </p>
-                    )}
-                  </div>
+                    </div>
 
-                  {/* Dynamic Features List from DB */}
-                  <div className="space-y-3.5">
-                    <span className="block text-[10px] font-extrabold tracking-wider text-slate-400 uppercase">
-                      Included Features
-                    </span>
-                    <ul className="space-y-2.5">
-                      {plan.features.map((feat, idx) => (
-                        <li key={idx} className="flex items-center gap-3 text-xs font-medium text-slate-700 dark:text-slate-300">
-                          <div
-                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
-                              feat.highlight || isPro
-                                ? 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300'
-                                : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
-                            }`}
-                          >
-                            <Check className="h-3 w-3 stroke-[3]" />
-                          </div>
-                          <span className={feat.highlight ? 'font-bold text-slate-900 dark:text-white' : ''}>
-                            {feat.text}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
+                    {/* Price Display */}
+                    <div className="border-b border-slate-100 pb-6 dark:border-slate-800">
+                      <div className="flex items-baseline gap-1">
+                        <span className="font-sans text-3xl font-black tracking-tight text-slate-900 dark:text-white">
+                          {displayPrice}
+                        </span>
+                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                          {billingSuffix}
+                        </span>
+                      </div>
+                      {billingCycle === 'yearly' && plan.price_yearly > 0 && (
+                        <p className="mt-1 text-[11px] font-semibold text-purple-600 dark:text-purple-400">
+                          Billed annually (Save 17%)
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Dynamic Features List from DB */}
+                    <div className="space-y-3.5">
+                      <span className="block text-[10px] font-extrabold tracking-wider text-slate-400 uppercase">
+                        Included Features
+                      </span>
+                      <ul className="space-y-2.5">
+                        {plan.features.map((feat, idx) => (
+                          <li key={idx} className="flex items-center gap-3 text-xs font-medium text-slate-700 dark:text-slate-300">
+                            <div
+                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
+                                feat.highlight || isPro
+                                  ? 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300'
+                                  : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                              }`}
+                            >
+                              <Check className="h-3 w-3 stroke-[3]" />
+                            </div>
+                            <span className={feat.highlight ? 'font-bold text-slate-900 dark:text-white' : ''}>
+                              {feat.text}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
                 </div>
 
@@ -707,11 +745,11 @@ export const SubscriptionPage: React.FC = () => {
                 <div className="pt-2">
                   <button
                     type="button"
-                    onClick={() => showInfo('Add Payment Method integration coming soon.')}
+                    onClick={() => showInfo('Payment gateway integration is currently under development.')}
                     className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-dashed border-purple-300 bg-purple-50/50 px-4 py-3 text-xs font-bold text-purple-700 transition-colors hover:bg-purple-100/60 dark:border-purple-800 dark:bg-purple-950/30 dark:text-purple-300"
                   >
                     <CreditCard className="h-4 w-4" />
-                    <span>+ Add Payment Method (Gateway Placeholder)</span>
+                    <span>+ Add Payment Method</span>
                   </button>
                 </div>
               </div>
@@ -719,27 +757,31 @@ export const SubscriptionPage: React.FC = () => {
 
             {activePlaceholderTab === 'promo' && (
               <div className="max-w-md space-y-3">
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                  Redeem Promo Code or Coupon
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Redeem Promo Code or Coupon
+                  </label>
+                  <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-[10px] font-black text-purple-700 dark:bg-purple-950 dark:text-purple-300">
+                    Coming Soon
+                  </span>
+                </div>
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    value={promoInput}
-                    onChange={(e) => setPromoInput(e.target.value)}
-                    placeholder="Enter code (e.g. WELCOME10)"
-                    className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-900 transition-all focus:border-purple-600 focus:bg-white focus:outline-none dark:border-slate-800 dark:bg-slate-800 dark:text-white dark:focus:border-purple-500"
+                    disabled
+                    placeholder="Promo Code (Coming Soon)"
+                    className="flex-1 cursor-not-allowed rounded-2xl border border-slate-200 bg-slate-100/70 px-4 py-2.5 text-xs font-semibold text-slate-400 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-500"
                   />
                   <button
                     type="button"
-                    onClick={handleApplyPromo}
-                    className="rounded-2xl bg-purple-600 px-4 py-2.5 text-xs font-extrabold text-white transition-all hover:bg-purple-700 shadow-xs"
+                    disabled
+                    className="cursor-not-allowed rounded-2xl bg-slate-300 px-4 py-2.5 text-xs font-extrabold text-slate-500 dark:bg-slate-800 dark:text-slate-600"
                   >
                     Apply Code
                   </button>
                 </div>
                 <p className="text-[11px] font-medium text-slate-400">
-                  Try using code <span className="font-mono font-bold text-purple-600 dark:text-purple-400">WELCOME10</span> or <span className="font-mono font-bold text-purple-600 dark:text-purple-400">LIBROVIA17</span>
+                  Promo code redemption feature is currently under development.
                 </p>
               </div>
             )}
@@ -867,13 +909,6 @@ export const SubscriptionPage: React.FC = () => {
                     </span>
                   </div>
 
-                  {promoApplied && (
-                    <div className="flex justify-between text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                      <span>Promo Discount ({promoDiscount}%)</span>
-                      <span>Applied</span>
-                    </div>
-                  )}
-
                   <div className="border-t border-slate-200 pt-2 flex justify-between text-sm font-black text-slate-900 dark:border-slate-700 dark:text-white">
                     <span>Total Due Today</span>
                     <span className="text-purple-600 dark:text-purple-400">
@@ -886,35 +921,33 @@ export const SubscriptionPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Promo Code Input in Modal */}
+                {/* Promo Code Disabled with Coming Soon */}
                 <div className="space-y-2">
-                  <label className="block text-[11px] font-extrabold text-slate-600 uppercase dark:text-slate-300">
-                    Have a promo code?
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={promoInput}
-                      onChange={(e) => setPromoInput(e.target.value)}
-                      placeholder="e.g. WELCOME10"
-                      className="flex-1 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-900 focus:border-purple-600 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleApplyPromo}
-                      className="rounded-xl border border-purple-200 bg-purple-50 px-3.5 py-2 text-xs font-bold text-purple-700 hover:bg-purple-100 dark:border-purple-900 dark:bg-purple-950/60 dark:text-purple-300"
-                    >
-                      Apply
-                    </button>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[11px] font-extrabold text-slate-600 uppercase dark:text-slate-300">
+                      Promo Code
+                    </label>
+                    <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[9.5px] font-black text-purple-700 dark:bg-purple-950 dark:text-purple-300">
+                      Coming Soon
+                    </span>
                   </div>
+                  <input
+                    type="text"
+                    disabled
+                    placeholder="Promo Code (Coming Soon)"
+                    className="w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-100/70 px-3.5 py-2 text-xs font-semibold text-slate-400 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-500"
+                  />
                 </div>
 
-                {/* Payment Gateway Disclaimer Note */}
+                {/* Refined Demo Version Note */}
                 <div className="flex items-start gap-2.5 rounded-2xl border border-purple-200/80 bg-purple-50/80 p-3.5 text-xs text-purple-900 dark:border-purple-900/40 dark:bg-purple-950/30 dark:text-purple-200">
                   <Lock className="h-4 w-4 shrink-0 text-purple-600 dark:text-purple-400 mt-0.5" />
-                  <p className="text-[11px] leading-relaxed">
-                    <span className="font-bold">Payment Gateway Integration</span>: Clicking confirm will connect to the payment gateway once integrated.
-                  </p>
+                  <div className="space-y-0.5 text-[11px] leading-relaxed text-left">
+                    <span className="font-bold block text-purple-900 dark:text-purple-300">Demo Version</span>
+                    <p className="text-slate-600 dark:text-slate-300">
+                      Payment gateway integration is currently under development. Your subscription will only be upgraded after successful payment verification.
+                    </p>
+                  </div>
                 </div>
 
                 {/* Action Buttons */}
@@ -922,7 +955,7 @@ export const SubscriptionPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setSelectedUpgradePlan(null)}
-                    className="flex-1 rounded-2xl border border-slate-200 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                    className="flex-1 rounded-2xl border border-slate-200 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-all duration-200"
                   >
                     Cancel
                   </button>
@@ -931,10 +964,10 @@ export const SubscriptionPage: React.FC = () => {
                     type="button"
                     onClick={handleConfirmSubscription}
                     disabled={isProcessingUpgrade}
-                    className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-purple-600 py-3 text-xs font-black text-white hover:bg-purple-700 shadow-md shadow-purple-600/20 disabled:opacity-50"
+                    className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-purple-600 py-3 text-xs font-black text-white hover:bg-purple-700 shadow-md shadow-purple-600/20 active:scale-98 transition-all duration-200"
                   >
                     <Crown className="h-4 w-4" />
-                    <span>Confirm & Upgrade</span>
+                    <span>Continue to Payment</span>
                   </button>
                 </div>
               </div>
@@ -980,14 +1013,14 @@ export const SubscriptionPage: React.FC = () => {
 
                 <div className="space-y-2">
                   <h3 className="font-sans text-xl font-black text-slate-900 dark:text-white">
-                    Payment Gateway Not Connected
+                    Demo Version
                   </h3>
-                  <div className="space-y-2 rounded-2xl border border-slate-100 bg-slate-50/70 p-4 text-xs font-medium leading-relaxed text-slate-600 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300">
+                  <div className="space-y-2 rounded-2xl border border-slate-100 bg-slate-50/70 p-4 text-xs font-medium leading-relaxed text-slate-600 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300 text-left">
                     <p className="font-bold text-slate-900 dark:text-white">
-                      Librovia is currently running in demo mode.
+                      Payment gateway integration is currently under development.
                     </p>
                     <p>
-                      Payment gateway is not connected yet. Subscription upgrades will be available after payment integration.
+                      Your subscription will only be upgraded after successful payment verification.
                     </p>
                   </div>
                 </div>
@@ -996,7 +1029,7 @@ export const SubscriptionPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleCloseGatewayNotice}
-                    className="w-full cursor-pointer rounded-2xl bg-purple-600 py-3 text-xs font-black text-white hover:bg-purple-700 shadow-md shadow-purple-600/20"
+                    className="w-full cursor-pointer rounded-2xl bg-purple-600 py-3 text-xs font-black text-white hover:bg-purple-700 shadow-md shadow-purple-600/20 transition-all duration-200 active:scale-98"
                   >
                     Understood & Close
                   </button>

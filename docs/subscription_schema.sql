@@ -53,7 +53,7 @@ INSERT INTO public.subscription_plans (
     'free',
     'FREE',
     'Perfect for casual readers getting started with digital book management.',
-    NULL,
+    'Free Forever',
     0.00,
     0.00,
     5368709120, -- 5 GB
