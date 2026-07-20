@@ -54,8 +54,6 @@ export interface DynamicSaaSPlan {
 export const AdminSubscriptionsPage: React.FC = () => {
   const { showSuccess } = useToast()
 
-  const [loading, setLoading] = useState(false)
-
   // Dynamic SaaS Plans List
   const [plans, setPlans] = useState<DynamicSaaSPlan[]>([
     {
@@ -250,11 +248,7 @@ export const AdminSubscriptionsPage: React.FC = () => {
           <button
             type="button"
             onClick={() => {
-              setLoading(true)
-              setTimeout(() => {
-                setLoading(false)
-                showSuccess('Refreshed subscription plans and cache!')
-              }, 400)
+              showSuccess('Refreshed subscription plans and cache!')
             }}
             className="inline-flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-extrabold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 transition-all"
           >
