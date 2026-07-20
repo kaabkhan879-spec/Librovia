@@ -1,50 +1,97 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { PageWrapper } from '../../components/common/PageWrapper'
 import { useToast } from '../../context/ToastContext'
+import { useSubscription } from '../../context/SubscriptionContext'
+import { subscriptionsService } from '../../services/subscriptions'
 import { booksService, type Book } from '../../services/books'
+import { collectionsService, type Collection } from '../../services/collections'
 import { ROUTES } from '../../constants/routes'
-import { Cloud, Database, HardDrive, ShieldAlert, Sparkles } from 'lucide-react'
 import { formatBytes } from '../../utils/helpers'
 import { Button } from '../../components/common/Button'
+import { DownloadsManagerModal } from '../../components/common/DownloadsManagerModal'
+import {
+  Cloud,
+  Database,
+  HardDrive,
+  ShieldAlert,
+  Sparkles,
+  Crown,
+  CheckCircle2,
+  Download,
+  Trash2,
+  Info,
+} from 'lucide-react'
 
 export const StoragePage: React.FC = () => {
-  const { showInfo } = useToast()
+  const { currentPlan, subscriptionStatus, storageLimitBytes } = useSubscription()
+  const { showInfo, showSuccess } = useToast()
+  const navigate = useNavigate()
+
   const [books, setBooks] = useState<Book[]>([])
+  const [collections, setCollections] = useState<Collection[]>([])
   const [loading, setLoading] = useState(true)
+  const [showDownloadsModal, setShowDownloadsModal] = useState(false)
 
   useEffect(() => {
-    booksService.getBooks().then((data) => {
-      setBooks(data)
-      setLoading(false)
-    })
+    Promise.all([booksService.getBooks(), collectionsService.getCollections()])
+      .then(([booksData, colsData]) => {
+        setBooks(booksData)
+        setCollections(colsData)
+        setLoading(false)
+      })
+      .catch((err) => {
+        console.error('Failed to load storage page details:', err)
+        setLoading(false)
+      })
   }, [])
 
-  // Calculate storage usage
+  // Dynamic storage calculations from actual uploaded files and subscription quota
   const totalStorageBytes = useMemo(() => {
-    return books.reduce((acc, b) => acc + b.fileSize, 0)
+    return books.reduce((acc, b) => acc + (b.fileSize || 0), 0)
   }, [books])
 
   const totalStorageStr = useMemo(() => {
     return formatBytes(totalStorageBytes)
   }, [totalStorageBytes])
 
-  const limitBytes = 1000000000 // 1 GB allocation
-  const limitStr = formatBytes(limitBytes)
+  const limitStr = useMemo(() => {
+    return subscriptionsService.formatStorageLimit(storageLimitBytes)
+  }, [storageLimitBytes])
 
   const storagePercent = useMemo(() => {
-    return Math.min(100, Math.round((totalStorageBytes / limitBytes) * 100))
-  }, [totalStorageBytes])
+    if (!storageLimitBytes) return 0
+    return Math.min(100, Math.round((totalStorageBytes / storageLimitBytes) * 100))
+  }, [totalStorageBytes, storageLimitBytes])
 
-  // Remaining space calculation
   const remainingBytes = useMemo(() => {
-    return Math.max(0, limitBytes - totalStorageBytes)
-  }, [totalStorageBytes])
+    return Math.max(0, storageLimitBytes - totalStorageBytes)
+  }, [totalStorageBytes, storageLimitBytes])
 
   const remainingStr = useMemo(() => {
     return formatBytes(remainingBytes)
   }, [remainingBytes])
+
+  const handleClearCache = () => {
+    try {
+      const keysToKeep = [
+        'librovia_theme_mode',
+        'librovia-theme',
+        'librovia_user_plan',
+        'librovia_billing_cycle',
+        'sb-ap-south-1-auth-token',
+      ]
+      Object.keys(localStorage).forEach((key) => {
+        if (!keysToKeep.some((k) => key.includes(k))) {
+          localStorage.removeItem(key)
+        }
+      })
+      showSuccess('Local browser cache cleared! Your cloud library and notes remain 100% safe.')
+    } catch {
+      showInfo('Could not clear local cache.')
+    }
+  }
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -59,19 +106,21 @@ export const StoragePage: React.FC = () => {
     show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 100 } },
   } as const
 
-  const handleUpgradeAlert = () => {
-    showInfo('Checkout is disabled during testing. High capacity tiers unlock in Phase 5! 🚀')
-  }
-
   return (
     <PageWrapper className="min-h-screen space-y-8 pb-20 text-left select-none">
+      {/* Offline Downloads Manager Modal */}
+      <DownloadsManagerModal
+        isOpen={showDownloadsModal}
+        onClose={() => setShowDownloadsModal(false)}
+      />
+
       {/* Header section */}
       <div className="space-y-1">
         <h1 className="font-sans text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
           Cloud Storage
         </h1>
         <p className="text-xs font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">
-          Monitor your digital library workspace files capacity and limits.
+          Monitor your digital library capacity, current plan metrics, and workspace files.
         </p>
       </div>
 
@@ -84,7 +133,6 @@ export const StoragePage: React.FC = () => {
             exit={{ opacity: 0 }}
             className="space-y-6"
           >
-            {/* Capacity Meter Skeleton */}
             <div className="rounded-3xl border border-slate-100 bg-white p-6 h-28 flex flex-col justify-between dark:border-slate-800 dark:bg-slate-900">
               <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-center gap-4">
@@ -103,75 +151,6 @@ export const StoragePage: React.FC = () => {
                 </div>
               </div>
             </div>
-
-            {/* Storage breakdown details cards skeleton */}
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-              {Array.from({ length: 3 }).map((_, idx) => (
-                <div
-                  key={idx}
-                  className="rounded-3xl border border-slate-100 bg-white p-5 h-24 flex flex-col justify-between dark:border-slate-800 dark:bg-slate-900"
-                >
-                  <div className="flex justify-between items-center">
-                    <div className="h-2.5 w-20 rounded shimmer-placeholder" />
-                    <div className="h-7 w-7 rounded shimmer-placeholder" />
-                  </div>
-                  <div className="h-5 w-16 rounded shimmer-placeholder" />
-                </div>
-              ))}
-            </div>
-
-            {/* List of files occupying storage table skeleton */}
-            <div className="rounded-3xl border border-slate-100 bg-white dark:border-slate-800 dark:bg-slate-900 overflow-hidden">
-              <div className="border-b border-slate-50 p-5 dark:border-slate-800/40">
-                <div className="h-4 w-44 rounded shimmer-placeholder" />
-              </div>
-              <div className="p-6 space-y-4">
-                {Array.from({ length: 3 }).map((_, idx) => (
-                  <div key={idx} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0 dark:border-slate-800/40">
-                    <div className="flex items-center gap-3 flex-1">
-                      <div className="h-9 w-7 rounded shimmer-placeholder shrink-0" />
-                      <div className="space-y-2 flex-1">
-                        <div className="h-3.5 w-1/3 rounded shimmer-placeholder" />
-                        <div className="h-2.5 w-20 rounded shimmer-placeholder" />
-                      </div>
-                    </div>
-                    <div className="h-3 w-16 rounded shimmer-placeholder" />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Upgrade banner skeleton */}
-            <div className="rounded-3xl bg-slate-100 dark:bg-slate-900/60 p-6 h-28 flex items-center justify-between">
-              <div className="space-y-2.5 w-2/3">
-                <div className="h-2.5 w-20 rounded shimmer-placeholder" />
-                <div className="h-4 w-48 rounded shimmer-placeholder" />
-                <div className="h-3 w-full rounded shimmer-placeholder" />
-              </div>
-              <div className="h-10 w-28 rounded-xl shimmer-placeholder shrink-0" />
-            </div>
-          </motion.div>
-        ) : books.length === 0 ? (
-          <motion.div
-            key="empty"
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="mx-auto max-w-xl space-y-6 rounded-3xl border-2 border-dashed border-slate-100 bg-white p-12 text-center dark:border-slate-800 dark:bg-slate-900"
-          >
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-purple-50 text-purple-600 dark:bg-purple-950/20">
-              <Cloud className="h-7 w-7" />
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">No Storage Used</h3>
-              <p className="mx-auto max-w-xs text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-                You haven't uploaded any books yet. Once you upload PDF documents, they will occupy
-                your cloud space here.
-              </p>
-            </div>
-            <Link to={ROUTES.LIBRARY} className="inline-block">
-              <Button>Browse Library</Button>
-            </Link>
           </motion.div>
         ) : (
           <motion.div
@@ -192,7 +171,103 @@ export const StoragePage: React.FC = () => {
               </motion.div>
             )}
 
-            {/* Usage Summary Card */}
+            {/* 1. COMPACT CURRENT PLAN SUMMARY CARD */}
+            <motion.div
+              variants={itemVariants}
+              className="rounded-3xl border border-purple-200/80 bg-white p-6 shadow-xs dark:border-purple-900/40 dark:bg-slate-900"
+            >
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between border-b border-slate-100 pb-5 dark:border-slate-800">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-600/20">
+                    <Crown className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-extrabold tracking-widest text-slate-400 uppercase">
+                      Current Plan
+                    </span>
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <h2 className="text-2xl font-black text-slate-900 capitalize dark:text-white">
+                        {currentPlan.plan_name} Plan
+                      </h2>
+                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[10.5px] font-extrabold text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300">
+                        <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                        {subscriptionStatus}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowDownloadsModal(true)}
+                    className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 text-xs font-extrabold text-white shadow-md transition-all hover:bg-purple-700 active:scale-98"
+                  >
+                    <Download className="h-4 w-4" />
+                    <span>Manage Offline Downloads</span>
+                  </button>
+
+                  <Link to={ROUTES.SUBSCRIPTION}>
+                    <button
+                      type="button"
+                      className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 transition-all hover:bg-slate-50 active:scale-98 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                    >
+                      Change Plan
+                    </button>
+                  </Link>
+                </div>
+              </div>
+
+              {/* Current Plan Summary Metrics */}
+              <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+                  <span className="block text-[10px] font-extrabold tracking-wider text-slate-400 uppercase">
+                    Current Plan
+                  </span>
+                  <p className="mt-1 text-sm font-black text-slate-900 dark:text-white">
+                    {currentPlan.plan_name}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+                  <span className="block text-[10px] font-extrabold tracking-wider text-slate-400 uppercase">
+                    Subscription Status
+                  </span>
+                  <p className="mt-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                    {subscriptionStatus}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+                  <span className="block text-[10px] font-extrabold tracking-wider text-slate-400 uppercase">
+                    Storage Limit
+                  </span>
+                  <p className="mt-1 text-sm font-black text-purple-600 dark:text-purple-400">
+                    {limitStr}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+                  <span className="block text-[10px] font-extrabold tracking-wider text-slate-400 uppercase">
+                    Books Uploaded
+                  </span>
+                  <p className="mt-1 text-sm font-black text-slate-900 dark:text-white">
+                    {books.length} {books.length === 1 ? 'Book' : 'Books'}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+                  <span className="block text-[10px] font-extrabold tracking-wider text-slate-400 uppercase">
+                    Collections
+                  </span>
+                  <p className="mt-1 text-sm font-black text-slate-900 dark:text-white">
+                    {collections.length} {collections.length === 1 ? 'Collection' : 'Collections'}
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* 2. DYNAMIC CLOUD STORAGE CARD */}
             <motion.div
               variants={itemVariants}
               className="rounded-3xl border border-slate-100 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900"
@@ -204,7 +279,7 @@ export const StoragePage: React.FC = () => {
                   </div>
                   <div className="text-left">
                     <span className="block text-[10px] font-bold tracking-widest text-slate-400 uppercase">
-                      Capacity Meter
+                      Cloud Storage Capacity
                     </span>
                     <h3 className="mt-0.5 text-2xl font-extrabold text-slate-900 dark:text-white">
                       {totalStorageStr}{' '}
@@ -217,12 +292,12 @@ export const StoragePage: React.FC = () => {
 
                 <div className="w-full max-w-md flex-1 space-y-2.5">
                   <div className="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400">
-                    <span>Usage limit</span>
+                    <span>Usage limit ({currentPlan.plan_name})</span>
                     <span>{storagePercent}%</span>
                   </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                  <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                     <div
-                      className="h-full rounded-full bg-purple-600 transition-all duration-500"
+                      className="h-full rounded-full bg-gradient-to-r from-purple-500 to-indigo-600 transition-all duration-500"
                       style={{ width: `${storagePercent}%` }}
                     />
                   </div>
@@ -262,7 +337,7 @@ export const StoragePage: React.FC = () => {
               >
                 <div className="flex items-start justify-between">
                   <span className="text-[9px] font-extrabold tracking-wider text-slate-400 uppercase">
-                    Storage Allocation Limit
+                    Available Limit ({currentPlan.plan_name})
                   </span>
                   <div className="flex h-7 w-7 items-center justify-center rounded-lg text-blue-600 bg-blue-50 dark:bg-blue-950/20">
                     <Database className="h-4 w-4" />
@@ -301,10 +376,30 @@ export const StoragePage: React.FC = () => {
               variants={itemVariants}
               className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900"
             >
-              <div className="border-b border-slate-50 p-5 text-left dark:border-slate-800/40">
+              <div className="border-b border-slate-50 p-5 text-left dark:border-slate-800/40 flex items-center justify-between">
                 <h3 className="text-sm font-bold tracking-wider text-slate-800 uppercase dark:text-white">
                   Library Space Allocation Breakdown
                 </h3>
+
+                {/* Cache Deletion Action Button with Clear Tooltip/Explanation */}
+                <div className="relative group">
+                  <button
+                    type="button"
+                    onClick={handleClearCache}
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 transition-colors hover:bg-rose-100 dark:border-rose-950/40 dark:bg-rose-950/30 dark:text-rose-300"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Clear Local Cache</span>
+                  </button>
+                  <div className="absolute right-0 top-full mt-2 hidden w-64 rounded-xl border border-slate-200 bg-slate-900 p-2.5 text-[11px] font-medium leading-normal text-slate-200 shadow-xl group-hover:block z-20 dark:border-slate-700 dark:bg-slate-800">
+                    <div className="flex items-start gap-1.5">
+                      <Info className="h-3.5 w-3.5 text-purple-400 shrink-0 mt-0.5" />
+                      <p>
+                        Clears offline PDF cache from local browser storage. Your cloud library books and notes stay 100% safe.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="overflow-x-auto">
@@ -350,7 +445,7 @@ export const StoragePage: React.FC = () => {
               </div>
             </motion.div>
 
-            {/* Premium Upgrade Card */}
+            {/* Premium Upgrade Banner */}
             <motion.div
               variants={itemVariants}
               className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-purple-700 via-indigo-850 to-slate-900 p-6 text-white shadow-lg text-left"
@@ -360,19 +455,19 @@ export const StoragePage: React.FC = () => {
                 <div className="space-y-1.5 max-w-xl">
                   <span className="flex items-center gap-1 text-[9px] font-extrabold tracking-widest text-purple-300 uppercase">
                     <Sparkles className="h-3 w-3 shrink-0" />
-                    Premium Tier
+                    Subscription Upgrade
                   </span>
-                  <h3 className="text-lg font-black tracking-tight">Need more digital shelving space?</h3>
+                  <h3 className="text-lg font-black tracking-tight">Need more digital storage space?</h3>
                   <p className="text-xs text-slate-300 leading-relaxed">
-                    Upgrade to **Librovia Premium** for 50 GB cloud storage, unlimited file sizes, custom tagging categories, and advanced priority annotations sync.
+                    Upgrade your plan to unlock up to 1 TB cloud storage, unlimited AI search, unlimited offline downloads, and family sharing.
                   </p>
                 </div>
                 <div className="shrink-0 pt-2 sm:pt-0">
                   <Button
-                    onClick={handleUpgradeAlert}
+                    onClick={() => navigate(ROUTES.SUBSCRIPTION)}
                     className="rounded-xl bg-white px-5 py-2.5 text-xs font-bold text-indigo-950 shadow hover:bg-slate-100"
                   >
-                    Upgrade Storage
+                    Upgrade Storage Plan
                   </Button>
                 </div>
               </div>

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { PageWrapper } from '../../components/common/PageWrapper'
 import { useToast } from '../../context/ToastContext'
 import { useAuth } from '../../context/AuthContext'
+import { useSubscription } from '../../context/SubscriptionContext'
 import { useLocalStorage } from '../../hooks/useLocalStorage'
 import { booksService, type Book } from '../../services/books'
 import { collectionsService, type Collection } from '../../services/collections'
@@ -182,10 +183,11 @@ export const SettingsPage: React.FC = () => {
     return books.reduce((acc, b) => acc + (b.fileSize || 0), 0)
   }, [books])
 
-  const maxStorageLimitBytes = 1073741824 // 1 GB allocation
+  const { storageLimitBytes } = useSubscription()
+
   const storagePercentage = useMemo(() => {
-    return Math.min(100, Math.round((totalUsedBytes / maxStorageLimitBytes) * 100))
-  }, [totalUsedBytes])
+    return Math.min(100, Math.round((totalUsedBytes / (storageLimitBytes || 5368709120)) * 100))
+  }, [totalUsedBytes, storageLimitBytes])
 
   const cacheSizeStr = useMemo(() => {
     try {
@@ -1039,7 +1041,7 @@ export const SettingsPage: React.FC = () => {
                           <h3 className="text-xl font-extrabold text-slate-900 dark:text-white">
                             {formatBytes(totalUsedBytes)}{' '}
                             <span className="text-xs font-medium text-slate-400">
-                              / {formatBytes(maxStorageLimitBytes)}
+                              / {formatBytes(storageLimitBytes)}
                             </span>
                           </h3>
                         </div>

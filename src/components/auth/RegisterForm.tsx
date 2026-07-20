@@ -86,7 +86,7 @@ export const RegisterForm: React.FC = () => {
             Create an account
           </h2>
           <p className="text-text-muted mt-1 font-sans text-xs font-semibold">
-            Get started with 1 GB free cloud library storage today.
+            Get started with 5 GB free cloud library storage today.
           </p>
         </div>
 
