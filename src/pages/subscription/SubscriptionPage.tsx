@@ -79,7 +79,6 @@ export const SubscriptionPage: React.FC = () => {
     storageLimitBytes,
     invoices,
     paymentMethods,
-    setPlan,
     setBillingCycle,
     cancelSubscription,
     reactivateSubscription,
