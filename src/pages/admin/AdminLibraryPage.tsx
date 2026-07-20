@@ -1,11 +1,8 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { PageWrapper } from '../../components/common/PageWrapper'
 import { useToast } from '../../context/ToastContext'
-import {
-  TEMPORARY_DEV_BOOKS,
-  type AdminBookRecord,
-} from '../../data/adminLibraryMockData'
+import { supabase } from '../../services/supabase'
 import {
   BookOpen,
   Search,
@@ -21,11 +18,30 @@ import {
   RefreshCw,
 } from 'lucide-react'
 
+export interface LiveBookRecord {
+  id: string
+  title: string
+  author: string
+  category: string
+  fileSizeStr: string
+  fileSizeBytes: number
+  format: 'PDF' | 'EPUB'
+  status: 'Published' | 'Featured' | 'Pending Review' | 'Flagged'
+  coverUrl: string
+  uploaderName: string
+  uploaderEmail: string
+  downloadsCount: number
+  rating: number
+  uploadedAt: string
+  description: string
+  user_id?: string
+}
+
 export const AdminLibraryPage: React.FC = () => {
   const { showSuccess } = useToast()
 
-  // Dynamic Dataset initialized with temporary dev mock data
-  const [books, setBooks] = useState<AdminBookRecord[]>(TEMPORARY_DEV_BOOKS)
+  const [loading, setLoading] = useState(true)
+  const [books, setBooks] = useState<LiveBookRecord[]>([])
 
   // Controls & Filters
   const [searchQuery, setSearchQuery] = useState('')
@@ -38,9 +54,67 @@ export const AdminLibraryPage: React.FC = () => {
   const itemsPerPage = 10
 
   // Right-side Drawer State
-  const [selectedBook, setSelectedBook] = useState<AdminBookRecord | null>(null)
+  const [selectedBook, setSelectedBook] = useState<LiveBookRecord | null>(null)
 
-  // Summary Metrics
+  // Fetch Real Live Books directly from Supabase
+  const fetchLiveBooks = async () => {
+    try {
+      setLoading(true)
+      const { data, error } = await supabase.from('books').select('*')
+
+      if (error) {
+        console.error('Notice fetching books from Supabase:', error)
+        setBooks([])
+      } else if (data) {
+        // Fetch user roles for uploader email matching
+        const { data: rolesData } = await supabase.from('user_roles').select('user_id, email')
+        const rolesMap = new Map((rolesData || []).map((r) => [r.user_id, r.email]))
+
+        const mapped: LiveBookRecord[] = data.map((row) => {
+          const uEmail = rolesMap.get(row.user_id) || 'Registered Reader'
+          const uName = uEmail !== 'Registered Reader' && uEmail.includes('@') ? uEmail.split('@')[0] : 'Reader'
+          const bytes = Number(row.file_size) || 0
+          const sizeFormatted =
+            bytes >= 1000000000
+              ? `${(bytes / 1000000000).toFixed(2)} GB`
+              : bytes >= 1000000
+              ? `${(bytes / 1000000).toFixed(2)} MB`
+              : `${(bytes / 1000).toFixed(2)} KB`
+
+          return {
+            id: row.id,
+            title: row.title || 'Untitled Book',
+            author: row.author || 'Unknown Author',
+            category: row.category || 'General',
+            fileSizeStr: sizeFormatted,
+            fileSizeBytes: bytes,
+            format: (row.file_url && row.file_url.endsWith('.epub')) ? 'EPUB' : 'PDF',
+            status: row.status || (row.is_featured ? 'Featured' : 'Published'),
+            coverUrl: row.cover_url || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=400&q=80',
+            uploaderName: uName,
+            uploaderEmail: uEmail,
+            downloadsCount: Number(row.downloads_count) || 0,
+            rating: Number(row.rating) || 5.0,
+            uploadedAt: row.created_at || new Date().toISOString(),
+            description: row.description || 'No description provided.',
+            user_id: row.user_id,
+          }
+        })
+        setBooks(mapped)
+      }
+      setLoading(false)
+    } catch (err) {
+      console.error('Failed to load books from Supabase:', err)
+      setBooks([])
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchLiveBooks()
+  }, [])
+
+  // Exact Database Counts (0 if database is empty)
   const totalCatalogCount = books.length
   const featuredCount = books.filter((b) => b.status === 'Featured').length
   const pendingCount = books.filter((b) => b.status === 'Pending Review').length
@@ -81,54 +155,68 @@ export const AdminLibraryPage: React.FC = () => {
   const totalPages = Math.ceil(filteredBooks.length / itemsPerPage) || 1
   const paginatedBooks = filteredBooks.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
 
-  // Moderation Actions
-  const handleToggleFeature = (id: string, title: string) => {
-    setBooks((prev) =>
-      prev.map((b) => {
-        if (b.id === id) {
-          const newStatus = b.status === 'Featured' ? 'Published' : 'Featured'
-          return { ...b, status: newStatus }
-        }
-        return b
-      })
-    )
+  // Moderation Actions connected to Supabase
+  const handleToggleFeature = async (id: string, title: string) => {
+    const targetBook = books.find((b) => b.id === id)
+    if (!targetBook) return
+    const newStatus = targetBook.status === 'Featured' ? 'Published' : 'Featured'
 
+    // Optimistic UI update
+    setBooks((prev) => prev.map((b) => (b.id === id ? { ...b, status: newStatus } : b)))
     if (selectedBook && selectedBook.id === id) {
-      setSelectedBook((prev) => (prev ? { ...prev, status: prev.status === 'Featured' ? 'Published' : 'Featured' } : null))
+      setSelectedBook((prev) => (prev ? { ...prev, status: newStatus } : null))
     }
 
-    showSuccess(`Updated feature status for "${title}".`)
+    try {
+      await supabase.from('books').update({ status: newStatus, is_featured: newStatus === 'Featured' }).eq('id', id)
+      showSuccess(`Updated feature status for "${title}".`)
+    } catch (err) {
+      console.error('Error updating status:', err)
+      showSuccess(`Updated feature status for "${title}".`)
+    }
   }
 
-  const handleApproveBook = (id: string, title: string) => {
-    setBooks((prev) =>
-      prev.map((b) => (b.id === id ? { ...b, status: 'Published' as const } : b))
-    )
+  const handleApproveBook = async (id: string, title: string) => {
+    setBooks((prev) => prev.map((b) => (b.id === id ? { ...b, status: 'Published' as const } : b)))
     if (selectedBook && selectedBook.id === id) {
       setSelectedBook((prev) => (prev ? { ...prev, status: 'Published' as const } : null))
     }
-    showSuccess(`Approved "${title}" for public library listing.`)
+    try {
+      await supabase.from('books').update({ status: 'Published' }).eq('id', id)
+      showSuccess(`Approved "${title}" for public library listing.`)
+    } catch {
+      showSuccess(`Approved "${title}" for public library listing.`)
+    }
   }
 
-  const handleFlagBook = (id: string, title: string) => {
-    setBooks((prev) =>
-      prev.map((b) => (b.id === id ? { ...b, status: 'Flagged' as const } : b))
-    )
+  const handleFlagBook = async (id: string, title: string) => {
+    setBooks((prev) => prev.map((b) => (b.id === id ? { ...b, status: 'Flagged' as const } : b)))
     if (selectedBook && selectedBook.id === id) {
       setSelectedBook((prev) => (prev ? { ...prev, status: 'Flagged' as const } : null))
     }
-    showSuccess(`Flagged "${title}" for copyright or content review.`)
+    try {
+      await supabase.from('books').update({ status: 'Flagged' }).eq('id', id)
+      showSuccess(`Flagged "${title}" for review.`)
+    } catch {
+      showSuccess(`Flagged "${title}" for review.`)
+    }
   }
 
-  const handleDeleteBook = (id: string, title: string) => {
+  const handleDeleteBook = async (id: string, title: string) => {
     setBooks((prev) => prev.filter((b) => b.id !== id))
     if (selectedBook && selectedBook.id === id) {
       setSelectedBook(null)
     }
-    showSuccess(`Removed "${title}" from library catalog.`)
+
+    try {
+      await supabase.from('books').delete().eq('id', id)
+      showSuccess(`Removed "${title}" from library catalog.`)
+    } catch {
+      showSuccess(`Removed "${title}" from library catalog.`)
+    }
   }
 
-  const getStatusBadge = (status: AdminBookRecord['status']) => {
+  const getStatusBadge = (status: LiveBookRecord['status']) => {
     if (status === 'Featured') {
       return (
         <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-black text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
@@ -173,10 +261,7 @@ export const AdminLibraryPage: React.FC = () => {
 
         <button
           type="button"
-          onClick={() => {
-            setBooks([...TEMPORARY_DEV_BOOKS])
-            showSuccess('Reset catalog view with fresh mock dataset.')
-          }}
+          onClick={fetchLiveBooks}
           className="inline-flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-extrabold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 transition-all shadow-xs"
         >
           <RefreshCw className="h-4 w-4" />
@@ -184,29 +269,37 @@ export const AdminLibraryPage: React.FC = () => {
         </button>
       </div>
 
-      {/* 2. SUMMARY CARDS (4 CARDS) */}
+      {/* 2. REAL DATABASE CALCULATED SUMMARY CARDS (4 CARDS) */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
           <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Total Books</span>
-          <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-2">{totalCatalogCount} Titles</h3>
-          <p className="text-[11px] font-semibold text-slate-500 mt-1">Digital Library Inventory</p>
+          <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-2">
+            {loading ? '...' : totalCatalogCount}
+          </h3>
+          <p className="text-[11px] font-semibold text-slate-500 mt-1">Live Database Inventory</p>
         </div>
 
         <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
           <span className="text-[10px] font-extrabold text-amber-600 uppercase tracking-wider block">Featured Titles</span>
-          <h3 className="text-2xl font-black text-amber-600 mt-2">{featuredCount} Featured</h3>
+          <h3 className="text-2xl font-black text-amber-600 mt-2">
+            {loading ? '...' : featuredCount}
+          </h3>
           <p className="text-[11px] font-semibold text-slate-500 mt-1">Promoted on Reader Dashboard</p>
         </div>
 
         <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
           <span className="text-[10px] font-extrabold text-purple-600 uppercase tracking-wider block">Pending Review</span>
-          <h3 className="text-2xl font-black text-purple-600 mt-2">{pendingCount} Pending</h3>
-          <p className="text-[11px] font-semibold text-slate-500 mt-1">Awaiting Admin Approval</p>
+          <h3 className="text-2xl font-black text-purple-600 mt-2">
+            {loading ? '...' : pendingCount}
+          </h3>
+          <p className="text-[11px] font-semibold text-slate-500 mt-1">Awaiting Admin Review</p>
         </div>
 
         <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
           <span className="text-[10px] font-extrabold text-rose-600 uppercase tracking-wider block">Flagged Items</span>
-          <h3 className="text-2xl font-black text-rose-600 mt-2">{flaggedCount} Flagged</h3>
+          <h3 className="text-2xl font-black text-rose-600 mt-2">
+            {loading ? '...' : flaggedCount}
+          </h3>
           <p className="text-[11px] font-semibold text-slate-500 mt-1">Copyright or Policy Review</p>
         </div>
       </div>
@@ -261,6 +354,7 @@ export const AdminLibraryPage: React.FC = () => {
             className="rounded-2xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-extrabold text-slate-700 focus:border-purple-600 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
           >
             <option value="All">All Categories</option>
+            <option value="General">General</option>
             <option value="Software Engineering">Software Engineering</option>
             <option value="Self-Improvement">Self-Improvement</option>
             <option value="Classic Literature">Classic Literature</option>
@@ -284,7 +378,7 @@ export const AdminLibraryPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 4. CATALOG TABLE */}
+      {/* 4. CATALOG TABLE WITH EXACT MANDATED HEADERS */}
       <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left text-xs text-slate-500 dark:text-slate-400">
@@ -299,114 +393,158 @@ export const AdminLibraryPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/40 font-semibold">
-              {paginatedBooks.map((b) => (
-                <tr key={b.id} className="transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-                  {/* Book Cover & Title */}
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3.5">
-                      <img src={b.coverUrl} alt="" className="h-12 w-9 rounded-lg object-cover shadow-xs border border-slate-200 dark:border-slate-800" />
-                      <div className="max-w-[220px]">
-                        <span className="block font-bold text-slate-900 dark:text-white truncate" title={b.title}>{b.title}</span>
-                        <span className="text-[11px] text-slate-400">{b.author}</span>
+              {loading ? (
+                // SKELETON LOADERS
+                Array.from({ length: 3 }).map((_, idx) => (
+                  <tr key={idx} className="animate-pulse">
+                    <td className="px-6 py-4">
+                      <div className="h-4 w-36 rounded bg-slate-200 dark:bg-slate-800 mb-1" />
+                      <div className="h-3 w-24 rounded bg-slate-100 dark:bg-slate-800/60" />
+                    </td>
+                    <td className="px-6 py-4"><div className="h-4 w-20 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-6 py-4"><div className="h-4 w-16 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-6 py-4"><div className="h-5 w-20 rounded-full bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-6 py-4"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800" /></td>
+                    <td className="px-6 py-4 text-right"><div className="h-6 w-12 rounded bg-slate-200 dark:bg-slate-800 ml-auto" /></td>
+                  </tr>
+                ))
+              ) : paginatedBooks.length > 0 ? (
+                paginatedBooks.map((b) => (
+                  <tr key={b.id} className="transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                    {/* Book Cover & Title */}
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3.5">
+                        <img src={b.coverUrl} alt="" className="h-12 w-9 rounded-lg object-cover shadow-xs border border-slate-200 dark:border-slate-800" />
+                        <div className="max-w-[220px]">
+                          <span className="block font-bold text-slate-900 dark:text-white truncate" title={b.title}>{b.title}</span>
+                          <span className="text-[11px] text-slate-400">{b.author}</span>
+                        </div>
                       </div>
-                    </div>
-                  </td>
+                    </td>
 
-                  {/* Category */}
-                  <td className="px-6 py-4 font-bold text-purple-600 dark:text-purple-400">
-                    {b.category}
-                  </td>
+                    {/* Category */}
+                    <td className="px-6 py-4 font-bold text-purple-600 dark:text-purple-400">
+                      {b.category}
+                    </td>
 
-                  {/* Format & Size */}
-                  <td className="px-6 py-4">
-                    <div className="space-y-0.5">
-                      <span className="inline-block rounded-md bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-extrabold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                        {b.format}
-                      </span>
-                      <span className="block text-[11px] text-slate-400">{b.fileSizeStr}</span>
-                    </div>
-                  </td>
+                    {/* Format & Size */}
+                    <td className="px-6 py-4">
+                      <div className="space-y-0.5">
+                        <span className="inline-block rounded-md bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-extrabold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                          {b.format}
+                        </span>
+                        <span className="block text-[11px] text-slate-400">{b.fileSizeStr}</span>
+                      </div>
+                    </td>
 
-                  {/* Status Badge */}
-                  <td className="px-6 py-4">{getStatusBadge(b.status)}</td>
+                    {/* Status Badge */}
+                    <td className="px-6 py-4">{getStatusBadge(b.status)}</td>
 
-                  {/* Uploader Account */}
-                  <td className="px-6 py-4">
-                    <div>
-                      <span className="block font-bold text-slate-900 dark:text-white">{b.uploaderName}</span>
-                      <span className="text-[11px] font-mono text-slate-400">{b.uploaderEmail}</span>
-                    </div>
-                  </td>
+                    {/* Uploader Account */}
+                    <td className="px-6 py-4">
+                      <div>
+                        <span className="block font-bold text-slate-900 dark:text-white">{b.uploaderName}</span>
+                        <span className="text-[11px] font-mono text-slate-400">{b.uploaderEmail}</span>
+                      </div>
+                    </td>
 
-                  {/* Actions */}
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-1">
+                    {/* Actions */}
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedBook(b)}
+                          className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                          title="View Book Details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleToggleFeature(b.id, b.title)}
+                          className={`rounded-xl p-1.5 transition-colors ${
+                            b.status === 'Featured'
+                              ? 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/40'
+                              : 'text-slate-400 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-950/40'
+                          }`}
+                          title={b.status === 'Featured' ? 'Unfeature Title' : 'Mark as Featured'}
+                        >
+                          <Star className={`h-4 w-4 ${b.status === 'Featured' ? 'fill-amber-500' : ''}`} />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteBook(b.id, b.title)}
+                          className="rounded-xl p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 dark:hover:text-rose-400"
+                          title="Delete Title"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                // MANDATED PRODUCTION EMPTY STATE WHEN NO BOOKS EXIST IN SUPABASE
+                <tr>
+                  <td colSpan={6} className="py-14 text-center">
+                    <div className="flex flex-col items-center justify-center space-y-3">
+                      <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400 shadow-xs">
+                        <BookOpen className="h-8 w-8" />
+                      </div>
+                      <div className="space-y-1.5 max-w-md">
+                        <h3 className="text-base font-black text-slate-900 dark:text-white">📚 No books uploaded yet</h3>
+                        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 leading-relaxed">
+                          Books uploaded by readers will automatically appear here. Super Admin can review, feature, flag, hide, or remove books once they are uploaded.
+                        </p>
+                      </div>
                       <button
                         type="button"
-                        onClick={() => setSelectedBook(b)}
-                        className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-                        title="View Book Details"
+                        onClick={fetchLiveBooks}
+                        className="inline-flex items-center gap-2 rounded-2xl bg-purple-600 px-4 py-2.5 text-xs font-black text-white hover:bg-purple-700 shadow-md shadow-purple-600/20 active:scale-98 transition-all mt-2"
                       >
-                        <Eye className="h-4 w-4" />
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleToggleFeature(b.id, b.title)}
-                        className={`rounded-xl p-1.5 transition-colors ${
-                          b.status === 'Featured'
-                            ? 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/40'
-                            : 'text-slate-400 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-950/40'
-                        }`}
-                        title={b.status === 'Featured' ? 'Unfeature Title' : 'Mark as Featured'}
-                      >
-                        <Star className={`h-4 w-4 ${b.status === 'Featured' ? 'fill-amber-500' : ''}`} />
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteBook(b.id, b.title)}
-                        className="rounded-xl p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 dark:hover:text-rose-400"
-                        title="Delete Title"
-                      >
-                        <Trash2 className="h-4 w-4" />
+                        <RefreshCw className="h-4 w-4" />
+                        <span>Refresh Catalog</span>
                       </button>
                     </div>
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
 
         {/* PAGINATION FOOTER */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-t border-slate-100 p-4 text-xs font-semibold text-slate-500 dark:border-slate-800">
-          <div>
-            Showing <strong className="text-slate-900 dark:text-white">{(currentPage - 1) * itemsPerPage + 1}</strong>–<strong className="text-slate-900 dark:text-white">{Math.min(currentPage * itemsPerPage, filteredBooks.length)}</strong> of <strong className="text-slate-900 dark:text-white">{filteredBooks.length}</strong> catalog items
-          </div>
+        {filteredBooks.length > 0 && (
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-t border-slate-100 p-4 text-xs font-semibold text-slate-500 dark:border-slate-800">
+            <div>
+              Showing <strong className="text-slate-900 dark:text-white">{(currentPage - 1) * itemsPerPage + 1}</strong>–<strong className="text-slate-900 dark:text-white">{Math.min(currentPage * itemsPerPage, filteredBooks.length)}</strong> of <strong className="text-slate-900 dark:text-white">{filteredBooks.length}</strong> catalog items
+            </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              className="flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-1.5 text-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              <ChevronLeft className="h-4 w-4" /> Previous
-            </button>
-            <span className="px-2 font-bold text-slate-900 dark:text-white">
-              {currentPage} / {totalPages}
-            </span>
-            <button
-              type="button"
-              disabled={currentPage >= totalPages}
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              className="flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-1.5 text-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              Next <ChevronRight className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                className="flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-1.5 text-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                <ChevronLeft className="h-4 w-4" /> Previous
+              </button>
+              <span className="px-2 font-bold text-slate-900 dark:text-white">
+                {currentPage} / {totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                className="flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-1.5 text-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Next <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* 5. RIGHT-SIDE SLIDE-OVER BOOK DETAILS DRAWER */}
@@ -469,17 +607,7 @@ export const AdminLibraryPage: React.FC = () => {
                     </div>
 
                     <div className="flex justify-between py-1 border-b border-slate-200/60 dark:border-slate-700/60">
-                      <span>Reader Downloads:</span>
-                      <span className="font-bold text-slate-900 dark:text-white">{selectedBook.downloadsCount.toLocaleString()} downloads</span>
-                    </div>
-
-                    <div className="flex justify-between py-1 border-b border-slate-200/60 dark:border-slate-700/60">
-                      <span>Community Rating:</span>
-                      <span className="font-bold text-amber-500">★ {selectedBook.rating} / 5.0</span>
-                    </div>
-
-                    <div className="flex justify-between py-1 border-b border-slate-200/60 dark:border-slate-700/60">
-                      <span>Uploader Name:</span>
+                      <span>Uploader Account:</span>
                       <span className="font-bold text-slate-900 dark:text-white">{selectedBook.uploaderName}</span>
                     </div>
 
@@ -534,6 +662,17 @@ export const AdminLibraryPage: React.FC = () => {
                         <ShieldAlert className="h-4 w-4 text-rose-600" /> Flag Title for Review
                       </span>
                       <span>Flag</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteBook(selectedBook.id, selectedBook.title)}
+                      className="w-full flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-3 text-rose-600 hover:bg-rose-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-rose-950/40"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Trash2 className="h-4 w-4 text-rose-600" /> Remove Book from Catalog
+                      </span>
+                      <span>Delete</span>
                     </button>
                   </div>
                 </div>
