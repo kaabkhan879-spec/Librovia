@@ -273,43 +273,49 @@ export const AdminSubscriptionsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. SUBSCRIPTION OVERVIEW DASHBOARD CARDS (6 CARDS) */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-        <div className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-1">
-          <span className="text-[10px] font-extrabold text-slate-400 uppercase block">Total Plans</span>
-          <h3 className="text-xl font-black text-slate-900 dark:text-white">{plans.length} Tiers</h3>
-          <span className="text-[10.5px] font-semibold text-purple-600 dark:text-purple-400">Dynamic List</span>
+      {/* 2. SUBSCRIPTION OVERVIEW DASHBOARD & PRODUCTION EMPTY STATE */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        {/* Verified Metric 1: Total Subscription Plans */}
+        <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-1">
+          <span className="text-[10px] font-extrabold text-slate-400 uppercase block tracking-wider">Total Subscription Plans</span>
+          <h3 className="text-2xl font-black text-slate-900 dark:text-white">{plans.length} Configured Tiers</h3>
+          <p className="text-[11px] font-semibold text-purple-600 dark:text-purple-400">Dynamic SaaS Architecture</p>
         </div>
 
-        <div className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-1">
-          <span className="text-[10px] font-extrabold text-slate-400 uppercase block">Active Subscribers</span>
-          <h3 className="text-xl font-black text-slate-900 dark:text-white">{loading ? 'Loading...' : '0 Active'}</h3>
-          <span className="text-[10.5px] font-semibold text-slate-400">Waiting for Live Data</span>
+        {/* Verified Metric 2: Total Storage Allocated */}
+        <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-1">
+          <span className="text-[10px] font-extrabold text-slate-400 uppercase block tracking-wider">Total Storage Allocated</span>
+          <h3 className="text-2xl font-black text-slate-900 dark:text-white">
+            {plans.reduce((acc, p) => acc + p.storageGB, 0) >= 1000
+              ? `${(plans.reduce((acc, p) => acc + p.storageGB, 0) / 1000).toFixed(3)} TB`
+              : `${plans.reduce((acc, p) => acc + p.storageGB, 0)} GB`}
+          </h3>
+          <p className="text-[11px] font-semibold text-emerald-600">Active Storage Quotas</p>
         </div>
 
-        <div className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-1">
-          <span className="text-[10px] font-extrabold text-slate-400 uppercase block">Monthly Revenue</span>
-          <h3 className="text-xl font-black text-purple-600 dark:text-purple-400">{loading ? 'Loading...' : 'PKR 0'}</h3>
-          <span className="text-[10.5px] font-semibold text-slate-400 font-mono">No Data</span>
+        {/* Verified Metric 3: Active Plan Types */}
+        <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-1">
+          <span className="text-[10px] font-extrabold text-slate-400 uppercase block tracking-wider">Active Plan Types</span>
+          <h3 className="text-xl font-black text-slate-900 dark:text-white truncate">
+            {plans.map((p) => p.name).join(' • ')}
+          </h3>
+          <p className="text-[11px] font-semibold text-slate-500">Live Tier Catalog</p>
         </div>
+      </div>
 
-        <div className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-1">
-          <span className="text-[10px] font-extrabold text-slate-400 uppercase block">Storage Allocated</span>
-          <h3 className="text-xl font-black text-slate-900 dark:text-white">1.305 TB</h3>
-          <span className="text-[10.5px] font-semibold text-emerald-600">Active Quotas</span>
+      {/* Production Empty-State Card for Subscriber Activity */}
+      <div className="rounded-3xl border border-dashed border-purple-200 bg-purple-50/40 p-6 dark:border-purple-900/50 dark:bg-purple-950/20 text-left flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="space-y-1">
+          <h4 className="font-sans text-sm font-black text-slate-900 dark:text-white">
+            No subscription activity yet.
+          </h4>
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+            Subscriber analytics will appear automatically after the first customer subscribes.
+          </p>
         </div>
-
-        <div className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-1">
-          <span className="text-[10px] font-extrabold text-slate-400 uppercase block">Pending Renewals</span>
-          <h3 className="text-xl font-black text-slate-900 dark:text-white">{loading ? 'Loading...' : '0 Pending'}</h3>
-          <span className="text-[10.5px] font-semibold text-slate-400">No Data</span>
-        </div>
-
-        <div className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-1">
-          <span className="text-[10px] font-extrabold text-slate-400 uppercase block">Cancelled Subs</span>
-          <h3 className="text-xl font-black text-rose-600">{loading ? 'Loading...' : '0 Cancelled'}</h3>
-          <span className="text-[10.5px] font-semibold text-slate-400">No Data</span>
-        </div>
+        <span className="inline-flex items-center rounded-full bg-purple-100 px-3 py-1 text-[10.5px] font-black text-purple-800 dark:bg-purple-900/60 dark:text-purple-300 w-fit">
+          Waiting for Live Customers
+        </span>
       </div>
 
       {/* 3. DYNAMIC MANAGEABLE PLAN CARDS GRID */}
@@ -372,18 +378,6 @@ export const AdminSubscriptionsPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Per-Plan Analytics Placeholder Slot */}
-                <div className="rounded-2xl bg-slate-50 p-3 dark:bg-slate-800/40 text-[11px] font-medium text-slate-400 space-y-1">
-                  <span className="font-bold text-slate-500 block uppercase text-[9.5px]">Live Analytics</span>
-                  <div className="flex justify-between">
-                    <span>Subscribers:</span>
-                    <span className="font-bold text-slate-700 dark:text-slate-300">Loading...</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Cancellation Rate:</span>
-                    <span className="font-bold text-slate-700 dark:text-slate-300">0%</span>
-                  </div>
-                </div>
               </div>
 
               {/* Action Buttons */}
