@@ -13,20 +13,10 @@ import {
   Archive,
   RefreshCw,
   FileSpreadsheet,
-  CheckCircle2,
-  XCircle,
-  HelpCircle,
   Users,
-  CreditCard,
-  Crown,
-  Activity,
   Layers,
   Check,
   X,
-  Zap,
-  Clock,
-  ShieldAlert,
-  Inbox,
 } from 'lucide-react'
 
 export interface SaaSPlanFeature {
@@ -62,7 +52,7 @@ export interface DynamicSaaSPlan {
 }
 
 export const AdminSubscriptionsPage: React.FC = () => {
-  const { showSuccess, showError } = useToast()
+  const { showSuccess } = useToast()
 
   const [loading, setLoading] = useState(false)
 
