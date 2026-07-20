@@ -10,25 +10,19 @@ export interface User {
   role: 'user' | 'super_admin'
 }
 
-const SUPER_ADMIN_EMAIL = 'kaabkhan879@gmail.com'
-
-const fetchUserRole = async (userId: string, email: string): Promise<'user' | 'super_admin'> => {
-  if (email.trim().toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
-    return 'super_admin'
-  }
-
+const fetchUserRole = async (userId: string): Promise<'user' | 'super_admin'> => {
   try {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', userId)
       .maybeSingle()
 
-    if (data?.role === 'super_admin') {
+    if (!error && data?.role === 'super_admin') {
       return 'super_admin'
     }
-  } catch {
-    // Fallback to standard user
+  } catch (err) {
+    console.error('Failed to query user_roles table:', err)
   }
 
   return 'user'
@@ -55,7 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         const email = session.user.email || ''
-        const role = await fetchUserRole(session.user.id, email)
+        const role = await fetchUserRole(session.user.id)
         setUser({
           id: session.user.id,
           email,
@@ -76,7 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         const email = session.user.email || ''
-        const role = await fetchUserRole(session.user.id, email)
+        const role = await fetchUserRole(session.user.id)
         setUser({
           id: session.user.id,
           email,
@@ -110,7 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     if (data.user) {
       const userEmail = data.user.email || email
-      const role = await fetchUserRole(data.user.id, userEmail)
+      const role = await fetchUserRole(data.user.id)
       const loggedUser: User = {
         id: data.user.id,
         email: userEmail,
