@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { PageWrapper } from '../../components/common/PageWrapper'
 import { useToast } from '../../context/ToastContext'
 import {
@@ -7,8 +6,6 @@ import {
   Send,
   CheckCircle2,
   Clock,
-  AlertTriangle,
-  Info,
   ShieldAlert,
   Sparkles,
   Paperclip,
@@ -21,10 +18,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Activity,
-  Bell,
   Smartphone,
-  Check,
-  X,
 } from 'lucide-react'
 
 export interface BroadcastAnnouncement {
@@ -92,9 +86,6 @@ export const AdminAnnouncementsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'All' | 'Sent' | 'Scheduled' | 'Draft' | 'Failed'>('All')
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 5
-
-  // Preview Drawer Modal
-  const [previewOpen, setPreviewOpen] = useState(false)
 
   // Calculations
   const totalBroadcasts = announcements.length
@@ -393,10 +384,10 @@ export const AdminAnnouncementsPage: React.FC = () => {
 
               <button
                 type="button"
-                onClick={() => setPreviewOpen(true)}
+                onClick={() => showSuccess('Live Reader App simulation preview is active in the right column!')}
                 className="inline-flex items-center gap-1 text-xs font-extrabold text-purple-600 hover:underline"
               >
-                <Eye className="h-3.5 w-3.5" /> Fullscreen Preview
+                <Eye className="h-3.5 w-3.5" /> Live Reader App Preview
               </button>
             </div>
 
