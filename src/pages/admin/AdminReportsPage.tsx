@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { PageWrapper } from '../../components/common/PageWrapper'
 import { useToast } from '../../context/ToastContext'
 import { supabase } from '../../services/supabase'
@@ -7,20 +6,11 @@ import {
   LineChart,
   BarChart3,
   TrendingUp,
-  Users,
   BookOpen,
-  CreditCard,
-  HardDrive,
-  Sparkles,
   Download,
   RefreshCw,
-  Calendar,
-  Layers,
-  Star,
   Activity,
-  ArrowUpRight,
   Inbox,
-  FileSpreadsheet,
 } from 'lucide-react'
 
 export interface ReportKPIs {
@@ -33,7 +23,7 @@ export interface ReportKPIs {
 }
 
 export const AdminReportsPage: React.FC = () => {
-  const { showSuccess, showError } = useToast()
+  const { showSuccess } = useToast()
 
   const [loading, setLoading] = useState(true)
   const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | 'ytd'>('30d')
