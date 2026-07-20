@@ -74,7 +74,6 @@ export const SubscriptionPage: React.FC = () => {
     currentPlanId,
     billingCycle,
     subscriptionStatus,
-    renewalDate,
     storageUsedBytes,
     storageLimitBytes,
     invoices,
@@ -84,7 +83,7 @@ export const SubscriptionPage: React.FC = () => {
     reactivateSubscription,
   } = useSubscription()
 
-  const { showSuccess, showInfo, showError } = useToast()
+  const { showSuccess, showInfo } = useToast()
 
   // Tab for Future-ready placeholders
   const [activePlaceholderTab, setActivePlaceholderTab] = useState<
@@ -94,9 +93,6 @@ export const SubscriptionPage: React.FC = () => {
   // Selected plan for Upgrade Modal
   const [selectedUpgradePlan, setSelectedUpgradePlan] = useState<SubscriptionPlan | null>(null)
   const [showPaymentGatewayNotice, setShowPaymentGatewayNotice] = useState(false)
-  const [promoInput, setPromoInput] = useState('')
-  const [promoApplied, setPromoApplied] = useState(false)
-  const [promoDiscount, setPromoDiscount] = useState(0)
   const [isProcessingUpgrade] = useState(false)
 
   // FAQ accordion collapse state
@@ -121,22 +117,6 @@ export const SubscriptionPage: React.FC = () => {
       return
     }
     setSelectedUpgradePlan(plan)
-    setPromoInput('')
-    setPromoApplied(false)
-    setPromoDiscount(0)
-  }
-
-  const handleApplyPromo = () => {
-    const code = promoInput.trim().toUpperCase()
-    if (code === 'WELCOME10' || code === 'LIBROVIA17') {
-      setPromoApplied(true)
-      setPromoDiscount(15) // 15% discount
-      showSuccess(`Promo code '${code}' applied! 15% extra discount added.`)
-    } else if (code === '') {
-      showError('Please enter a promo code.')
-    } else {
-      showError('Invalid or expired promo code.')
-    }
   }
 
   const handleConfirmSubscription = () => {
