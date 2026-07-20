@@ -18,4 +18,5 @@ export const ROUTES = {
   DESIGN_SYSTEM: '/design-system',
   FORGOT_PASSWORD: '/forgot-password',
   FLASHCARDS: '/flashcards',
+  SUBSCRIPTION: '/subscription',
 } as const

@@ -19,6 +19,7 @@ import {
   Sun,
   Moon,
   Layers,
+  Crown,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -65,6 +66,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { name: 'Notes', to: ROUTES.NOTES, icon: MessageSquare },
     { name: 'AI Flashcards', to: ROUTES.FLASHCARDS, icon: Layers },
     { name: 'Analytics', to: ROUTES.ANALYTICS, icon: BarChart3 },
+    { name: 'Subscription', to: ROUTES.SUBSCRIPTION, icon: Crown },
     { name: 'Settings', to: ROUTES.SETTINGS, icon: Settings },
   ]
 

@@ -27,6 +27,7 @@ import { SettingsPage } from '../pages/settings/SettingsPage'
 import { StoragePage } from '../pages/storage/StoragePage'
 import { AnalyticsPage } from '../pages/analytics/AnalyticsPage'
 import { FlashcardsPage } from '../pages/flashcards/FlashcardsPage'
+import { SubscriptionPage } from '../pages/subscription/SubscriptionPage'
 
 export const AppRoutes: React.FC = () => {
   return (
@@ -60,6 +61,7 @@ export const AppRoutes: React.FC = () => {
           <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
           <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />
           <Route path={ROUTES.STORAGE} element={<StoragePage />} />
+          <Route path={ROUTES.SUBSCRIPTION} element={<SubscriptionPage />} />
         </Route>
       </Route>
 
