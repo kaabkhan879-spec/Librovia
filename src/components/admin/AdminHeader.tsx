@@ -2,7 +2,7 @@ import React from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { ROUTES } from '../../constants/routes'
-import { Menu, ShieldCheck, BookMarked, User as UserIcon } from 'lucide-react'
+import { Menu, ShieldCheck, BookMarked, Search, User as UserIcon } from 'lucide-react'
 
 interface AdminHeaderProps {
   onToggleSidebar: () => void
@@ -35,6 +35,22 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ onToggleSidebar, pageT
       </div>
 
       <div className="flex items-center gap-3">
+        {/* Global Admin Search */}
+        <button
+          type="button"
+          onClick={() => {
+            const searchInput = document.querySelector('input[placeholder*="Search"]') as HTMLInputElement
+            if (searchInput) searchInput.focus()
+          }}
+          className="hidden md:flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-xs font-medium text-slate-400 hover:border-purple-300 hover:bg-white dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-400"
+        >
+          <Search className="h-3.5 w-3.5" />
+          <span>Search users, books, plans, logs...</span>
+          <kbd className="rounded bg-slate-200/60 px-1.5 py-0.5 text-[9px] font-mono font-bold text-slate-500 dark:bg-slate-700 dark:text-slate-300">
+            Ctrl+K
+          </kbd>
+        </button>
+
         {/* Switch to Reader Mode Quick Action */}
         <Link to={ROUTES.DASHBOARD}>
           <button

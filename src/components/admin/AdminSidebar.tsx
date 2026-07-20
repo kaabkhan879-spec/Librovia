@@ -147,6 +147,24 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
             </button>
           </Link>
 
+          {/* Enterprise System Info & Badges */}
+          {!isCollapsed && (
+            <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-2 text-center text-[10px] space-y-1 dark:border-slate-800/60 dark:bg-slate-800/30">
+              <div className="flex items-center justify-between font-bold text-slate-500 dark:text-slate-400">
+                <span>Platform Version:</span>
+                <span className="font-mono text-purple-600 dark:text-purple-400 font-extrabold">v2.4.0</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="inline-flex items-center gap-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-black text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                  PROD
+                </span>
+                <span className="text-[9.5px] font-semibold text-slate-400">
+                  Supabase • Vercel • Edge
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Theme Toggle & User Logout */}
           <div className="flex items-center justify-between pt-1">
             <button
