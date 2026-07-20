@@ -46,9 +46,13 @@ export const LoginForm: React.FC = () => {
     setIsLoading(true)
 
     login(email, password)
-      .then(() => {
+      .then((loggedUser) => {
         setIsLoading(false)
-        navigate(ROUTES.DASHBOARD)
+        if (loggedUser?.role === 'super_admin') {
+          navigate(ROUTES.ADMIN)
+        } else {
+          navigate(ROUTES.DASHBOARD)
+        }
       })
       .catch((err: unknown) => {
         setIsLoading(false)

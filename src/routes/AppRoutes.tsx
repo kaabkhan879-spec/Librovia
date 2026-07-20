@@ -10,6 +10,8 @@ import { AppLayout } from '../layouts/AppLayout'
 import { PrivateRoute } from './PrivateRoute'
 import { PublicRoute } from './PublicRoute'
 
+import { AdminRoute } from './AdminRoute'
+
 // Pages
 import { LandingPage } from '../pages/landing/LandingPage'
 import { LoginPage } from '../pages/login/LoginPage'
@@ -28,6 +30,7 @@ import { StoragePage } from '../pages/storage/StoragePage'
 import { AnalyticsPage } from '../pages/analytics/AnalyticsPage'
 import { FlashcardsPage } from '../pages/flashcards/FlashcardsPage'
 import { SubscriptionPage } from '../pages/subscription/SubscriptionPage'
+import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage'
 
 export const AppRoutes: React.FC = () => {
   return (
@@ -54,7 +57,7 @@ export const AppRoutes: React.FC = () => {
           <Route path={ROUTES.READER} element={<ReaderPage />} />
           <Route path={ROUTES.FAVORITES} element={<Navigate to="/library?tab=favorites" replace />} />
           <Route path={ROUTES.COLLECTIONS} element={<CategoriesPage />} />
-           <Route path={ROUTES.NOTES} element={<NotesPage />} />
+          <Route path={ROUTES.NOTES} element={<NotesPage />} />
           <Route path={ROUTES.FLASHCARDS} element={<FlashcardsPage />} />
           <Route path={ROUTES.READING} element={<Navigate to="/analytics" replace />} />
           <Route path={ROUTES.ANALYTICS} element={<AnalyticsPage />} />
@@ -62,6 +65,11 @@ export const AppRoutes: React.FC = () => {
           <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />
           <Route path={ROUTES.STORAGE} element={<StoragePage />} />
           <Route path={ROUTES.SUBSCRIPTION} element={<SubscriptionPage />} />
+
+          {/* Admin Protected Route */}
+          <Route element={<AdminRoute />}>
+            <Route path={ROUTES.ADMIN} element={<AdminDashboardPage />} />
+          </Route>
         </Route>
       </Route>
 

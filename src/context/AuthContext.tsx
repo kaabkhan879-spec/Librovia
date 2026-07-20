@@ -7,13 +7,38 @@ export interface User {
   email: string
   displayName?: string
   avatarUrl?: string
+  role: 'user' | 'super_admin'
+}
+
+const SUPER_ADMIN_EMAIL = 'kaabkhan879@gmail.com'
+
+const fetchUserRole = async (userId: string, email: string): Promise<'user' | 'super_admin'> => {
+  if (email.trim().toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
+    return 'super_admin'
+  }
+
+  try {
+    const { data } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (data?.role === 'super_admin') {
+      return 'super_admin'
+    }
+  } catch {
+    // Fallback to standard user
+  }
+
+  return 'user'
 }
 
 interface AuthContextType {
   user: User | null
   loading: boolean
   isAuthenticated: boolean
-  login: (email: string, password: string) => Promise<void>
+  login: (email: string, password: string) => Promise<User | null>
   register: (email: string, password: string, displayName: string) => Promise<void>
   logout: () => Promise<void>
   updateProfile: (data: { displayName?: string; avatarUrl?: string }) => Promise<void>
@@ -27,16 +52,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     // 1. Recover session on load
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
+        const email = session.user.email || ''
+        const role = await fetchUserRole(session.user.id, email)
         setUser({
           id: session.user.id,
-          email: session.user.email || '',
+          email,
           displayName:
-            session.user.user_metadata?.display_name || session.user.email?.split('@')[0],
+            session.user.user_metadata?.display_name || email.split('@')[0],
           avatarUrl:
             session.user.user_metadata?.avatar_url ||
             'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&h=100&q=80',
+          role,
         })
       }
       setLoading(false)
@@ -45,16 +73,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // 2. Setup auth state change listener
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
+        const email = session.user.email || ''
+        const role = await fetchUserRole(session.user.id, email)
         setUser({
           id: session.user.id,
-          email: session.user.email || '',
+          email,
           displayName:
-            session.user.user_metadata?.display_name || session.user.email?.split('@')[0],
+            session.user.user_metadata?.display_name || email.split('@')[0],
           avatarUrl:
             session.user.user_metadata?.avatar_url ||
             'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&h=100&q=80',
+          role,
         })
       } else {
         setUser(null)
@@ -67,9 +98,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [])
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string): Promise<User | null> => {
     setLoading(true)
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
@@ -77,6 +108,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false)
       throw error
     }
+    if (data.user) {
+      const userEmail = data.user.email || email
+      const role = await fetchUserRole(data.user.id, userEmail)
+      const loggedUser: User = {
+        id: data.user.id,
+        email: userEmail,
+        displayName: data.user.user_metadata?.display_name || userEmail.split('@')[0],
+        avatarUrl:
+          data.user.user_metadata?.avatar_url ||
+          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&h=100&q=80',
+        role,
+      }
+      setUser(loggedUser)
+      setLoading(false)
+      return loggedUser
+    }
+    setLoading(false)
+    return null
   }
 
   const register = async (email: string, password: string, displayName: string) => {

@@ -19,4 +19,5 @@ export const ROUTES = {
   FORGOT_PASSWORD: '/forgot-password',
   FLASHCARDS: '/flashcards',
   SUBSCRIPTION: '/subscription',
+  ADMIN: '/admin',
 } as const
