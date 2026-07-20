@@ -94,10 +94,11 @@ export const SubscriptionPage: React.FC = () => {
 
   // Selected plan for Upgrade Modal
   const [selectedUpgradePlan, setSelectedUpgradePlan] = useState<SubscriptionPlan | null>(null)
+  const [showPaymentGatewayNotice, setShowPaymentGatewayNotice] = useState(false)
   const [promoInput, setPromoInput] = useState('')
   const [promoApplied, setPromoApplied] = useState(false)
   const [promoDiscount, setPromoDiscount] = useState(0)
-  const [isProcessingUpgrade, setIsProcessingUpgrade] = useState(false)
+  const [isProcessingUpgrade] = useState(false)
 
   // FAQ accordion collapse state
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0)
@@ -141,16 +142,20 @@ export const SubscriptionPage: React.FC = () => {
 
   const handleConfirmSubscription = () => {
     if (!selectedUpgradePlan) return
-    setIsProcessingUpgrade(true)
 
-    setTimeout(() => {
-      setPlan(selectedUpgradePlan.id)
-      setIsProcessingUpgrade(false)
-      setSelectedUpgradePlan(null)
-      showSuccess(
-        `Successfully updated plan to ${selectedUpgradePlan.plan_name}! (Database Subscription Reference Updated)`
-      )
-    }, 800)
+    // FUTURE PAYMENT GATEWAY INTEGRATION PLACEHOLDER:
+    // 1. Initialize payment checkout session (e.g., Stripe / JazzCash / EasyPaisa / Checkout.com)
+    // 2. Launch payment gateway modal or redirect to secure payment URL
+    // 3. Only after successful payment verification callback:
+    //    await setPlan(selectedUpgradePlan.id)
+
+    // Demo Mode Notice: User subscription, storage limits, AI limits, and offline limits remain UNCHANGED.
+    setShowPaymentGatewayNotice(true)
+  }
+
+  const handleCloseGatewayNotice = () => {
+    setShowPaymentGatewayNotice(false)
+    setSelectedUpgradePlan(null)
   }
 
   return (
@@ -906,10 +911,10 @@ export const SubscriptionPage: React.FC = () => {
                 </div>
 
                 {/* Payment Gateway Disclaimer Note */}
-                <div className="flex items-start gap-2.5 rounded-2xl border border-amber-200/80 bg-amber-50/80 p-3.5 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
-                  <Lock className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                <div className="flex items-start gap-2.5 rounded-2xl border border-purple-200/80 bg-purple-50/80 p-3.5 text-xs text-purple-900 dark:border-purple-900/40 dark:bg-purple-950/30 dark:text-purple-200">
+                  <Lock className="h-4 w-4 shrink-0 text-purple-600 dark:text-purple-400 mt-0.5" />
                   <p className="text-[11px] leading-relaxed">
-                    <span className="font-bold">Payment Gateway Placeholder</span>: Clicking confirm will update your account subscription tier in the database.
+                    <span className="font-bold">Payment Gateway Integration</span>: Clicking confirm will connect to the payment gateway once integrated.
                   </p>
                 </div>
 
@@ -929,17 +934,72 @@ export const SubscriptionPage: React.FC = () => {
                     disabled={isProcessingUpgrade}
                     className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-purple-600 py-3 text-xs font-black text-white hover:bg-purple-700 shadow-md shadow-purple-600/20 disabled:opacity-50"
                   >
-                    {isProcessingUpgrade ? (
-                      <>
-                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        <span>Updating Plan...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Crown className="h-4 w-4" />
-                        <span>Confirm & Upgrade</span>
-                      </>
-                    )}
+                    <Crown className="h-4 w-4" />
+                    <span>Confirm & Upgrade</span>
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ==================================================================== */}
+      {/* 8. PAYMENT GATEWAY DEMO MODE NOTICE MODAL */}
+      {/* ==================================================================== */}
+      <AnimatePresence>
+        {showPaymentGatewayNotice && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={handleCloseGatewayNotice}
+              className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs"
+            />
+
+            {/* Modal Box */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="relative w-full max-w-md rounded-3xl border border-purple-200 bg-white p-6 text-center shadow-2xl dark:border-slate-800 dark:bg-slate-900"
+            >
+              <button
+                type="button"
+                onClick={handleCloseGatewayNotice}
+                className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="h-5 w-5" />
+              </button>
+
+              <div className="space-y-4 py-2">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-100 text-purple-600 dark:bg-purple-950/70 dark:text-purple-300 shadow-inner">
+                  <CreditCard className="h-7 w-7" />
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="font-sans text-xl font-black text-slate-900 dark:text-white">
+                    Payment Gateway Not Connected
+                  </h3>
+                  <div className="space-y-2 rounded-2xl border border-slate-100 bg-slate-50/70 p-4 text-xs font-medium leading-relaxed text-slate-600 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300">
+                    <p className="font-bold text-slate-900 dark:text-white">
+                      Librovia is currently running in demo mode.
+                    </p>
+                    <p>
+                      Payment gateway is not connected yet. Subscription upgrades will be available after payment integration.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={handleCloseGatewayNotice}
+                    className="w-full cursor-pointer rounded-2xl bg-purple-600 py-3 text-xs font-black text-white hover:bg-purple-700 shadow-md shadow-purple-600/20"
+                  >
+                    Understood & Close
                   </button>
                 </div>
               </div>
