@@ -1,8 +1,9 @@
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { PageWrapper } from '../../components/common/PageWrapper'
-import { useSubscription, type PlanType } from '../../context/SubscriptionContext'
+import { useSubscription } from '../../context/SubscriptionContext'
 import { useToast } from '../../context/ToastContext'
+import { subscriptionsService, type SubscriptionPlan } from '../../services/subscriptions'
 import {
   Crown,
   Sparkles,
@@ -21,97 +22,6 @@ import {
   CheckCircle2,
   Lock,
 } from 'lucide-react'
-
-// Features list structure for pricing cards
-interface PlanFeature {
-  text: string
-  highlight?: boolean
-}
-
-interface PricingPlanData {
-  id: PlanType
-  name: string
-  badge?: string
-  monthlyPrice: string
-  monthlyNumber: number
-  yearlyPrice: string
-  yearlyNumber: number
-  yearlySave: string
-  description: string
-  icon: React.ComponentType<{ className?: string }>
-  features: PlanFeature[]
-  buttonText: string
-  isPopular?: boolean
-}
-
-const PLANS_DATA: PricingPlanData[] = [
-  {
-    id: 'free',
-    name: 'FREE',
-    monthlyPrice: 'PKR 0',
-    monthlyNumber: 0,
-    yearlyPrice: 'PKR 0',
-    yearlyNumber: 0,
-    yearlySave: 'Always Free',
-    description: 'Perfect for casual readers getting started with digital book management.',
-    icon: BookOpen,
-    features: [
-      { text: '5 GB Cloud Storage' },
-      { text: '20 AI Requests per Day' },
-      { text: 'Up to 10 Offline Downloads' },
-      { text: 'Unlimited Reading' },
-      { text: 'Notes & Highlights' },
-      { text: 'Collections' },
-      { text: 'Basic Reader' },
-    ],
-    buttonText: 'Get Started',
-  },
-  {
-    id: 'pro',
-    name: 'PRO',
-    badge: '⭐ Most Popular',
-    monthlyPrice: 'PKR 500',
-    monthlyNumber: 500,
-    yearlyPrice: 'PKR 4,999',
-    yearlyNumber: 4999,
-    yearlySave: 'Save 17%',
-    description: 'Designed for avid readers, researchers, and AI-powered studying.',
-    icon: Crown,
-    isPopular: true,
-    features: [
-      { text: '300 GB Cloud Storage', highlight: true },
-      { text: 'Unlimited AI', highlight: true },
-      { text: 'Unlimited Offline Downloads', highlight: true },
-      { text: 'Faster AI Responses' },
-      { text: 'Premium Reader Experience' },
-      { text: 'Priority Sync' },
-      { text: 'Premium Support' },
-    ],
-    buttonText: 'Upgrade to Pro',
-  },
-  {
-    id: 'family',
-    name: 'FAMILY',
-    badge: '👨‍👩‍👧 Best Value',
-    monthlyPrice: 'PKR 899',
-    monthlyNumber: 899,
-    yearlyPrice: 'PKR 8,999',
-    yearlyNumber: 8999,
-    yearlySave: 'Save 17%',
-    description: 'Shared digital library experience for families and reading groups.',
-    icon: Users,
-    features: [
-      { text: '1 TB Shared Storage', highlight: true },
-      { text: 'Up to 5 Family Members', highlight: true },
-      { text: 'Unlimited AI' },
-      { text: 'Unlimited Offline Downloads' },
-      { text: 'Shared Library' },
-      { text: 'Shared Collections' },
-      { text: 'Family Reading' },
-    ],
-    buttonText: 'Upgrade to Family',
-  },
-]
 
 // FAQ items
 const FAQS = [
@@ -142,9 +52,26 @@ const FAQS = [
   },
 ]
 
+// Helper to select icon dynamically for database plan records
+const getPlanIcon = (planId: string) => {
+  switch (planId.toLowerCase()) {
+    case 'pro':
+      return Crown
+    case 'family':
+      return Users
+    case 'free':
+      return BookOpen
+    default:
+      return Sparkles
+  }
+}
+
 export const SubscriptionPage: React.FC = () => {
   const {
-    plan: currentPlan,
+    plans,
+    loadingPlans,
+    currentPlan,
+    currentPlanId,
     billingCycle,
     subscriptionStatus,
     renewalDate,
@@ -166,7 +93,7 @@ export const SubscriptionPage: React.FC = () => {
   >('invoices')
 
   // Selected plan for Upgrade Modal
-  const [selectedUpgradePlan, setSelectedUpgradePlan] = useState<PricingPlanData | null>(null)
+  const [selectedUpgradePlan, setSelectedUpgradePlan] = useState<SubscriptionPlan | null>(null)
   const [promoInput, setPromoInput] = useState('')
   const [promoApplied, setPromoApplied] = useState(false)
   const [promoDiscount, setPromoDiscount] = useState(0)
@@ -175,11 +102,11 @@ export const SubscriptionPage: React.FC = () => {
   // FAQ accordion collapse state
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0)
 
-  // Storage metric calculations
+  // Storage metric calculations driven by DB limit
   const storageUsedGB = (storageUsedBytes / (1024 * 1024 * 1024)).toFixed(1)
-  const storageLimitGB = (storageLimitBytes / (1024 * 1024 * 1024)).toFixed(0)
+  const storageLimitGBText = subscriptionsService.formatStorageLimit(storageLimitBytes)
   const storageRemainingGB = (
-    (storageLimitBytes - storageUsedBytes) /
+    Math.max(0, storageLimitBytes - storageUsedBytes) /
     (1024 * 1024 * 1024)
   ).toFixed(1)
   const storagePercentage = Math.min(
@@ -188,12 +115,12 @@ export const SubscriptionPage: React.FC = () => {
   )
 
   // Handlers
-  const handleUpgradeClick = (planData: PricingPlanData) => {
-    if (planData.id === currentPlan) {
-      showInfo(`You are already subscribed to the ${planData.name} plan.`)
+  const handleUpgradeClick = (plan: SubscriptionPlan) => {
+    if (plan.id === currentPlanId) {
+      showInfo(`You are already subscribed to the ${plan.plan_name} plan.`)
       return
     }
-    setSelectedUpgradePlan(planData)
+    setSelectedUpgradePlan(plan)
     setPromoInput('')
     setPromoApplied(false)
     setPromoDiscount(0)
@@ -221,9 +148,9 @@ export const SubscriptionPage: React.FC = () => {
       setIsProcessingUpgrade(false)
       setSelectedUpgradePlan(null)
       showSuccess(
-        `Successfully updated plan to ${selectedUpgradePlan.name}! (Payment Gateway Placeholder)`
+        `Successfully updated plan to ${selectedUpgradePlan.plan_name}! (Database Subscription Reference Updated)`
       )
-    }, 900)
+    }, 800)
   }
 
   return (
@@ -235,7 +162,7 @@ export const SubscriptionPage: React.FC = () => {
         <div className="mx-auto max-w-3xl space-y-4">
           <div className="inline-flex items-center gap-2 rounded-full border border-purple-200 bg-purple-100/80 px-3.5 py-1.5 text-xs font-extrabold tracking-wider text-purple-700 uppercase shadow-2xs dark:border-purple-800/60 dark:bg-purple-950/60 dark:text-purple-300">
             <Sparkles className="h-4 w-4 fill-purple-400 text-purple-600 dark:text-purple-400" />
-            <span>Simple, Transparent Pricing</span>
+            <span>Database-Driven SaaS Pricing</span>
           </div>
 
           <h1 className="font-sans text-3xl font-black tracking-tight text-slate-900 sm:text-5xl dark:text-white">
@@ -315,9 +242,9 @@ export const SubscriptionPage: React.FC = () => {
                 </span>
               </div>
               <h2 className="text-xl font-black text-slate-900 capitalize dark:text-white">
-                {currentPlan} Plan
+                {currentPlan.plan_name} Plan
               </h2>
-              {currentPlan !== 'free' && (
+              {currentPlan.id !== 'free' && (
                 <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
                   Renews on <span className="font-bold text-slate-700 dark:text-slate-200">{renewalDate}</span> ({billingCycle === 'yearly' ? 'Yearly' : 'Monthly'})
                 </p>
@@ -325,7 +252,7 @@ export const SubscriptionPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Storage Bar */}
+          {/* Storage Bar driven dynamically by database limit */}
           <div className="min-w-[280px] flex-1 max-w-md rounded-2xl border border-slate-100 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-800/40">
             <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
               <span className="flex items-center gap-1.5">
@@ -333,7 +260,7 @@ export const SubscriptionPage: React.FC = () => {
                 <span>Storage Usage</span>
               </span>
               <span className="font-mono text-[11px]">
-                {storageUsedGB} GB / {currentPlan === 'family' ? '1 TB' : `${storageLimitGB} GB`}
+                {storageUsedGB} GB / {storageLimitGBText}
               </span>
             </div>
 
@@ -352,7 +279,7 @@ export const SubscriptionPage: React.FC = () => {
 
           {/* Actions */}
           <div className="flex flex-wrap items-center gap-2">
-            {currentPlan !== 'free' ? (
+            {currentPlan.id !== 'free' ? (
               <button
                 type="button"
                 onClick={() => {
@@ -378,145 +305,153 @@ export const SubscriptionPage: React.FC = () => {
       </div>
 
       {/* ==================================================================== */}
-      {/* 3. PRICING CARDS (FREE, PRO, FAMILY) */}
+      {/* 3. DYNAMIC PRICING CARDS FROM DATABASE (`subscription_plans`) */}
       {/* ==================================================================== */}
-      <div className="grid grid-cols-1 items-stretch gap-8 lg:grid-cols-3">
-        {PLANS_DATA.map((planData) => {
-          const isCurrent = currentPlan === planData.id
-          const isPro = planData.isPopular
-          const displayPrice =
-            billingCycle === 'yearly' ? planData.yearlyPrice : planData.monthlyPrice
-          const billingSuffix =
-            planData.id === 'free'
-              ? '/ forever'
-              : billingCycle === 'yearly'
-              ? '/ year'
-              : '/ month'
+      {loadingPlans ? (
+        <div className="flex h-40 items-center justify-center rounded-3xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+          <span className="h-6 w-6 animate-spin rounded-full border-2 border-purple-600 border-t-transparent" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 items-stretch gap-8 lg:grid-cols-3">
+          {plans.map((plan) => {
+            const isCurrent = currentPlanId === plan.id
+            const isPro = plan.id === 'pro'
+            const numericPrice =
+              billingCycle === 'yearly' ? plan.price_yearly : plan.price_monthly
+            const displayPrice = `PKR ${numericPrice.toLocaleString()}`
+            const billingSuffix =
+              plan.id === 'free'
+                ? '/ forever'
+                : billingCycle === 'yearly'
+                ? '/ year'
+                : '/ month'
+            const Icon = getPlanIcon(plan.id)
 
-          return (
-            <div
-              key={planData.id}
-              className={`premium-card relative flex flex-col justify-between rounded-3xl p-8 transition-all duration-300 ${
-                isPro
-                  ? 'border-2 border-purple-600 bg-white shadow-xl shadow-purple-500/10 ring-4 ring-purple-600/10 lg:-translate-y-2 dark:border-purple-500 dark:bg-slate-900 dark:shadow-purple-950/30'
-                  : 'border border-slate-200/90 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900'
-              }`}
-            >
-              {/* Badge for Pro or Family */}
-              {planData.badge && (
-                <div
-                  className={`absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full px-4 py-1 text-[11px] font-black tracking-wide uppercase shadow-md ${
-                    isPro
-                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white'
-                      : 'bg-emerald-500 text-white'
-                  }`}
-                >
-                  {planData.badge}
-                </div>
-              )}
-
-              {/* Card Header */}
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
+            return (
+              <div
+                key={plan.id}
+                className={`premium-card relative flex flex-col justify-between rounded-3xl p-8 transition-all duration-300 ${
+                  isPro
+                    ? 'border-2 border-purple-600 bg-white shadow-xl shadow-purple-500/10 ring-4 ring-purple-600/10 lg:-translate-y-2 dark:border-purple-500 dark:bg-slate-900 dark:shadow-purple-950/30'
+                    : 'border border-slate-200/90 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900'
+                }`}
+              >
+                {/* Badge from DB record */}
+                {plan.badge && (
                   <div
-                    className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
+                    className={`absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full px-4 py-1 text-[11px] font-black tracking-wide uppercase shadow-md ${
                       isPro
-                        ? 'bg-purple-600 text-white shadow-md'
-                        : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white'
+                        : 'bg-emerald-500 text-white'
                     }`}
                   >
-                    <planData.icon className="h-6 w-6" />
+                    {plan.badge}
                   </div>
-
-                  {billingCycle === 'yearly' && planData.id !== 'free' && (
-                    <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-                      {planData.yearlySave}
-                    </span>
-                  )}
-                </div>
-
-                <div>
-                  <h3 className="font-sans text-xl font-black text-slate-900 dark:text-white">
-                    {planData.name}
-                  </h3>
-                  <p className="mt-1 text-xs font-normal text-slate-500 dark:text-slate-400">
-                    {planData.description}
-                  </p>
-                </div>
-
-                {/* Price Display */}
-                <div className="border-b border-slate-100 pb-6 dark:border-slate-800">
-                  <div className="flex items-baseline gap-1">
-                    <span className="font-sans text-3xl font-black tracking-tight text-slate-900 dark:text-white">
-                      {displayPrice}
-                    </span>
-                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                      {billingSuffix}
-                    </span>
-                  </div>
-                  {billingCycle === 'yearly' && planData.id !== 'free' && (
-                    <p className="mt-1 text-[11px] font-semibold text-purple-600 dark:text-purple-400">
-                      Billed annually (Save 17%)
-                    </p>
-                  )}
-                </div>
-
-                {/* Features List */}
-                <div className="space-y-3.5">
-                  <span className="block text-[10px] font-extrabold tracking-wider text-slate-400 uppercase">
-                    Included Features
-                  </span>
-                  <ul className="space-y-2.5">
-                    {planData.features.map((feat, idx) => (
-                      <li key={idx} className="flex items-center gap-3 text-xs font-medium text-slate-700 dark:text-slate-300">
-                        <div
-                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
-                            feat.highlight || isPro
-                              ? 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300'
-                              : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
-                          }`}
-                        >
-                          <Check className="h-3 w-3 stroke-[3]" />
-                        </div>
-                        <span className={feat.highlight ? 'font-bold text-slate-900 dark:text-white' : ''}>
-                          {feat.text}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-
-              {/* Action Button / Empty State Handling */}
-              <div className="mt-8 pt-4">
-                {isCurrent ? (
-                  <button
-                    disabled
-                    className="w-full cursor-not-allowed rounded-2xl border border-purple-200 bg-purple-50 py-3.5 text-xs font-black text-purple-700 shadow-xs dark:border-purple-900/60 dark:bg-purple-950/40 dark:text-purple-300"
-                  >
-                    Current Plan
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => handleUpgradeClick(planData)}
-                    className={`premium-button w-full cursor-pointer rounded-2xl py-3.5 text-xs font-black transition-all shadow-md ${
-                      isPro
-                        ? 'bg-purple-600 text-white hover:bg-purple-700 shadow-purple-600/20'
-                        : 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100'
-                    }`}
-                  >
-                    {planData.id === 'free' ? 'Switch to Free' : planData.buttonText}
-                  </button>
                 )}
+
+                {/* Card Header */}
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div
+                      className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
+                        isPro
+                          ? 'bg-purple-600 text-white shadow-md'
+                          : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                      }`}
+                    >
+                      <Icon className="h-6 w-6" />
+                    </div>
+
+                    {billingCycle === 'yearly' && plan.price_yearly > 0 && (
+                      <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+                        Save 17%
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <h3 className="font-sans text-xl font-black text-slate-900 dark:text-white">
+                      {plan.plan_name}
+                    </h3>
+                    <p className="mt-1 text-xs font-normal text-slate-500 dark:text-slate-400">
+                      {plan.description}
+                    </p>
+                  </div>
+
+                  {/* Price Display */}
+                  <div className="border-b border-slate-100 pb-6 dark:border-slate-800">
+                    <div className="flex items-baseline gap-1">
+                      <span className="font-sans text-3xl font-black tracking-tight text-slate-900 dark:text-white">
+                        {displayPrice}
+                      </span>
+                      <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                        {billingSuffix}
+                      </span>
+                    </div>
+                    {billingCycle === 'yearly' && plan.price_yearly > 0 && (
+                      <p className="mt-1 text-[11px] font-semibold text-purple-600 dark:text-purple-400">
+                        Billed annually (Save 17%)
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Dynamic Features List from DB */}
+                  <div className="space-y-3.5">
+                    <span className="block text-[10px] font-extrabold tracking-wider text-slate-400 uppercase">
+                      Included Features
+                    </span>
+                    <ul className="space-y-2.5">
+                      {plan.features.map((feat, idx) => (
+                        <li key={idx} className="flex items-center gap-3 text-xs font-medium text-slate-700 dark:text-slate-300">
+                          <div
+                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
+                              feat.highlight || isPro
+                                ? 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300'
+                                : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                            }`}
+                          >
+                            <Check className="h-3 w-3 stroke-[3]" />
+                          </div>
+                          <span className={feat.highlight ? 'font-bold text-slate-900 dark:text-white' : ''}>
+                            {feat.text}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Action Button */}
+                <div className="mt-8 pt-4">
+                  {isCurrent ? (
+                    <button
+                      disabled
+                      className="w-full cursor-not-allowed rounded-2xl border border-purple-200 bg-purple-50 py-3.5 text-xs font-black text-purple-700 shadow-xs dark:border-purple-900/60 dark:bg-purple-950/40 dark:text-purple-300"
+                    >
+                      Current Plan
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleUpgradeClick(plan)}
+                      className={`premium-button w-full cursor-pointer rounded-2xl py-3.5 text-xs font-black transition-all shadow-md ${
+                        isPro
+                          ? 'bg-purple-600 text-white hover:bg-purple-700 shadow-purple-600/20'
+                          : 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100'
+                      }`}
+                    >
+                      {plan.id === 'free' ? 'Switch to Free' : `Upgrade to ${plan.plan_name}`}
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* ==================================================================== */}
-      {/* 4. PLAN COMPARISON TABLE */}
+      {/* 4. DYNAMIC PLAN COMPARISON TABLE */}
       {/* ==================================================================== */}
       <div className="space-y-6 pt-6">
         <div className="text-center space-y-1">
@@ -524,7 +459,7 @@ export const SubscriptionPage: React.FC = () => {
             Detailed Feature Comparison
           </h2>
           <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-            Compare all features across Free, Pro, and Family plans side-by-side.
+            Compare limits dynamically loaded from database records.
           </p>
         </div>
 
@@ -533,11 +468,16 @@ export const SubscriptionPage: React.FC = () => {
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/80 text-xs font-extrabold text-slate-900 dark:border-slate-800 dark:bg-slate-800/50 dark:text-white">
                 <th className="p-4 sm:p-5">Features</th>
-                <th className="p-4 text-center sm:p-5">Free</th>
-                <th className="p-4 text-center text-purple-700 sm:p-5 dark:text-purple-400">
-                  Pro ⭐
-                </th>
-                <th className="p-4 text-center sm:p-5">Family 👨‍👩‍👧</th>
+                {plans.map((p) => (
+                  <th
+                    key={p.id}
+                    className={`p-4 text-center sm:p-5 ${
+                      p.id === 'pro' ? 'text-purple-700 dark:text-purple-400' : ''
+                    }`}
+                  >
+                    {p.plan_name} {p.badge ? `(${p.badge.replace('⭐ ', '')})` : ''}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700 dark:divide-slate-800 dark:text-slate-300">
@@ -545,87 +485,81 @@ export const SubscriptionPage: React.FC = () => {
                 <td className="p-4 font-bold text-slate-900 sm:p-5 dark:text-white">
                   Storage Space
                 </td>
-                <td className="p-4 text-center sm:p-5">5 GB</td>
-                <td className="p-4 text-center font-bold text-purple-600 sm:p-5 dark:text-purple-400">
-                  300 GB
-                </td>
-                <td className="p-4 text-center font-bold sm:p-5">1 TB Shared</td>
+                {plans.map((p) => (
+                  <td
+                    key={p.id}
+                    className={`p-4 text-center sm:p-5 ${
+                      p.id === 'pro' ? 'font-bold text-purple-600 dark:text-purple-400' : ''
+                    }`}
+                  >
+                    {subscriptionsService.formatStorageLimit(p.storage_limit_bytes)}
+                  </td>
+                ))}
               </tr>
               <tr>
                 <td className="p-4 font-bold text-slate-900 sm:p-5 dark:text-white">
-                  AI Usage
+                  AI Requests
                 </td>
-                <td className="p-4 text-center sm:p-5">20 Requests / Day</td>
-                <td className="p-4 text-center font-bold text-purple-600 sm:p-5 dark:text-purple-400">
-                  Unlimited
-                </td>
-                <td className="p-4 text-center font-bold sm:p-5">Unlimited</td>
+                {plans.map((p) => (
+                  <td
+                    key={p.id}
+                    className={`p-4 text-center sm:p-5 ${
+                      p.id === 'pro' ? 'font-bold text-purple-600 dark:text-purple-400' : ''
+                    }`}
+                  >
+                    {subscriptionsService.formatAILimit(p.ai_daily_limit)}
+                  </td>
+                ))}
               </tr>
               <tr>
                 <td className="p-4 font-bold text-slate-900 sm:p-5 dark:text-white">
                   Offline Downloads
                 </td>
-                <td className="p-4 text-center sm:p-5">Up to 10 Books</td>
-                <td className="p-4 text-center font-bold text-purple-600 sm:p-5 dark:text-purple-400">
-                  Unlimited
-                </td>
-                <td className="p-4 text-center font-bold sm:p-5">Unlimited</td>
+                {plans.map((p) => (
+                  <td
+                    key={p.id}
+                    className={`p-4 text-center sm:p-5 ${
+                      p.id === 'pro' ? 'font-bold text-purple-600 dark:text-purple-400' : ''
+                    }`}
+                  >
+                    {subscriptionsService.formatOfflineLimit(p.offline_download_limit)}
+                  </td>
+                ))}
               </tr>
               <tr>
                 <td className="p-4 font-bold text-slate-900 sm:p-5 dark:text-white">
-                  Collections
+                  Family Members
                 </td>
-                <td className="p-4 text-center sm:p-5">Standard</td>
-                <td className="p-4 text-center font-bold text-purple-600 sm:p-5 dark:text-purple-400">
-                  Custom & Smart
-                </td>
-                <td className="p-4 text-center font-bold sm:p-5">Shared Collections</td>
+                {plans.map((p) => (
+                  <td
+                    key={p.id}
+                    className={`p-4 text-center sm:p-5 ${
+                      p.family_member_limit > 1
+                        ? 'font-bold text-emerald-600 dark:text-emerald-400'
+                        : ''
+                    }`}
+                  >
+                    {subscriptionsService.formatFamilyLimit(p.family_member_limit)}
+                  </td>
+                ))}
               </tr>
               <tr>
                 <td className="p-4 font-bold text-slate-900 sm:p-5 dark:text-white">
                   Reader Experience
                 </td>
-                <td className="p-4 text-center sm:p-5">Basic Reader</td>
-                <td className="p-4 text-center font-bold text-purple-600 sm:p-5 dark:text-purple-400">
-                  Premium Experience
-                </td>
-                <td className="p-4 text-center font-bold sm:p-5">Family Reading Mode</td>
-              </tr>
-              <tr>
-                <td className="p-4 font-bold text-slate-900 sm:p-5 dark:text-white">Notes</td>
-                <td className="p-4 text-center sm:p-5">Standard Notes</td>
-                <td className="p-4 text-center font-bold text-purple-600 sm:p-5 dark:text-purple-400">
-                  Voice & Smart Notes
-                </td>
-                <td className="p-4 text-center font-bold sm:p-5">Shared Notes</td>
-              </tr>
-              <tr>
-                <td className="p-4 font-bold text-slate-900 sm:p-5 dark:text-white">
-                  Highlights
-                </td>
-                <td className="p-4 text-center sm:p-5">3 Colors</td>
-                <td className="p-4 text-center font-bold text-purple-600 sm:p-5 dark:text-purple-400">
-                  Unlimited Colors
-                </td>
-                <td className="p-4 text-center font-bold sm:p-5">Shared Annotations</td>
-              </tr>
-              <tr>
-                <td className="p-4 font-bold text-slate-900 sm:p-5 dark:text-white">
-                  Family Sharing
-                </td>
-                <td className="p-4 text-center text-slate-400 sm:p-5">✕</td>
-                <td className="p-4 text-center text-slate-400 sm:p-5">✕</td>
-                <td className="p-4 text-center font-bold text-emerald-600 sm:p-5 dark:text-emerald-400">
-                  Up to 5 Members
-                </td>
+                {plans.map((p) => (
+                  <td key={p.id} className="p-4 text-center sm:p-5">
+                    {p.id === 'free' ? 'Basic Reader' : 'Premium Reader'}
+                  </td>
+                ))}
               </tr>
               <tr>
                 <td className="p-4 font-bold text-slate-900 sm:p-5 dark:text-white">Support</td>
-                <td className="p-4 text-center sm:p-5">Community</td>
-                <td className="p-4 text-center font-bold text-purple-600 sm:p-5 dark:text-purple-400">
-                  Priority Support
-                </td>
-                <td className="p-4 text-center font-bold sm:p-5">24/7 Dedicated Support</td>
+                {plans.map((p) => (
+                  <td key={p.id} className="p-4 text-center sm:p-5">
+                    {p.id === 'family' ? '24/7 Dedicated' : p.id === 'pro' ? 'Priority Support' : 'Community'}
+                  </td>
+                ))}
               </tr>
             </tbody>
           </table>
@@ -633,7 +567,7 @@ export const SubscriptionPage: React.FC = () => {
       </div>
 
       {/* ==================================================================== */}
-      {/* 5. FUTURE-READY PLACEHOLDERS (INVOICES, PAYMENT METHODS, PROMO CODES) */}
+      {/* 5. FUTURE-READY PLACEHOLDERS */}
       {/* ==================================================================== */}
       <div className="space-y-6 pt-6">
         <div className="space-y-1">
@@ -866,7 +800,7 @@ export const SubscriptionPage: React.FC = () => {
       </div>
 
       {/* ==================================================================== */}
-      {/* 7. UPGRADE CONFIRMATION MODAL (PAYMENT PLACEHOLDER FLOW) */}
+      {/* 7. UPGRADE CONFIRMATION MODAL */}
       {/* ==================================================================== */}
       <AnimatePresence>
         {selectedUpgradePlan && (
@@ -904,7 +838,7 @@ export const SubscriptionPage: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="font-sans text-xl font-black text-slate-900 dark:text-white">
-                      Upgrade to {selectedUpgradePlan.name} Plan
+                      Upgrade to {selectedUpgradePlan.plan_name} Plan
                     </h3>
                     <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
                       {billingCycle === 'yearly' ? 'Annual Billing (Save 17%)' : 'Monthly Billing'}
@@ -916,14 +850,16 @@ export const SubscriptionPage: React.FC = () => {
                 <div className="space-y-3 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-800/40">
                   <div className="flex justify-between text-xs font-bold text-slate-900 dark:text-white">
                     <span>Selected Plan</span>
-                    <span>{selectedUpgradePlan.name}</span>
+                    <span>{selectedUpgradePlan.plan_name}</span>
                   </div>
                   <div className="flex justify-between text-xs font-semibold text-slate-600 dark:text-slate-300">
                     <span>Base Price</span>
                     <span>
-                      {billingCycle === 'yearly'
-                        ? selectedUpgradePlan.yearlyPrice
-                        : selectedUpgradePlan.monthlyPrice}
+                      PKR{' '}
+                      {(billingCycle === 'yearly'
+                        ? selectedUpgradePlan.price_yearly
+                        : selectedUpgradePlan.price_monthly
+                      ).toLocaleString()}
                     </span>
                   </div>
 
@@ -937,9 +873,11 @@ export const SubscriptionPage: React.FC = () => {
                   <div className="border-t border-slate-200 pt-2 flex justify-between text-sm font-black text-slate-900 dark:border-slate-700 dark:text-white">
                     <span>Total Due Today</span>
                     <span className="text-purple-600 dark:text-purple-400">
-                      {billingCycle === 'yearly'
-                        ? selectedUpgradePlan.yearlyPrice
-                        : selectedUpgradePlan.monthlyPrice}
+                      PKR{' '}
+                      {(billingCycle === 'yearly'
+                        ? selectedUpgradePlan.price_yearly
+                        : selectedUpgradePlan.price_monthly
+                      ).toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -971,7 +909,7 @@ export const SubscriptionPage: React.FC = () => {
                 <div className="flex items-start gap-2.5 rounded-2xl border border-amber-200/80 bg-amber-50/80 p-3.5 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
                   <Lock className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
                   <p className="text-[11px] leading-relaxed">
-                    <span className="font-bold">Payment Gateway Placeholder</span>: Clicking confirm will update your account tier immediately in local state. No real monetary charges will occur.
+                    <span className="font-bold">Payment Gateway Placeholder</span>: Clicking confirm will update your account subscription tier in the database.
                   </p>
                 </div>
 
