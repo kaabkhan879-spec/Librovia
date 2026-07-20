@@ -25,21 +25,39 @@ export const ResetPasswordForm: React.FC = () => {
 
   // Verify that the user came via a recovery reset link / has valid session
   useEffect(() => {
+    // 1. Check current session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      // Supabase recovers session from hash parameters automatically on redirect
       if (session) {
         setHasSession(true)
-      } else {
-        // Fallback checks for recovery tokens in hash params
-        const hash = window.location.hash
-        if (hash && (hash.includes('access_token') || hash.includes('type=recovery'))) {
-          setHasSession(true)
-        } else {
-          setHasSession(false)
-          setGlobalError('Invalid or expired password reset link. Please request a new recovery link.')
-        }
       }
     })
+
+    // 2. Listen for PASSWORD_RECOVERY event or active session detection
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' || session) {
+        setHasSession(true)
+      }
+    })
+
+    // 3. Fallback check for access token in hash or query parameters
+    const timer = setTimeout(() => {
+      const hash = window.location.hash || window.location.search
+      if (hash && (hash.includes('access_token') || hash.includes('type=recovery') || hash.includes('token='))) {
+        setHasSession(true)
+      } else {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (!session) {
+            setHasSession(false)
+            setGlobalError('Invalid or expired password reset link. Please request a new recovery link.')
+          }
+        })
+      }
+    }, 800)
+
+    return () => {
+      subscription.unsubscribe()
+      clearTimeout(timer)
+    }
   }, [])
 
   // Live Password Strength Check

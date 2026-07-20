@@ -27,9 +27,14 @@ export const ForgotPasswordForm: React.FC = () => {
     setError('')
     setIsLoading(true)
 
+    // Use development URL as requested to ensure local test links resolve correctly without 'site can't be reached' errors
+    const redirectUrl = import.meta.env.PROD 
+      ? `${window.location.origin}${ROUTES.RESET_PASSWORD}`
+      : "http://localhost:5173/reset-password"
+
     supabase.auth
       .resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}${ROUTES.RESET_PASSWORD}`,
+        redirectTo: redirectUrl,
       })
       .then(({ error }) => {
         setIsLoading(false)
