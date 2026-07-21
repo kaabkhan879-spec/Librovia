@@ -13,7 +13,7 @@ export const ForgotPasswordForm: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!email) {
@@ -27,27 +27,37 @@ export const ForgotPasswordForm: React.FC = () => {
     setError('')
     setIsLoading(true)
 
-    // Use development URL as requested to ensure local test links resolve correctly without 'site can't be reached' errors
-    const redirectUrl = import.meta.env.PROD 
-      ? `${window.location.origin}${ROUTES.RESET_PASSWORD}`
-      : "http://localhost:5173/reset-password"
+    const redirectUrl = window.location.origin + '/reset-password'
 
-    supabase.auth
-      .resetPasswordForEmail(email, {
+    try {
+      const { error: apiError } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: redirectUrl,
       })
-      .then(({ error }) => {
-        setIsLoading(false)
-        if (error) {
-          setError(error.message)
-        } else {
-          setIsSuccess(true)
-        }
-      })
-      .catch((err) => {
-        setIsLoading(false)
+
+      setIsLoading(false)
+
+      if (apiError) {
+        console.error('Forgot Password Error:', apiError)
+        console.error('Error Message:', apiError.message)
+        console.error('Error Status:', apiError.status)
+        console.error('Error Code:', apiError.code)
+        setError(apiError.message || 'An unexpected error occurred')
+      } else {
+        setIsSuccess(true)
+      }
+    } catch (err) {
+      setIsLoading(false)
+      console.error('Forgot Password Catch Error:', err)
+      if (err && typeof err === 'object') {
+        const errorObj = err as Record<string, unknown>
+        console.error('Error Message:', errorObj.message)
+        console.error('Error Status:', errorObj.status)
+        console.error('Error Code:', errorObj.code)
+        setError(String(errorObj.message || 'An unexpected error occurred'))
+      } else {
         setError(err instanceof Error ? err.message : 'An unexpected error occurred')
-      })
+      }
+    }
   }
 
   if (isSuccess) {

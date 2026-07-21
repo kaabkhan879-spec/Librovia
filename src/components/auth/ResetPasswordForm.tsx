@@ -33,7 +33,9 @@ export const ResetPasswordForm: React.FC = () => {
     })
 
     // 2. Listen for PASSWORD_RECOVERY event or active session detection
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY' || session) {
         setHasSession(true)
       }
@@ -42,13 +44,18 @@ export const ResetPasswordForm: React.FC = () => {
     // 3. Fallback check for access token in hash or query parameters
     const timer = setTimeout(() => {
       const hash = window.location.hash || window.location.search
-      if (hash && (hash.includes('access_token') || hash.includes('type=recovery') || hash.includes('token='))) {
+      if (
+        hash &&
+        (hash.includes('access_token') || hash.includes('type=recovery') || hash.includes('token='))
+      ) {
         setHasSession(true)
       } else {
         supabase.auth.getSession().then(({ data: { session } }) => {
           if (!session) {
             setHasSession(false)
-            setGlobalError('Invalid or expired password reset link. Please request a new recovery link.')
+            setGlobalError(
+              'Invalid or expired password reset link. Please request a new recovery link.'
+            )
           }
         })
       }
@@ -110,15 +117,20 @@ export const ResetPasswordForm: React.FC = () => {
         throw error
       }
 
+      await supabase.auth.signOut()
       setIsSuccess(true)
-      showSuccess('Password updated successfully! Redirecting...')
+      showSuccess('Password updated successfully. Please log in with your new password.')
 
       // Delay redirect to login so they see the success card
       setTimeout(() => {
         navigate(ROUTES.LOGIN)
       }, 3000)
-    } catch (err: any) {
-      setGlobalError(err.message || 'Failed to update password. Your reset link may have expired.')
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Failed to update password. Your reset link may have expired.'
+      setGlobalError(message)
     } finally {
       setIsLoading(false)
     }
@@ -137,7 +149,7 @@ export const ResetPasswordForm: React.FC = () => {
               Password Updated
             </h2>
             <p className="text-text-sub max-w-sm text-xs leading-relaxed">
-              Your password has been changed successfully. You will be redirected to the Login page shortly.
+              Password updated successfully. Please log in with your new password.
             </p>
           </div>
 
@@ -155,7 +167,7 @@ export const ResetPasswordForm: React.FC = () => {
     return (
       <AuthCard>
         <div className="space-y-5 text-center">
-          <div className="bg-rose-50 text-rose-500 dark:bg-rose-950/40 dark:text-rose-400 mx-auto flex h-12 w-12 items-center justify-center rounded-full">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-rose-50 text-rose-500 dark:bg-rose-950/40 dark:text-rose-400">
             <AlertTriangle className="h-6 w-6" />
           </div>
 
@@ -164,7 +176,8 @@ export const ResetPasswordForm: React.FC = () => {
               Link Expired or Invalid
             </h2>
             <p className="text-text-sub max-w-sm text-xs leading-relaxed">
-              {globalError || 'The password reset link is invalid, expired, or has already been used.'}
+              {globalError ||
+                'The password reset link is invalid, expired, or has already been used.'}
             </p>
           </div>
 
@@ -196,7 +209,7 @@ export const ResetPasswordForm: React.FC = () => {
         </div>
 
         {globalError && (
-          <div className="rounded-2xl bg-rose-50 p-4 text-xs font-semibold text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-100 dark:border-rose-900/40 flex gap-2">
+          <div className="flex gap-2 rounded-2xl border border-rose-100 bg-rose-50 p-4 text-xs font-semibold text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/40 dark:text-rose-400">
             <AlertTriangle className="h-4 w-4 shrink-0" />
             <span>{globalError}</span>
           </div>
@@ -215,12 +228,18 @@ export const ResetPasswordForm: React.FC = () => {
           {/* Password strength meter */}
           {password && (
             <div className="space-y-1.5 px-1">
-              <div className="flex justify-between items-center text-[10px] font-extrabold text-slate-400">
-                <span>Strength: <strong className="text-slate-700 dark:text-slate-200">{strength.label}</strong></span>
+              <div className="flex items-center justify-between text-[10px] font-extrabold text-slate-400">
+                <span>
+                  Strength:{' '}
+                  <strong className="text-slate-700 dark:text-slate-200">{strength.label}</strong>
+                </span>
                 <span>{strength.pct}%</span>
               </div>
-              <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-slate-800">
-                <div className={`h-full ${strength.color} transition-all duration-300`} style={{ width: `${strength.pct}%` }} />
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                <div
+                  className={`h-full ${strength.color} transition-all duration-300`}
+                  style={{ width: `${strength.pct}%` }}
+                />
               </div>
             </div>
           )}

@@ -14,9 +14,9 @@ import { AdminRoute } from './AdminRoute'
 
 // Pages
 import { LandingPage } from '../pages/landing/LandingPage'
-import { LoginPage } from '../pages/login/LoginPage'
-import { RegisterPage } from '../pages/register/RegisterPage'
-import { ForgotPasswordPage } from '../pages/forgot-password/ForgotPasswordPage'
+import { LoginPage } from '../pages/auth/LoginPage'
+import { RegisterPage } from '../pages/auth/RegisterPage'
+import { ForgotPasswordPage } from '../pages/auth/ForgotPasswordPage'
 import { ResetPasswordPage } from '../pages/auth/ResetPasswordPage'
 import { DashboardPage } from '../pages/dashboard/DashboardPage'
 import { LibraryPage } from '../pages/library/LibraryPage'
@@ -68,7 +68,10 @@ export const AppRoutes: React.FC = () => {
           <Route path={ROUTES.UPLOAD} element={<UploadBookPage />} />
           <Route path={ROUTES.BOOK_DETAILS} element={<BookDetailsPage />} />
           <Route path={ROUTES.READER} element={<ReaderPage />} />
-          <Route path={ROUTES.FAVORITES} element={<Navigate to="/library?tab=favorites" replace />} />
+          <Route
+            path={ROUTES.FAVORITES}
+            element={<Navigate to="/library?tab=favorites" replace />}
+          />
           <Route path={ROUTES.COLLECTIONS} element={<CategoriesPage />} />
           <Route path={ROUTES.NOTES} element={<NotesPage />} />
           <Route path={ROUTES.FLASHCARDS} element={<FlashcardsPage />} />

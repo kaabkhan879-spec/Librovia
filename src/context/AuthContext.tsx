@@ -32,6 +32,7 @@ interface AuthContextType {
   user: User | null
   loading: boolean
   isAuthenticated: boolean
+  isPasswordRecovery: boolean
   login: (email: string, password: string) => Promise<User | null>
   register: (email: string, password: string, displayName: string) => Promise<void>
   logout: () => Promise<void>
@@ -43,6 +44,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false)
 
   useEffect(() => {
     // 1. Recover session on load
@@ -53,8 +55,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser({
           id: session.user.id,
           email,
-          displayName:
-            session.user.user_metadata?.display_name || email.split('@')[0],
+          displayName: session.user.user_metadata?.display_name || email.split('@')[0],
           avatarUrl:
             session.user.user_metadata?.avatar_url ||
             'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&h=100&q=80',
@@ -67,15 +68,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // 2. Setup auth state change listener
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsPasswordRecovery(true)
+      } else if (event === 'SIGNED_OUT') {
+        setIsPasswordRecovery(false)
+      }
+
       if (session?.user) {
         const email = session.user.email || ''
         const role = await fetchUserRole(session.user.id)
         setUser({
           id: session.user.id,
           email,
-          displayName:
-            session.user.user_metadata?.display_name || email.split('@')[0],
+          displayName: session.user.user_metadata?.display_name || email.split('@')[0],
           avatarUrl:
             session.user.user_metadata?.avatar_url ||
             'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&h=100&q=80',
@@ -177,6 +183,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         loading,
         isAuthenticated: !!user,
+        isPasswordRecovery,
         login,
         register,
         logout,
