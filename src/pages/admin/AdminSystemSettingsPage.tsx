@@ -24,6 +24,7 @@ export const AdminSystemSettingsPage: React.FC = () => {
   const [bankAccountNumber, setBankAccountNumber] = useState('')
   const [bankAccountName, setBankAccountName] = useState('')
   const [paymentInstructions, setPaymentInstructions] = useState('')
+  const [whatsappNumber, setWhatsappNumber] = useState('')
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -49,6 +50,7 @@ export const AdminSystemSettingsPage: React.FC = () => {
         setBankAccountNumber(data.bank_account_number || '')
         setBankAccountName(data.bank_account_name || '')
         setPaymentInstructions(data.payment_instructions || '')
+        setWhatsappNumber(data.whatsapp_number || '')
       }
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : 'Failed to fetch settings'
@@ -78,6 +80,7 @@ export const AdminSystemSettingsPage: React.FC = () => {
       bank_account_number: bankAccountNumber,
       bank_account_name: bankAccountName,
       payment_instructions: paymentInstructions,
+      whatsapp_number: whatsappNumber,
     }
 
     try {
@@ -264,6 +267,17 @@ export const AdminSystemSettingsPage: React.FC = () => {
                 value={bankAccountName}
                 onChange={(e) => setBankAccountName(e.target.value)}
                 placeholder="e.g. Librovia Private Limited"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 dark:border-slate-800 dark:bg-slate-800 dark:text-white"
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="mb-1 block">WhatsApp Support Number (for Quick Verification)</label>
+              <input
+                type="text"
+                value={whatsappNumber}
+                onChange={(e) => setWhatsappNumber(e.target.value)}
+                placeholder="e.g. 923001234567"
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 dark:border-slate-800 dark:bg-slate-800 dark:text-white"
               />
             </div>

@@ -97,7 +97,7 @@ export const SubscriptionPage: React.FC = () => {
 
   // Selected plan for Upgrade Modal
   const [selectedUpgradePlan, setSelectedUpgradePlan] = useState<SubscriptionPlan | null>(null)
-  const [upgradeStep, setUpgradeStep] = useState<'summary' | 'payment'>('summary')
+  const [upgradeStep, setUpgradeStep] = useState<'summary' | 'payment' | 'success'>('summary')
   const [paymentRequests, setPaymentRequests] = useState<any[]>([])
   
   // Form fields
@@ -222,9 +222,9 @@ export const SubscriptionPage: React.FC = () => {
         note: userNote,
       })
 
-      showSuccess('Your payment has been submitted successfully and is awaiting verification.')
+      showSuccess('Your payment has been submitted successfully!')
       fetchUserRequests()
-      handleCloseUpgradeModal()
+      setUpgradeStep('success')
     } catch (err: any) {
       console.error(err)
       showError(err.message || 'Failed to submit payment request')
@@ -1130,7 +1130,7 @@ export const SubscriptionPage: React.FC = () => {
                     </button>
                   </div>
                 </div>
-              ) : (
+              ) : upgradeStep === 'payment' ? (
                 // Step 2: Payment Gateway & Submission form
                 <form onSubmit={handleSubmitPayment} className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
                   <div className="flex items-center gap-3 border-b border-slate-100 pb-3 dark:border-slate-800">
@@ -1329,6 +1329,53 @@ export const SubscriptionPage: React.FC = () => {
                     </button>
                   </div>
                 </form>
+              ) : (
+                // Step 3: Success screen with WhatsApp support trigger
+                <div className="space-y-6 text-center py-4 select-none">
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-950/70 dark:text-emerald-400 shadow-inner">
+                    <CheckCircle2 className="h-8 w-8 animate-bounce" />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <h3 className="font-sans text-xl font-black text-slate-900 dark:text-white">
+                      Payment Submitted Successfully! ⏳
+                    </h3>
+                    <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 max-w-sm mx-auto leading-relaxed">
+                      Your payment request for the <span className="text-purple-600 dark:text-purple-400 font-bold uppercase">{selectedUpgradePlan?.plan_name}</span> plan has been received. Our team will verify and activate your subscription shortly.
+                    </p>
+                  </div>
+
+                  {systemSettings?.whatsapp_number && (
+                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4 dark:border-emerald-900/30 dark:bg-emerald-950/20 text-xs font-semibold text-slate-600 dark:text-slate-300 space-y-3">
+                      <p className="text-[11px] font-bold text-slate-800 dark:text-white leading-normal">
+                        Need quick activation? Message us on WhatsApp for fast verification!
+                      </p>
+                      <a
+                        href={`https://wa.me/${systemSettings.whatsapp_number.replace(/\D/g, '')}?text=${encodeURIComponent(
+                          `Hello Support! I have submitted a manual payment request for my upgrade to the ${selectedUpgradePlan?.plan_name.toUpperCase()} plan (TxID: ${transactionId}). Please verify and approve it quickly. Thank you!`
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center gap-2 w-full rounded-2xl bg-emerald-600 py-3 text-xs font-black text-white hover:bg-emerald-700 shadow-md shadow-emerald-600/20 transition-all duration-200 active:scale-98"
+                      >
+                        <svg className="h-4.5 w-4.5 fill-current" viewBox="0 0 24 24">
+                          <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.625 1.451 5.437 0 9.862-4.414 9.866-9.84.002-2.628-1.02-5.1-2.878-6.958C16.398 1.95 13.933 1.929 12 1.929c-5.436 0-9.86 4.415-9.864 9.843-.001 1.848.493 3.654 1.432 5.228l-.995 3.635 3.73-.977-.256-.489zm13.125-9.351c-.321-.16-1.9-.938-2.193-1.047-.293-.108-.507-.162-.72.16-.213.32-.825 1.047-1.012 1.261-.187.213-.373.24-.693.08-.32-.16-1.353-.499-2.577-1.591-.951-.849-1.593-1.898-1.78-2.218-.187-.32-.02-.493.14-.653.144-.144.32-.373.48-.56.16-.187.213-.32.32-.533.107-.213.053-.4-.027-.56-.08-.16-.72-1.734-.987-2.373-.259-.626-.523-.538-.72-.547-.187-.008-.4-.01-.613-.01-.213 0-.56.08-.853.4-.293.32-1.12 1.093-1.12 2.667 0 1.573 1.147 3.093 1.307 3.293.16.2 2.257 3.447 5.467 4.833.764.331 1.36.528 1.823.675.77.244 1.472.21 2.027.128.618-.092 1.9-.777 2.167-1.493.267-.717.267-1.33.187-1.46-.08-.13-.293-.21-.613-.37z"/>
+                        </svg>
+                        <span>Contact Support on WhatsApp</span>
+                      </a>
+                    </div>
+                  )}
+
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={handleCloseUpgradeModal}
+                      className="w-full cursor-pointer rounded-2xl bg-purple-600 py-3 text-xs font-black text-white hover:bg-purple-700 shadow-md shadow-purple-600/20 transition-all duration-200 active:scale-98"
+                    >
+                      Close & Go to Dashboard
+                    </button>
+                  </div>
+                </div>
               )}
             </motion.div>
           </div>

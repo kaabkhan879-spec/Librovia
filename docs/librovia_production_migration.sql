@@ -795,7 +795,8 @@ ADD COLUMN IF NOT EXISTS jazzcash_name VARCHAR(255),
 ADD COLUMN IF NOT EXISTS bank_name VARCHAR(255),
 ADD COLUMN IF NOT EXISTS bank_account_number VARCHAR(100),
 ADD COLUMN IF NOT EXISTS bank_account_name VARCHAR(255),
-ADD COLUMN IF NOT EXISTS payment_instructions TEXT;
+ADD COLUMN IF NOT EXISTS payment_instructions TEXT,
+ADD COLUMN IF NOT EXISTS whatsapp_number VARCHAR(100);
 
 -- Seed default manual payment gateway credentials
 UPDATE public.system_settings 
@@ -807,7 +808,8 @@ SET
   bank_name = 'Meezan Bank Ltd', 
   bank_account_number = '1234-5678-9012-34', 
   bank_account_name = 'Librovia Private Limited', 
-  payment_instructions = 'Please transfer the correct subscription amount based on your selected billing interval to any of the wallets/accounts listed below, capture a screenshot of the confirmation message showing the transaction details, and upload it below along with your transaction ID.'
+  payment_instructions = 'Please transfer the correct subscription amount based on your selected billing interval to any of the wallets/accounts listed below, capture a screenshot of the confirmation message showing the transaction details, and upload it below along with your transaction ID.',
+  whatsapp_number = '923001234567'
 WHERE id = 1;
 
 -- 2. CREATE PAYMENT REQUESTS TABLE

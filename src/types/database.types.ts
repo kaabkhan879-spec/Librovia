@@ -562,6 +562,7 @@ export interface Database {
           bank_account_number: string | null
           bank_account_name: string | null
           payment_instructions: string | null
+          whatsapp_number: string | null
         }
         Insert: {
           id?: number
@@ -578,6 +579,7 @@ export interface Database {
           bank_account_number?: string | null
           bank_account_name?: string | null
           payment_instructions?: string | null
+          whatsapp_number?: string | null
         }
         Update: {
           id?: number
@@ -594,6 +596,7 @@ export interface Database {
           bank_account_number?: string | null
           bank_account_name?: string | null
           payment_instructions?: string | null
+          whatsapp_number?: string | null
         }
         Relationships: []
       }
