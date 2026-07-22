@@ -490,7 +490,7 @@ export const subscriptionsService = {
       const { error: storageErr } = await supabase.from('storage_usage').upsert(
         {
           user_id: req.user_id,
-          max_limit_bytes: limitBytes,
+          limit_bytes: limitBytes,
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'user_id' }
