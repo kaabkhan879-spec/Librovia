@@ -1,4 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
+import { supabase } from '../../services/supabase'
+import { auditService } from '../../services/audit'
 import { motion, AnimatePresence } from 'framer-motion'
 import { PageWrapper } from '../../components/common/PageWrapper'
 import { useToast } from '../../context/ToastContext'
@@ -51,81 +53,128 @@ export interface DynamicSaaSPlan {
   cancellationRatePct?: number
 }
 
+interface DbSubscriptionPlan {
+  id: string
+  plan_name: string
+  badge: string | null
+  price_monthly: number
+  price_yearly: number
+  storage_limit_bytes: number
+  ai_daily_limit: number
+  offline_download_limit: number
+  family_member_limit: number
+  features: unknown
+  is_active: boolean
+}
+
+const mapDbToSaaSPlan = (db: DbSubscriptionPlan): DynamicSaaSPlan => {
+  const featuresList = Array.isArray(db.features) ? db.features : []
+  const textStr = (featuresList as { text?: string }[])
+    .map((f) => f.text?.toLowerCase() || '')
+    .join(' ')
+
+  const storageGB = Math.round(Number(db.storage_limit_bytes) / (1024 * 1024 * 1024))
+  const aiDailyLimit = db.ai_daily_limit === -1 ? 'Unlimited' : db.ai_daily_limit
+  const offlineLimit = db.offline_download_limit === -1 ? 'Unlimited' : db.offline_download_limit
+
+  return {
+    id: db.id,
+    name: db.plan_name,
+    priceMonthly: Number(db.price_monthly),
+    priceYearly: Number(db.price_yearly),
+    billingCycle: 'Monthly',
+    status: db.is_active ? 'Active' : 'Draft',
+    storageGB,
+    aiDailyLimit,
+    offlineLimit,
+    familyMembers: db.family_member_limit,
+    supportLevel: textStr.includes('vip')
+      ? 'VIP Priority'
+      : textStr.includes('standard')
+        ? 'Standard 24/7'
+        : 'Community',
+    badge: db.badge || '',
+    features: {
+      aiSummarizer: textStr.includes('ai') || textStr.includes('summarizer'),
+      notesHighlights: textStr.includes('notes') || textStr.includes('highlight'),
+      collections: textStr.includes('collections'),
+      prioritySync: textStr.includes('sync'),
+      premiumReader: textStr.includes('premium'),
+      familySharing: textStr.includes('family'),
+      prioritySupport: textStr.includes('support'),
+    },
+  }
+}
+
+const mapSaaSPlanToDb = (plan: DynamicSaaSPlan) => {
+  const features = []
+  features.push({ text: `${plan.storageGB} GB Cloud Storage`, highlight: plan.storageGB > 5 })
+  features.push({
+    text:
+      plan.aiDailyLimit === 'Unlimited'
+        ? 'Unlimited AI Requests'
+        : `${plan.aiDailyLimit} AI Requests per Day`,
+  })
+  features.push({
+    text:
+      plan.offlineLimit === 'Unlimited'
+        ? 'Unlimited Offline Downloads'
+        : `Up to ${plan.offlineLimit} Offline Downloads`,
+  })
+
+  if (plan.features.notesHighlights) features.push({ text: 'Notes & Highlights' })
+  if (plan.features.collections) features.push({ text: 'Collections' })
+  if (plan.features.prioritySync) features.push({ text: 'Priority Cloud Sync' })
+  if (plan.features.premiumReader) features.push({ text: 'Premium Reader Experience' })
+  if (plan.features.familySharing) features.push({ text: 'Family Plan Sharing' })
+  if (plan.features.prioritySupport) features.push({ text: 'Priority Support' })
+
+  return {
+    id: plan.id,
+    plan_name: plan.name,
+    badge: plan.badge,
+    price_monthly: plan.priceMonthly,
+    price_yearly: plan.priceYearly,
+    storage_limit_bytes: plan.storageGB * 1024 * 1024 * 1024,
+    ai_daily_limit: plan.aiDailyLimit === 'Unlimited' ? -1 : Number(plan.aiDailyLimit),
+    offline_download_limit: plan.offlineLimit === 'Unlimited' ? -1 : Number(plan.offlineLimit),
+    family_member_limit: plan.familyMembers,
+    features,
+    is_active: plan.status === 'Active',
+    sort_order: plan.id === 'free' ? 1 : plan.id === 'pro' ? 2 : 3,
+  }
+}
+
 export const AdminSubscriptionsPage: React.FC = () => {
-  const { showSuccess } = useToast()
+  const { showSuccess, showError } = useToast()
 
   // Dynamic SaaS Plans List
-  const [plans, setPlans] = useState<DynamicSaaSPlan[]>([
-    {
-      id: 'free',
-      name: 'Free',
-      priceMonthly: 0,
-      priceYearly: 0,
-      billingCycle: 'Monthly',
-      status: 'Active',
-      storageGB: 5,
-      aiDailyLimit: 20,
-      offlineLimit: 10,
-      familyMembers: 1,
-      supportLevel: 'Community',
-      badge: 'Free Forever',
-      features: {
-        aiSummarizer: true,
-        notesHighlights: true,
-        collections: true,
-        prioritySync: false,
-        premiumReader: false,
-        familySharing: false,
-        prioritySupport: false,
-      },
-    },
-    {
-      id: 'pro',
-      name: 'Pro',
-      priceMonthly: 500,
-      priceYearly: 4999,
-      billingCycle: 'Monthly',
-      status: 'Active',
-      storageGB: 300,
-      aiDailyLimit: 'Unlimited',
-      offlineLimit: 'Unlimited',
-      familyMembers: 1,
-      supportLevel: 'Standard 24/7',
-      badge: '⭐ Most Popular',
-      features: {
-        aiSummarizer: true,
-        notesHighlights: true,
-        collections: true,
-        prioritySync: true,
-        premiumReader: true,
-        familySharing: false,
-        prioritySupport: true,
-      },
-    },
-    {
-      id: 'family',
-      name: 'Family',
-      priceMonthly: 899,
-      priceYearly: 8999,
-      billingCycle: 'Monthly',
-      status: 'Active',
-      storageGB: 1000,
-      aiDailyLimit: 'Unlimited',
-      offlineLimit: 'Unlimited',
-      familyMembers: 6,
-      supportLevel: 'VIP Priority',
-      badge: '👨‍👩‍👧 Best Value',
-      features: {
-        aiSummarizer: true,
-        notesHighlights: true,
-        collections: true,
-        prioritySync: true,
-        premiumReader: true,
-        familySharing: true,
-        prioritySupport: true,
-      },
-    },
-  ])
+  const [plans, setPlans] = useState<DynamicSaaSPlan[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const fetchPlans = useCallback(async () => {
+    try {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('subscription_plans')
+        .select('*')
+        .order('sort_order', { ascending: true })
+
+      if (error) throw error
+
+      setPlans((data || []).map(mapDbToSaaSPlan))
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : 'Failed to fetch subscription plans'
+      showError(errMsg)
+    } finally {
+      setLoading(false)
+    }
+  }, [showError])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchPlans()
+  }, [fetchPlans])
 
   // Slide-over Right Drawer for Editing or Creating Plans
   const [editingPlan, setEditingPlan] = useState<DynamicSaaSPlan | null>(null)
@@ -160,50 +209,118 @@ export const AdminSubscriptionsPage: React.FC = () => {
     setIsCreatingNew(true)
   }
 
-  const handleDuplicatePlan = (plan: DynamicSaaSPlan) => {
+  const handleDuplicatePlan = async (plan: DynamicSaaSPlan) => {
     const duplicated: DynamicSaaSPlan = {
       ...plan,
+      // eslint-disable-next-line react-hooks/purity
       id: `plan-${Date.now()}`,
       name: `${plan.name} (Copy)`,
       status: 'Draft',
     }
-    setPlans((prev) => [...prev, duplicated])
-    showSuccess(`Duplicated plan ${plan.name} into Draft status.`)
+
+    try {
+      const { error } = await supabase
+        .from('subscription_plans')
+        .insert(mapSaaSPlanToDb(duplicated))
+      if (error) throw error
+
+      await auditService.insertLog({
+        event: 'Subscription Plan Change',
+        category: 'Billing & Payments',
+        severity: 'Info',
+        metadata: { action: 'duplicate', planId: duplicated.id, name: duplicated.name },
+      })
+
+      showSuccess(`Duplicated plan ${plan.name} into Draft status.`)
+      fetchPlans()
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : 'Failed to duplicate plan'
+      showError(errMsg)
+    }
   }
 
-  const handleArchivePlan = (id: string, name: string) => {
-    setPlans((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, status: 'Archived' as const } : p))
-    )
-    showSuccess(`Archived subscription plan ${name}.`)
+  const handleArchivePlan = async (id: string, name: string) => {
+    try {
+      const { error } = await supabase
+        .from('subscription_plans')
+        .update({ is_active: false })
+        .eq('id', id)
+      if (error) throw error
+
+      await auditService.insertLog({
+        event: 'Subscription Plan Change',
+        category: 'Billing & Payments',
+        severity: 'Warning',
+        metadata: { action: 'archive', planId: id, name },
+      })
+
+      showSuccess(`Archived subscription plan ${name}.`)
+      fetchPlans()
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : 'Failed to archive plan'
+      showError(errMsg)
+    }
   }
 
-  const handleSaveDrawerPlan = (e: React.FormEvent) => {
+  const handleSaveDrawerPlan = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingPlan) return
 
-    if (isCreatingNew) {
-      setPlans((prev) => [...prev, editingPlan])
-      showSuccess(`Created new subscription plan ${editingPlan.name}.`)
-    } else {
-      setPlans((prev) => prev.map((p) => (p.id === editingPlan.id ? editingPlan : p)))
-      showSuccess(`Updated plan configuration for ${editingPlan.name}.`)
-    }
+    try {
+      const payload = mapSaaSPlanToDb(editingPlan)
+      if (isCreatingNew) {
+        const { error } = await supabase.from('subscription_plans').insert(payload)
+        if (error) throw error
+        showSuccess(`Created new subscription plan ${editingPlan.name}.`)
+      } else {
+        const { error } = await supabase
+          .from('subscription_plans')
+          .update(payload)
+          .eq('id', editingPlan.id)
+        if (error) throw error
+        showSuccess(`Updated plan configuration for ${editingPlan.name}.`)
+      }
 
-    setEditingPlan(null)
-    setIsCreatingNew(false)
+      await auditService.insertLog({
+        event: 'Subscription Plan Change',
+        category: 'Billing & Payments',
+        severity: 'Info',
+        metadata: {
+          action: isCreatingNew ? 'create' : 'edit',
+          planId: editingPlan.id,
+          name: editingPlan.name,
+        },
+      })
+
+      setEditingPlan(null)
+      setIsCreatingNew(false)
+      fetchPlans()
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : 'Failed to save plan settings'
+      showError(errMsg)
+    }
   }
 
   const handleExportPlans = () => {
     const headers = ['Plan ID', 'Name', 'Price Monthly', 'Storage GB', 'AI Limit', 'Status']
-    const rows = plans.map((p) => [p.id, p.name, p.priceMonthly, p.storageGB, p.aiDailyLimit, p.status])
+    const rows = plans.map((p) => [
+      p.id,
+      p.name,
+      p.priceMonthly,
+      p.storageGB,
+      p.aiDailyLimit,
+      p.status,
+    ])
     const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.setAttribute('href', url)
-    link.setAttribute('download', `librovia_plans_export_${new Date().toISOString().split('T')[0]}.csv`)
+    link.setAttribute(
+      'download',
+      `librovia_plans_export_${new Date().toISOString().split('T')[0]}.csv`
+    )
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -220,17 +337,26 @@ export const AdminSubscriptionsPage: React.FC = () => {
     return 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-900/40'
   }
 
+  if (loading) {
+    return (
+      <PageWrapper className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-purple-600 border-t-transparent" />
+      </PageWrapper>
+    )
+  }
+
   return (
     <PageWrapper className="min-h-screen space-y-8 pb-20 text-left select-none">
       {/* 1. HEADER & QUICK ACTION TOOLBAR */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200/80 pb-6 dark:border-slate-800">
+      <div className="flex flex-col gap-4 border-b border-slate-200/80 pb-6 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
         <div className="space-y-1">
-          <h1 className="font-sans text-2xl font-black tracking-tight text-slate-900 sm:text-3xl dark:text-white flex items-center gap-2.5">
+          <h1 className="flex items-center gap-2.5 font-sans text-2xl font-black tracking-tight text-slate-900 sm:text-3xl dark:text-white">
             <PackageCheck className="h-7 w-7 text-purple-600" />
             Subscription & Billing Architecture
           </h1>
           <p className="text-xs font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">
-            Configure dynamic plans (Free, Pro, Family, Custom), price tiers, cloud quotas, and feature flags.
+            Configure dynamic plans (Free, Pro, Family, Custom), price tiers, cloud quotas, and
+            feature flags.
           </p>
         </div>
 
@@ -239,7 +365,7 @@ export const AdminSubscriptionsPage: React.FC = () => {
           <button
             type="button"
             onClick={handleCreateNewPlan}
-            className="inline-flex items-center gap-1.5 rounded-2xl bg-purple-600 px-4 py-2.5 text-xs font-black text-white hover:bg-purple-700 shadow-md shadow-purple-600/20 active:scale-98 transition-all"
+            className="inline-flex items-center gap-1.5 rounded-2xl bg-purple-600 px-4 py-2.5 text-xs font-black text-white shadow-md shadow-purple-600/20 transition-all hover:bg-purple-700 active:scale-98"
           >
             <Plus className="h-4 w-4" />
             <span>Create Plan</span>
@@ -250,7 +376,7 @@ export const AdminSubscriptionsPage: React.FC = () => {
             onClick={() => {
               showSuccess('Refreshed subscription plans and cache!')
             }}
-            className="inline-flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-extrabold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 transition-all"
+            className="inline-flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-extrabold text-slate-700 transition-all hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
           >
             <RefreshCw className="h-4 w-4" />
             <span className="hidden sm:inline">Refresh</span>
@@ -259,7 +385,7 @@ export const AdminSubscriptionsPage: React.FC = () => {
           <button
             type="button"
             onClick={handleExportPlans}
-            className="inline-flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-extrabold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 transition-all"
+            className="inline-flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-extrabold text-slate-700 transition-all hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
           >
             <FileSpreadsheet className="h-4 w-4" />
             <span className="hidden sm:inline">Export</span>
@@ -270,15 +396,23 @@ export const AdminSubscriptionsPage: React.FC = () => {
       {/* 2. SUBSCRIPTION OVERVIEW DASHBOARD & PRODUCTION EMPTY STATE */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         {/* Verified Metric 1: Total Subscription Plans */}
-        <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-1">
-          <span className="text-[10px] font-extrabold text-slate-400 uppercase block tracking-wider">Total Subscription Plans</span>
-          <h3 className="text-2xl font-black text-slate-900 dark:text-white">{plans.length} Configured Tiers</h3>
-          <p className="text-[11px] font-semibold text-purple-600 dark:text-purple-400">Dynamic SaaS Architecture</p>
+        <div className="space-y-1 rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+          <span className="block text-[10px] font-extrabold tracking-wider text-slate-400 uppercase">
+            Total Subscription Plans
+          </span>
+          <h3 className="text-2xl font-black text-slate-900 dark:text-white">
+            {plans.length} Configured Tiers
+          </h3>
+          <p className="text-[11px] font-semibold text-purple-600 dark:text-purple-400">
+            Dynamic SaaS Architecture
+          </p>
         </div>
 
         {/* Verified Metric 2: Total Storage Allocated */}
-        <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-1">
-          <span className="text-[10px] font-extrabold text-slate-400 uppercase block tracking-wider">Total Storage Allocated</span>
+        <div className="space-y-1 rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+          <span className="block text-[10px] font-extrabold tracking-wider text-slate-400 uppercase">
+            Total Storage Allocated
+          </span>
           <h3 className="text-2xl font-black text-slate-900 dark:text-white">
             {plans.reduce((acc, p) => acc + p.storageGB, 0) >= 1000
               ? `${(plans.reduce((acc, p) => acc + p.storageGB, 0) / 1000).toFixed(3)} TB`
@@ -288,9 +422,11 @@ export const AdminSubscriptionsPage: React.FC = () => {
         </div>
 
         {/* Verified Metric 3: Active Plan Types */}
-        <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-1">
-          <span className="text-[10px] font-extrabold text-slate-400 uppercase block tracking-wider">Active Plan Types</span>
-          <h3 className="text-xl font-black text-slate-900 dark:text-white truncate">
+        <div className="space-y-1 rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+          <span className="block text-[10px] font-extrabold tracking-wider text-slate-400 uppercase">
+            Active Plan Types
+          </span>
+          <h3 className="truncate text-xl font-black text-slate-900 dark:text-white">
             {plans.map((p) => p.name).join(' • ')}
           </h3>
           <p className="text-[11px] font-semibold text-slate-500">Live Tier Catalog</p>
@@ -298,7 +434,7 @@ export const AdminSubscriptionsPage: React.FC = () => {
       </div>
 
       {/* Production Empty-State Card for Subscriber Activity */}
-      <div className="rounded-3xl border border-dashed border-purple-200 bg-purple-50/40 p-6 dark:border-purple-900/50 dark:bg-purple-950/20 text-left flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col gap-4 rounded-3xl border border-dashed border-purple-200 bg-purple-50/40 p-6 text-left sm:flex-row sm:items-center sm:justify-between dark:border-purple-900/50 dark:bg-purple-950/20">
         <div className="space-y-1">
           <h4 className="font-sans text-sm font-black text-slate-900 dark:text-white">
             No subscription activity yet.
@@ -307,7 +443,7 @@ export const AdminSubscriptionsPage: React.FC = () => {
             Subscriber analytics will appear automatically after the first customer subscribes.
           </p>
         </div>
-        <span className="inline-flex items-center rounded-full bg-purple-100 px-3 py-1 text-[10.5px] font-black text-purple-800 dark:bg-purple-900/60 dark:text-purple-300 w-fit">
+        <span className="inline-flex w-fit items-center rounded-full bg-purple-100 px-3 py-1 text-[10.5px] font-black text-purple-800 dark:bg-purple-900/60 dark:text-purple-300">
           Waiting for Live Customers
         </span>
       </div>
@@ -323,7 +459,7 @@ export const AdminSubscriptionsPage: React.FC = () => {
             <motion.div
               key={p.id}
               whileHover={{ y: -3 }}
-              className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xs flex flex-col justify-between dark:border-slate-800 dark:bg-slate-900 transition-all"
+              className="flex flex-col justify-between rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xs transition-all dark:border-slate-800 dark:bg-slate-900"
             >
               <div className="space-y-4">
                 {/* Header & Badges */}
@@ -332,7 +468,9 @@ export const AdminSubscriptionsPage: React.FC = () => {
                     {p.badge}
                   </span>
 
-                  <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10px] font-extrabold ${getStatusBadge(p.status)}`}>
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10px] font-extrabold ${getStatusBadge(p.status)}`}
+                  >
                     {p.status === 'Active' && '🟢 '}
                     {p.status === 'Draft' && '🟡 '}
                     {p.status === 'Hidden' && '⚪ '}
@@ -343,48 +481,66 @@ export const AdminSubscriptionsPage: React.FC = () => {
 
                 {/* Plan Title & Price */}
                 <div>
-                  <h3 className="text-2xl font-black text-slate-900 dark:text-white">{p.name} Plan</h3>
-                  <p className="text-2xl font-black text-purple-600 dark:text-purple-400 mt-1">
-                    PKR {p.priceMonthly.toLocaleString()} <span className="text-xs text-slate-400">/ mo</span>
+                  <h3 className="text-2xl font-black text-slate-900 dark:text-white">
+                    {p.name} Plan
+                  </h3>
+                  <p className="mt-1 text-2xl font-black text-purple-600 dark:text-purple-400">
+                    PKR {p.priceMonthly.toLocaleString()}{' '}
+                    <span className="text-xs text-slate-400">/ mo</span>
                   </p>
                 </div>
 
                 {/* Quotas & Features Breakdown */}
-                <div className="space-y-2.5 pt-4 border-t border-slate-100 text-xs font-semibold text-slate-600 dark:border-slate-800 dark:text-slate-300">
+                <div className="space-y-2.5 border-t border-slate-100 pt-4 text-xs font-semibold text-slate-600 dark:border-slate-800 dark:text-slate-300">
                   <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5"><HardDrive className="h-4 w-4 text-purple-500" /> Storage Limit</span>
-                    <span className="font-bold text-slate-900 dark:text-white">{p.storageGB >= 1000 ? `${p.storageGB / 1000} TB` : `${p.storageGB} GB`}</span>
+                    <span className="flex items-center gap-1.5">
+                      <HardDrive className="h-4 w-4 text-purple-500" /> Storage Limit
+                    </span>
+                    <span className="font-bold text-slate-900 dark:text-white">
+                      {p.storageGB >= 1000 ? `${p.storageGB / 1000} TB` : `${p.storageGB} GB`}
+                    </span>
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5"><Sparkles className="h-4 w-4 text-amber-500" /> AI Requests</span>
-                    <span className="font-bold text-slate-900 dark:text-white">{p.aiDailyLimit}</span>
+                    <span className="flex items-center gap-1.5">
+                      <Sparkles className="h-4 w-4 text-amber-500" /> AI Requests
+                    </span>
+                    <span className="font-bold text-slate-900 dark:text-white">
+                      {p.aiDailyLimit}
+                    </span>
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5"><Download className="h-4 w-4 text-indigo-500" /> Offline Downloads</span>
-                    <span className="font-bold text-slate-900 dark:text-white">{p.offlineLimit}</span>
+                    <span className="flex items-center gap-1.5">
+                      <Download className="h-4 w-4 text-indigo-500" /> Offline Downloads
+                    </span>
+                    <span className="font-bold text-slate-900 dark:text-white">
+                      {p.offlineLimit}
+                    </span>
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5"><Users className="h-4 w-4 text-emerald-500" /> Family Members</span>
-                    <span className="font-bold text-slate-900 dark:text-white">{p.familyMembers}</span>
+                    <span className="flex items-center gap-1.5">
+                      <Users className="h-4 w-4 text-emerald-500" /> Family Members
+                    </span>
+                    <span className="font-bold text-slate-900 dark:text-white">
+                      {p.familyMembers}
+                    </span>
                   </div>
                 </div>
-
               </div>
 
               {/* Action Buttons */}
-              <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+              <div className="mt-6 flex items-center justify-between gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => {
                     setIsCreatingNew(false)
                     setEditingPlan({ ...p })
                   }}
-                  className="flex-1 rounded-xl bg-purple-600 py-2 text-xs font-black text-white hover:bg-purple-700 shadow-xs"
+                  className="flex-1 rounded-xl bg-purple-600 py-2 text-xs font-black text-white shadow-xs hover:bg-purple-700"
                 >
-                  <Edit className="h-3.5 w-3.5 inline mr-1" />
+                  <Edit className="mr-1 inline h-3.5 w-3.5" />
                   Edit Configuration
                 </button>
 
@@ -412,8 +568,8 @@ export const AdminSubscriptionsPage: React.FC = () => {
       </div>
 
       {/* 4. VISUAL PLAN COMPARISON MATRIX TABLE */}
-      <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-4 p-6">
-        <h3 className="font-sans text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+      <div className="space-y-4 overflow-hidden rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+        <h3 className="flex items-center gap-2 font-sans text-lg font-black text-slate-900 dark:text-white">
           <Layers className="h-5 w-5 text-purple-600" />
           Plan Features Comparison Matrix
         </h3>
@@ -424,23 +580,33 @@ export const AdminSubscriptionsPage: React.FC = () => {
               <tr>
                 <th className="px-6 py-4">Feature Name</th>
                 {plans.map((p) => (
-                  <th key={p.id} className="px-6 py-4 text-center font-black text-purple-600 dark:text-purple-400">
+                  <th
+                    key={p.id}
+                    className="px-6 py-4 text-center font-black text-purple-600 dark:text-purple-400"
+                  >
                     {p.name}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/40 font-semibold">
+            <tbody className="divide-y divide-slate-100 font-semibold dark:divide-slate-800/40">
               <tr>
-                <td className="px-6 py-3.5 font-bold text-slate-900 dark:text-white">Monthly Price (PKR)</td>
+                <td className="px-6 py-3.5 font-bold text-slate-900 dark:text-white">
+                  Monthly Price (PKR)
+                </td>
                 {plans.map((p) => (
-                  <td key={p.id} className="px-6 py-3.5 text-center font-black text-slate-900 dark:text-white">
+                  <td
+                    key={p.id}
+                    className="px-6 py-3.5 text-center font-black text-slate-900 dark:text-white"
+                  >
                     {p.priceMonthly === 0 ? 'Free' : `PKR ${p.priceMonthly}`}
                   </td>
                 ))}
               </tr>
               <tr>
-                <td className="px-6 py-3.5 font-bold text-slate-900 dark:text-white">Cloud Storage Quota</td>
+                <td className="px-6 py-3.5 font-bold text-slate-900 dark:text-white">
+                  Cloud Storage Quota
+                </td>
                 {plans.map((p) => (
                   <td key={p.id} className="px-6 py-3.5 text-center">
                     {p.storageGB >= 1000 ? `${p.storageGB / 1000} TB` : `${p.storageGB} GB`}
@@ -448,7 +614,9 @@ export const AdminSubscriptionsPage: React.FC = () => {
                 ))}
               </tr>
               <tr>
-                <td className="px-6 py-3.5 font-bold text-slate-900 dark:text-white">AI Daily Limit</td>
+                <td className="px-6 py-3.5 font-bold text-slate-900 dark:text-white">
+                  AI Daily Limit
+                </td>
                 {plans.map((p) => (
                   <td key={p.id} className="px-6 py-3.5 text-center">
                     {p.aiDailyLimit}
@@ -456,7 +624,9 @@ export const AdminSubscriptionsPage: React.FC = () => {
                 ))}
               </tr>
               <tr>
-                <td className="px-6 py-3.5 font-bold text-slate-900 dark:text-white">Offline Download Limit</td>
+                <td className="px-6 py-3.5 font-bold text-slate-900 dark:text-white">
+                  Offline Download Limit
+                </td>
                 {plans.map((p) => (
                   <td key={p.id} className="px-6 py-3.5 text-center">
                     {p.offlineLimit}
@@ -464,33 +634,56 @@ export const AdminSubscriptionsPage: React.FC = () => {
                 ))}
               </tr>
               <tr>
-                <td className="px-6 py-3.5 font-bold text-slate-900 dark:text-white">AI Book Summarizer</td>
+                <td className="px-6 py-3.5 font-bold text-slate-900 dark:text-white">
+                  AI Book Summarizer
+                </td>
                 {plans.map((p) => (
                   <td key={p.id} className="px-6 py-3.5 text-center">
-                    {p.features.aiSummarizer ? <Check className="h-4 w-4 text-emerald-500 mx-auto" /> : <X className="h-4 w-4 text-slate-300 mx-auto" />}
+                    {p.features.aiSummarizer ? (
+                      <Check className="mx-auto h-4 w-4 text-emerald-500" />
+                    ) : (
+                      <X className="mx-auto h-4 w-4 text-slate-300" />
+                    )}
                   </td>
                 ))}
               </tr>
               <tr>
-                <td className="px-6 py-3.5 font-bold text-slate-900 dark:text-white">Priority Cloud Sync</td>
+                <td className="px-6 py-3.5 font-bold text-slate-900 dark:text-white">
+                  Priority Cloud Sync
+                </td>
                 {plans.map((p) => (
                   <td key={p.id} className="px-6 py-3.5 text-center">
-                    {p.features.prioritySync ? <Check className="h-4 w-4 text-emerald-500 mx-auto" /> : <X className="h-4 w-4 text-slate-300 mx-auto" />}
+                    {p.features.prioritySync ? (
+                      <Check className="mx-auto h-4 w-4 text-emerald-500" />
+                    ) : (
+                      <X className="mx-auto h-4 w-4 text-slate-300" />
+                    )}
                   </td>
                 ))}
               </tr>
               <tr>
-                <td className="px-6 py-3.5 font-bold text-slate-900 dark:text-white">Family Sharing</td>
+                <td className="px-6 py-3.5 font-bold text-slate-900 dark:text-white">
+                  Family Sharing
+                </td>
                 {plans.map((p) => (
                   <td key={p.id} className="px-6 py-3.5 text-center">
-                    {p.features.familySharing ? <Check className="h-4 w-4 text-emerald-500 mx-auto" /> : <X className="h-4 w-4 text-slate-300 mx-auto" />}
+                    {p.features.familySharing ? (
+                      <Check className="mx-auto h-4 w-4 text-emerald-500" />
+                    ) : (
+                      <X className="mx-auto h-4 w-4 text-slate-300" />
+                    )}
                   </td>
                 ))}
               </tr>
               <tr>
-                <td className="px-6 py-3.5 font-bold text-slate-900 dark:text-white">Support Level</td>
+                <td className="px-6 py-3.5 font-bold text-slate-900 dark:text-white">
+                  Support Level
+                </td>
                 {plans.map((p) => (
-                  <td key={p.id} className="px-6 py-3.5 text-center text-purple-600 dark:text-purple-400">
+                  <td
+                    key={p.id}
+                    className="px-6 py-3.5 text-center text-purple-600 dark:text-purple-400"
+                  >
                     {p.supportLevel}
                   </td>
                 ))}
@@ -521,7 +714,7 @@ export const AdminSubscriptionsPage: React.FC = () => {
                 animate={{ x: 0 }}
                 exit={{ x: '100%' }}
                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                className="w-screen max-w-md bg-white p-6 shadow-2xl dark:bg-slate-900 flex flex-col justify-between text-left"
+                className="flex w-screen max-w-md flex-col justify-between bg-white p-6 text-left shadow-2xl dark:bg-slate-900"
               >
                 <form onSubmit={handleSaveDrawerPlan} className="space-y-6 overflow-y-auto pr-1">
                   {/* Drawer Header */}
@@ -530,7 +723,9 @@ export const AdminSubscriptionsPage: React.FC = () => {
                       <h3 className="font-sans text-lg font-black text-slate-900 dark:text-white">
                         {isCreatingNew ? 'Create New Plan' : `Configure ${editingPlan.name} Plan`}
                       </h3>
-                      <p className="text-xs font-medium text-slate-500">Configure pricing, storage limits, and feature flags.</p>
+                      <p className="text-xs font-medium text-slate-500">
+                        Configure pricing, storage limits, and feature flags.
+                      </p>
                     </div>
 
                     <button
@@ -548,7 +743,7 @@ export const AdminSubscriptionsPage: React.FC = () => {
                   {/* Plan Inputs */}
                   <div className="space-y-4 text-xs font-bold text-slate-700 dark:text-slate-300">
                     <div>
-                      <label className="block mb-1">Plan Name</label>
+                      <label className="mb-1 block">Plan Name</label>
                       <input
                         type="text"
                         value={editingPlan.name}
@@ -560,21 +755,25 @@ export const AdminSubscriptionsPage: React.FC = () => {
 
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block mb-1">Monthly Price (PKR)</label>
+                        <label className="mb-1 block">Monthly Price (PKR)</label>
                         <input
                           type="number"
                           value={editingPlan.priceMonthly}
-                          onChange={(e) => setEditingPlan({ ...editingPlan, priceMonthly: Number(e.target.value) })}
+                          onChange={(e) =>
+                            setEditingPlan({ ...editingPlan, priceMonthly: Number(e.target.value) })
+                          }
                           className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 focus:border-purple-600 focus:outline-none dark:border-slate-800 dark:bg-slate-800 dark:text-white"
                         />
                       </div>
 
                       <div>
-                        <label className="block mb-1">Annual Price (PKR)</label>
+                        <label className="mb-1 block">Annual Price (PKR)</label>
                         <input
                           type="number"
                           value={editingPlan.priceYearly}
-                          onChange={(e) => setEditingPlan({ ...editingPlan, priceYearly: Number(e.target.value) })}
+                          onChange={(e) =>
+                            setEditingPlan({ ...editingPlan, priceYearly: Number(e.target.value) })
+                          }
                           className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 focus:border-purple-600 focus:outline-none dark:border-slate-800 dark:bg-slate-800 dark:text-white"
                         />
                       </div>
@@ -582,20 +781,27 @@ export const AdminSubscriptionsPage: React.FC = () => {
 
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block mb-1">Storage Quota (GB)</label>
+                        <label className="mb-1 block">Storage Quota (GB)</label>
                         <input
                           type="number"
                           value={editingPlan.storageGB}
-                          onChange={(e) => setEditingPlan({ ...editingPlan, storageGB: Number(e.target.value) })}
+                          onChange={(e) =>
+                            setEditingPlan({ ...editingPlan, storageGB: Number(e.target.value) })
+                          }
                           className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 focus:border-purple-600 focus:outline-none dark:border-slate-800 dark:bg-slate-800 dark:text-white"
                         />
                       </div>
 
                       <div>
-                        <label className="block mb-1">Plan Status</label>
+                        <label className="mb-1 block">Plan Status</label>
                         <select
                           value={editingPlan.status}
-                          onChange={(e) => setEditingPlan({ ...editingPlan, status: e.target.value as any })}
+                          onChange={(e) =>
+                            setEditingPlan({
+                              ...editingPlan,
+                              status: e.target.value as DynamicSaaSPlan['status'],
+                            })
+                          }
                           className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 focus:border-purple-600 focus:outline-none dark:border-slate-800 dark:bg-slate-800 dark:text-white"
                         >
                           <option value="Active">🟢 Active</option>
@@ -607,7 +813,7 @@ export const AdminSubscriptionsPage: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block mb-1">Plan Badge Label</label>
+                      <label className="mb-1 block">Plan Badge Label</label>
                       <input
                         type="text"
                         value={editingPlan.badge}
@@ -617,7 +823,7 @@ export const AdminSubscriptionsPage: React.FC = () => {
                     </div>
 
                     {/* Feature Toggles */}
-                    <div className="space-y-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                    <div className="space-y-3 border-t border-slate-100 pt-3 dark:border-slate-800">
                       <span className="block text-[11px] font-black tracking-widest text-slate-400 uppercase">
                         Feature Management Toggles
                       </span>
@@ -635,14 +841,16 @@ export const AdminSubscriptionsPage: React.FC = () => {
                           <span>{item.label}</span>
                           <input
                             type="checkbox"
-                            checked={(editingPlan.features as any)[item.key]}
+                            checked={
+                              (editingPlan.features as unknown as Record<string, boolean>)[item.key]
+                            }
                             onChange={(e) =>
                               setEditingPlan({
                                 ...editingPlan,
                                 features: {
                                   ...editingPlan.features,
                                   [item.key]: e.target.checked,
-                                },
+                                } as unknown as SaaSPlanFeature,
                               })
                             }
                             className="h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
@@ -652,7 +860,7 @@ export const AdminSubscriptionsPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex gap-3">
+                  <div className="flex gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
                     <button
                       type="button"
                       onClick={() => {
@@ -666,7 +874,7 @@ export const AdminSubscriptionsPage: React.FC = () => {
 
                     <button
                       type="submit"
-                      className="flex-1 rounded-2xl bg-purple-600 py-3 text-xs font-black text-white hover:bg-purple-700 shadow-md shadow-purple-600/20"
+                      className="flex-1 rounded-2xl bg-purple-600 py-3 text-xs font-black text-white shadow-md shadow-purple-600/20 hover:bg-purple-700"
                     >
                       Save Configuration
                     </button>

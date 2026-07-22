@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import { Button } from '../../components/common/Button'
 import { useSubscription } from '../../context/SubscriptionContext'
+import { useToast } from '../../context/ToastContext'
 
 export type SortType = 'recently-opened' | 'newest' | 'a-z' | 'z-a' | 'progress' | 'size'
 export type FormatFilter = 'all' | 'pdf' | 'epub'
@@ -33,11 +34,13 @@ export type StatusTab = 'all' | 'reading' | 'completed' | 'favorites'
 
 export const LibraryPage: React.FC = () => {
   const { refreshSubscription } = useSubscription()
+  const { showError, showInfo } = useToast()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const tabParam = searchParams.get('tab')
 
   const [books, setBooks] = useState<Book[]>([])
+  const [deletingBookId, setDeletingBookId] = useState<string | null>(null)
   const [collections, setCollections] = useState<Collection[]>([])
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
@@ -158,8 +161,11 @@ export const LibraryPage: React.FC = () => {
     const bookToDelete = books.find((b) => b.id === id)
     const title = bookToDelete ? bookToDelete.title : 'Book'
     if (!confirm('Are you sure you want to delete this book? This action cannot be undone.')) return
+
+    setDeletingBookId(id)
     try {
       await booksService.deleteBook(id)
+      showInfo(`Removed "${title}" from your library. 🗑️`)
       fetchBooksAndCollections()
       await refreshSubscription().catch(console.error)
       setActiveMenuBookId(null)
@@ -169,9 +175,13 @@ export const LibraryPage: React.FC = () => {
           'Book Removed 🗑️',
           `"${title}" has been deleted from your library.`
         )
-        .catch((e) => console.error(e))
+        .catch((err) => console.error(err))
     } catch (err) {
       console.error(err)
+      const msg = err instanceof Error ? err.message : 'Failed to delete book'
+      showError(msg)
+    } finally {
+      setDeletingBookId(null)
     }
   }
 
@@ -345,7 +355,7 @@ export const LibraryPage: React.FC = () => {
             placeholder="Search books by title, author, collection, or tag... (Ctrl + K)"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-2xl border border-slate-200/90 bg-white py-3 pr-12 pl-10 text-xs font-semibold text-slate-900 placeholder:text-slate-400 shadow-xs transition-all focus:border-purple-600 focus:outline-none focus:ring-2 focus:ring-purple-600/10 dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:focus:border-purple-500 dark:focus:ring-purple-500/10"
+            className="w-full rounded-2xl border border-slate-200/90 bg-white py-3 pr-12 pl-10 text-xs font-semibold text-slate-900 shadow-xs transition-all placeholder:text-slate-400 focus:border-purple-600 focus:ring-2 focus:ring-purple-600/10 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:focus:border-purple-500 dark:focus:ring-purple-500/10"
           />
           {searchQuery ? (
             <button
@@ -643,9 +653,7 @@ export const LibraryPage: React.FC = () => {
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  setActiveMenuBookId(
-                                    activeMenuBookId === book.id ? null : book.id
-                                  )
+                                  setActiveMenuBookId(activeMenuBookId === book.id ? null : book.id)
                                 }}
                                 className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200/60 bg-white/95 text-slate-600 backdrop-blur-xs transition-colors hover:text-purple-600 dark:border-slate-800/60 dark:bg-slate-900/95 dark:text-slate-300 dark:hover:text-white"
                               >
@@ -724,11 +732,14 @@ export const LibraryPage: React.FC = () => {
 
                                   <button
                                     type="button"
+                                    disabled={deletingBookId === book.id}
                                     onClick={(e) => handleDeleteBook(book.id, e)}
-                                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-rose-600 transition-colors hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/30"
+                                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-rose-600 transition-colors hover:bg-rose-50 disabled:opacity-50 dark:text-rose-400 dark:hover:bg-rose-950/30"
                                   >
                                     <Trash2 className="h-3.5 w-3.5 text-rose-500" />
-                                    <span>Delete</span>
+                                    <span>
+                                      {deletingBookId === book.id ? 'Deleting...' : 'Delete'}
+                                    </span>
                                   </button>
                                 </div>
                               )}
@@ -752,7 +763,7 @@ export const LibraryPage: React.FC = () => {
                             {getCollectionName(book.collectionId)}
                           </span>
 
-                          <h4 className="line-clamp-2 text-xs font-bold leading-snug text-slate-900 transition-colors group-hover/card:text-purple-600 dark:text-white dark:group-hover/card:text-purple-400">
+                          <h4 className="line-clamp-2 text-xs leading-snug font-bold text-slate-900 transition-colors group-hover/card:text-purple-600 dark:text-white dark:group-hover/card:text-purple-400">
                             {book.title}
                           </h4>
 
@@ -781,13 +792,10 @@ export const LibraryPage: React.FC = () => {
                           <Calendar className="h-3 w-3 shrink-0" />
                           <span className="truncate">
                             {book.lastReadAt
-                              ? `Opened ${new Date(book.lastReadAt).toLocaleDateString(
-                                  undefined,
-                                  {
-                                    month: 'short',
-                                    day: 'numeric',
-                                  }
-                                )}`
+                              ? `Opened ${new Date(book.lastReadAt).toLocaleDateString(undefined, {
+                                  month: 'short',
+                                  day: 'numeric',
+                                })}`
                               : 'Not opened yet'}
                           </span>
                         </div>
@@ -802,7 +810,7 @@ export const LibraryPage: React.FC = () => {
                  ================================================== */
               <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
                 <table className="w-full border-collapse text-left text-xs text-slate-500 dark:text-slate-400">
-                  <thead className="border-b border-slate-100 bg-slate-50/60 text-[10px] font-extrabold tracking-wider uppercase text-slate-400 dark:border-slate-800 dark:bg-slate-800/40">
+                  <thead className="border-b border-slate-100 bg-slate-50/60 text-[10px] font-extrabold tracking-wider text-slate-400 uppercase dark:border-slate-800 dark:bg-slate-800/40">
                     <tr>
                       <th className="px-6 py-4">Book Details</th>
                       <th className="px-6 py-4">Format & Size</th>
@@ -959,11 +967,14 @@ export const LibraryPage: React.FC = () => {
                                     <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
                                     <button
                                       type="button"
+                                      disabled={deletingBookId === book.id}
                                       onClick={(e) => handleDeleteBook(book.id, e)}
-                                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/30"
+                                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-rose-600 hover:bg-rose-50 disabled:opacity-50 dark:text-rose-400 dark:hover:bg-rose-950/30"
                                     >
                                       <Trash2 className="h-3.5 w-3.5 text-rose-500" />
-                                      <span>Delete</span>
+                                      <span>
+                                        {deletingBookId === book.id ? 'Deleting...' : 'Delete'}
+                                      </span>
                                     </button>
                                   </div>
                                 )}

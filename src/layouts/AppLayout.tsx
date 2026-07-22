@@ -34,7 +34,6 @@ export const AppLayout: React.FC = () => {
     if (pathname.startsWith('/favorites')) return 'Favorites'
     if (pathname.startsWith('/collections')) return 'Collections'
     if (pathname.startsWith('/notes')) return 'Notes'
-    if (pathname.startsWith('/flashcards')) return 'Study Flashcards'
     if (pathname.startsWith('/analytics')) return 'Analytics'
     if (pathname.startsWith('/storage')) return 'Storage'
     if (pathname.startsWith('/profile')) return 'Profile'

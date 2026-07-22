@@ -56,9 +56,51 @@ interface ReaderPreferences {
 interface NotificationPreferences {
   readingReminder: boolean
   uploadComplete: boolean
-  aiNotifications: boolean
   productUpdates: boolean
 }
+
+// Reusable Save Button Component with Loading & 2s "✓ Settings Saved" feedback
+const RenderSaveButton = ({
+  isSaving,
+  isSaved,
+  onClick,
+  disabled = false,
+}: {
+  isSaving: boolean
+  isSaved: boolean
+  onClick?: () => void
+  disabled?: boolean
+}) => (
+  <Button
+    type={onClick ? 'button' : 'submit'}
+    size="md"
+    onClick={onClick}
+    disabled={disabled || isSaving}
+    aria-label={isSaved ? 'Settings Saved' : isSaving ? 'Saving Changes' : 'Save Changes'}
+    className={`flex items-center gap-2 rounded-2xl font-bold shadow-xs transition-all duration-200 focus:ring-2 focus:ring-purple-600/30 focus:outline-none ${
+      isSaved
+        ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+        : 'bg-purple-600 text-white hover:bg-purple-700'
+    }`}
+  >
+    {isSaving ? (
+      <>
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+        <span>Saving Changes...</span>
+      </>
+    ) : isSaved ? (
+      <>
+        <Check className="h-4 w-4 stroke-[3]" />
+        <span>Settings Saved</span>
+      </>
+    ) : (
+      <>
+        <Save className="h-4 w-4" />
+        <span>Save Changes</span>
+      </>
+    )}
+  </Button>
+)
 
 export const SettingsPage: React.FC = () => {
   const { user, logout, updateProfile } = useAuth()
@@ -151,7 +193,6 @@ export const SettingsPage: React.FC = () => {
     {
       readingReminder: true,
       uploadComplete: true,
-      aiNotifications: true,
       productUpdates: false,
     }
   )
@@ -431,49 +472,6 @@ export const SettingsPage: React.FC = () => {
     },
   ]
 
-  // Reusable Save Button Component with Loading & 2s "✓ Settings Saved" feedback
-  const RenderSaveButton = ({
-    isSaving,
-    isSaved,
-    onClick,
-    disabled = false,
-  }: {
-    isSaving: boolean
-    isSaved: boolean
-    onClick?: () => void
-    disabled?: boolean
-  }) => (
-    <Button
-      type={onClick ? 'button' : 'submit'}
-      size="md"
-      onClick={onClick}
-      disabled={disabled || isSaving}
-      aria-label={isSaved ? 'Settings Saved' : isSaving ? 'Saving Changes' : 'Save Changes'}
-      className={`flex items-center gap-2 rounded-2xl font-bold shadow-xs transition-all duration-200 focus:ring-2 focus:ring-purple-600/30 focus:outline-none ${
-        isSaved
-          ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-          : 'bg-purple-600 text-white hover:bg-purple-700'
-      }`}
-    >
-      {isSaving ? (
-        <>
-          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-          <span>Saving Changes...</span>
-        </>
-      ) : isSaved ? (
-        <>
-          <Check className="h-4 w-4 stroke-[3]" />
-          <span>Settings Saved</span>
-        </>
-      ) : (
-        <>
-          <Save className="h-4 w-4" />
-          <span>Save Changes</span>
-        </>
-      )}
-    </Button>
-  )
-
   return (
     <PageWrapper className="relative min-h-screen space-y-6 pb-24 text-left select-none">
       {/* Hidden File Input for Avatar Selection */}
@@ -617,14 +615,21 @@ export const SettingsPage: React.FC = () => {
                               {displayName}
                             </h3>
                             <span className="inline-flex items-center gap-1.5 rounded-full border border-purple-200/70 bg-gradient-to-r from-purple-50 via-indigo-50 to-purple-50 px-2.5 py-1 text-[10px] font-extrabold tracking-wide text-purple-700 shadow-2xs dark:border-purple-800/60 dark:from-purple-950/60 dark:via-indigo-950/60 dark:to-purple-950/60 dark:text-purple-300">
-                              <Crown className="h-3.5 w-3.5 fill-amber-400 text-amber-500" /> Pro Member
+                              <Crown className="h-3.5 w-3.5 fill-amber-400 text-amber-500" /> Pro
+                              Member
                             </span>
                           </div>
                           <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                             {user?.email || 'kaab@librovia.com'}
                           </p>
                           <p className="font-mono text-[10.5px] font-bold text-slate-400 dark:text-slate-400">
-                            Member ID <span className="text-purple-600 dark:text-purple-400">#{user?.id ? user.id.replace(/-/g, '').toUpperCase().substring(0, 6) : '90D279'}</span>
+                            Member ID{' '}
+                            <span className="text-purple-600 dark:text-purple-400">
+                              #
+                              {user?.id
+                                ? user.id.replace(/-/g, '').toUpperCase().substring(0, 6)
+                                : '90D279'}
+                            </span>
                           </p>
                         </div>
                       </div>
@@ -737,7 +742,8 @@ export const SettingsPage: React.FC = () => {
                       Security & Authentication
                     </h2>
                     <p className="text-xs font-normal text-slate-500 dark:text-slate-400">
-                      Update login passcodes, change registered email address, and view security settings.
+                      Update login passcodes, change registered email address, and view security
+                      settings.
                     </p>
                   </div>
 
@@ -969,11 +975,6 @@ export const SettingsPage: React.FC = () => {
                         key: 'uploadComplete' as const,
                         label: 'Upload Complete Alerts',
                         desc: 'Receive alerts when your PDF book parsing & cover generation finish',
-                      },
-                      {
-                        key: 'aiNotifications' as const,
-                        label: 'AI Reading Assistant Updates',
-                        desc: 'Get notified when AI summaries and flashcards are generated',
                       },
                       {
                         key: 'productUpdates' as const,

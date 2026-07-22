@@ -4,6 +4,7 @@ import { PageWrapper } from '../../components/common/PageWrapper'
 import { useToast } from '../../context/ToastContext'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../services/supabase'
+import { auditService } from '../../services/audit'
 import {
   HardDrive,
   Search,
@@ -43,8 +44,12 @@ export const AdminStoragePage: React.FC = () => {
 
   // Search, Filters & Sorting
   const [searchQuery, setSearchQuery] = useState('')
-  const [filterType, setFilterType] = useState<'All' | 'Free' | 'Pro' | 'Family' | 'Near Limit' | 'Suspended'>('All')
-  const [sortBy, setSortBy] = useState<'Storage Used' | 'Plan' | 'Name' | 'Newest' | 'Oldest'>('Storage Used')
+  const [filterType, setFilterType] = useState<
+    'All' | 'Free' | 'Pro' | 'Family' | 'Near Limit' | 'Suspended'
+  >('All')
+  const [sortBy, setSortBy] = useState<'Storage Used' | 'Plan' | 'Name' | 'Newest' | 'Oldest'>(
+    'Storage Used'
+  )
 
   // Pagination (20 Users / Page)
   const [currentPage, setCurrentPage] = useState(1)
@@ -66,12 +71,14 @@ export const AdminStoragePage: React.FC = () => {
         .select('*, plan:subscription_plans(*)')
       if (subsErr) console.error('Error fetching subs for storage page:', subsErr)
 
-      const { data: booksData, error: booksErr } = await supabase.from('books').select('user_id, file_size')
+      const { data: booksData, error: booksErr } = await supabase
+        .from('books')
+        .select('user_id, file_size')
       if (booksErr) console.error('Error calculating storage size:', booksErr)
 
       const storageMap: Record<string, number> = {}
       if (booksData) {
-        booksData.forEach((b: any) => {
+        booksData.forEach((b: { user_id?: string; file_size?: number }) => {
           if (b.user_id) {
             storageMap[b.user_id] = (storageMap[b.user_id] || 0) + (b.file_size || 0)
           }
@@ -80,12 +87,15 @@ export const AdminStoragePage: React.FC = () => {
 
       if (roles) {
         const mapped: DBUserStorageRecord[] = roles.map((row) => {
-          const sub = subs?.find((s: any) => s.user_id === row.user_id)
+          const sub = subs?.find((s: { user_id?: string }) => s.user_id === row.user_id)
           const storageUsed = storageMap[row.user_id] || 0
-          
+
           let storageLimit = 5368709120 // 5 GB default fallback
           if (sub) {
-            if (sub.custom_storage_limit_bytes !== null && sub.custom_storage_limit_bytes !== undefined) {
+            if (
+              sub.custom_storage_limit_bytes !== null &&
+              sub.custom_storage_limit_bytes !== undefined
+            ) {
               storageLimit = Number(sub.custom_storage_limit_bytes)
             } else if (sub.plan) {
               storageLimit = sub.plan.storage_limit_bytes
@@ -96,14 +106,14 @@ export const AdminStoragePage: React.FC = () => {
             user_id: row.user_id,
             email: row.email || 'N/A',
             name: row.email ? row.email.split('@')[0] : 'Registered User',
-            role: (row.role as any) || 'user',
+            role: (row.role as 'user' | 'super_admin' | 'moderator') || 'user',
             plan: sub?.plan?.plan_name || 'FREE',
             storageUsedBytes: storageUsed,
             storageLimitBytes: storageLimit,
             status: sub?.status === 'suspended' ? 'Suspended' : 'Active',
             created_at: row.created_at || new Date().toISOString(),
             plan_id: sub?.plan_id || 'free',
-            billing_cycle: sub?.billing_cycle || 'monthly'
+            billing_cycle: sub?.billing_cycle || 'monthly',
           }
         })
 
@@ -120,7 +130,7 @@ export const AdminStoragePage: React.FC = () => {
             status: 'Active',
             created_at: new Date().toISOString(),
             plan_id: currentUser.role === 'super_admin' ? 'family' : 'free',
-            billing_cycle: 'monthly'
+            billing_cycle: 'monthly',
           })
         }
 
@@ -135,6 +145,7 @@ export const AdminStoragePage: React.FC = () => {
   }, [currentUser])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchLiveStorageUsers()
   }, [fetchLiveStorageUsers])
 
@@ -163,15 +174,20 @@ export const AdminStoragePage: React.FC = () => {
         if (sortBy === 'Storage Used') return b.storageUsedBytes - a.storageUsedBytes
         if (sortBy === 'Name') return a.name.localeCompare(b.name)
         if (sortBy === 'Plan') return a.plan.localeCompare(b.plan)
-        if (sortBy === 'Newest') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        if (sortBy === 'Oldest') return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        if (sortBy === 'Newest')
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        if (sortBy === 'Oldest')
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         return 0
       })
   }, [users, searchQuery, filterType, sortBy])
 
   // Pagination Slice
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage) || 1
-  const paginatedUsers = filteredUsers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+  const paginatedUsers = filteredUsers.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  )
 
   // Storage Formatters & Color Helpers
   const formatBytes = (bytes: number) => {
@@ -182,9 +198,23 @@ export const AdminStoragePage: React.FC = () => {
   }
 
   const getStorageColor = (pct: number) => {
-    if (pct < 60) return { bar: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400', badge: 'bg-emerald-50 text-emerald-700' }
-    if (pct < 90) return { bar: 'bg-amber-500', text: 'text-amber-600 dark:text-amber-400', badge: 'bg-amber-50 text-amber-700' }
-    return { bar: 'bg-rose-500', text: 'text-rose-600 dark:text-rose-400', badge: 'bg-rose-50 text-rose-700 font-black' }
+    if (pct < 60)
+      return {
+        bar: 'bg-emerald-500',
+        text: 'text-emerald-600 dark:text-emerald-400',
+        badge: 'bg-emerald-50 text-emerald-700',
+      }
+    if (pct < 90)
+      return {
+        bar: 'bg-amber-500',
+        text: 'text-amber-600 dark:text-amber-400',
+        badge: 'bg-amber-50 text-amber-700',
+      }
+    return {
+      bar: 'bg-rose-500',
+      text: 'text-rose-600 dark:text-rose-400',
+      badge: 'bg-rose-50 text-rose-700 font-black',
+    }
   }
 
   // Drawer edit states
@@ -192,6 +222,7 @@ export const AdminStoragePage: React.FC = () => {
 
   useEffect(() => {
     if (drawerUser) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEditPlanId(drawerUser.plan_id || 'free')
     }
   }, [drawerUser])
@@ -201,51 +232,90 @@ export const AdminStoragePage: React.FC = () => {
     if (!drawerUser) return
     try {
       const newLimit = drawerUser.storageLimitBytes + 10000000000 // +10GB
-      
-      const { error } = await supabase
-        .from('user_subscriptions')
-        .upsert({
+
+      const { error } = await supabase.from('user_subscriptions').upsert(
+        {
           user_id: drawerUser.user_id,
           plan_id: drawerUser.plan_id || 'free',
           custom_storage_limit_bytes: newLimit,
           custom_limit_bytes: newLimit,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'user_id' })
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id' }
+      )
 
       if (error) throw error
 
+      await auditService.insertLog({
+        event: 'Storage Limit Change',
+        category: 'Storage & Files',
+        severity: 'Info',
+        metadata: {
+          action: 'increase',
+          targetUserId: drawerUser.user_id,
+          targetUserEmail: drawerUser.email,
+          newLimitBytes: newLimit,
+        },
+      })
+
       setDrawerUser({ ...drawerUser, storageLimitBytes: newLimit })
-      setUsers((prev) => prev.map((u) => (u.user_id === drawerUser.user_id ? { ...u, storageLimitBytes: newLimit } : u)))
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.user_id === drawerUser.user_id ? { ...u, storageLimitBytes: newLimit } : u
+        )
+      )
       showSuccess(`Increased storage quota for ${drawerUser.email} by +10 GB.`)
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err)
-      showError(err.message || 'Failed to update storage limit.')
+      const errMsg = err instanceof Error ? err.message : 'Failed to update storage limit.'
+      showError(errMsg)
     }
   }
 
   const handleReduceQuota = async () => {
     if (!drawerUser) return
     try {
-      const newLimit = Math.max(drawerUser.storageUsedBytes, drawerUser.storageLimitBytes - 5000000000) // -5GB
-      
-      const { error } = await supabase
-        .from('user_subscriptions')
-        .upsert({
+      const newLimit = Math.max(
+        drawerUser.storageUsedBytes,
+        drawerUser.storageLimitBytes - 5000000000
+      ) // -5GB
+
+      const { error } = await supabase.from('user_subscriptions').upsert(
+        {
           user_id: drawerUser.user_id,
           plan_id: drawerUser.plan_id || 'free',
           custom_storage_limit_bytes: newLimit,
           custom_limit_bytes: newLimit,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'user_id' })
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id' }
+      )
 
       if (error) throw error
 
+      await auditService.insertLog({
+        event: 'Storage Limit Change',
+        category: 'Storage & Files',
+        severity: 'Warning',
+        metadata: {
+          action: 'reduce',
+          targetUserId: drawerUser.user_id,
+          targetUserEmail: drawerUser.email,
+          newLimitBytes: newLimit,
+        },
+      })
+
       setDrawerUser({ ...drawerUser, storageLimitBytes: newLimit })
-      setUsers((prev) => prev.map((u) => (u.user_id === drawerUser.user_id ? { ...u, storageLimitBytes: newLimit } : u)))
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.user_id === drawerUser.user_id ? { ...u, storageLimitBytes: newLimit } : u
+        )
+      )
       showSuccess(`Reduced storage quota for ${drawerUser.email} by -5 GB.`)
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err)
-      showError(err.message || 'Failed to reduce storage limit.')
+      const errMsg = err instanceof Error ? err.message : 'Failed to reduce storage limit.'
+      showError(errMsg)
     }
   }
 
@@ -253,25 +323,40 @@ export const AdminStoragePage: React.FC = () => {
     if (!drawerUser) return
     try {
       const newStatus = drawerUser.status === 'Active' ? 'suspended' : 'active'
-      
-      const { error } = await supabase
-        .from('user_subscriptions')
-        .upsert({
+
+      const { error } = await supabase.from('user_subscriptions').upsert(
+        {
           user_id: drawerUser.user_id,
           plan_id: drawerUser.plan_id || 'free',
           status: newStatus,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'user_id' })
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id' }
+      )
 
       if (error) throw error
 
+      await auditService.insertLog({
+        event: 'User Suspend/Activate',
+        category: 'RBAC & Roles',
+        severity: newStatus === 'suspended' ? 'Warning' : 'Info',
+        metadata: {
+          action: newStatus === 'suspended' ? 'suspend_uploads' : 'reactivate_uploads',
+          targetUserId: drawerUser.user_id,
+          targetUserEmail: drawerUser.email,
+        },
+      })
+
       const updatedStatus = newStatus === 'suspended' ? 'Suspended' : 'Active'
       setDrawerUser({ ...drawerUser, status: updatedStatus })
-      setUsers((prev) => prev.map((u) => (u.user_id === drawerUser.user_id ? { ...u, status: updatedStatus } : u)))
+      setUsers((prev) =>
+        prev.map((u) => (u.user_id === drawerUser.user_id ? { ...u, status: updatedStatus } : u))
+      )
       showSuccess(`Updated upload status for ${drawerUser.email} to ${updatedStatus}.`)
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err)
-      showError(err.message || 'Failed to suspend uploads.')
+      const errMsg = err instanceof Error ? err.message : 'Failed to suspend uploads.'
+      showError(errMsg)
     }
   }
 
@@ -287,7 +372,7 @@ export const AdminStoragePage: React.FC = () => {
         billing_cycle: drawerUser.billing_cycle || 'monthly',
         status: drawerUser.status === 'Suspended' ? 'suspended' : 'active',
         current_period_end: periodEnd.toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       }
 
       console.log('Sending UPDATE payload to Supabase for user_subscriptions:', payload)
@@ -312,37 +397,53 @@ export const AdminStoragePage: React.FC = () => {
         return
       }
 
-      showSuccess(`Subscription plan successfully changed to ${newPlanId.toUpperCase()} for ${drawerUser.email}`)
+      await auditService.insertLog({
+        event: 'Subscription Plan Change',
+        category: 'Billing & Payments',
+        severity: 'Info',
+        metadata: {
+          action: 'user_plan_change',
+          targetUserId: drawerUser.user_id,
+          targetUserEmail: drawerUser.email,
+          newPlanId,
+        },
+      })
+
+      showSuccess(
+        `Subscription plan successfully changed to ${newPlanId.toUpperCase()} for ${drawerUser.email}`
+      )
       fetchLiveStorageUsers()
       setDrawerUser({
         ...drawerUser,
         plan_id: newPlanId,
-        plan: data.plan?.plan_name || newPlanId.toUpperCase()
+        plan: data.plan?.plan_name || newPlanId.toUpperCase(),
       })
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Exception in handlePlanChange:', err)
-      showError(err.message || 'An unexpected error occurred.')
+      const errMsg = err instanceof Error ? err.message : 'An unexpected error occurred.'
+      showError(errMsg)
     }
   }
 
   return (
     <PageWrapper className="min-h-screen space-y-8 pb-20 text-left select-none">
       {/* 1. HEADER & GLOBAL ACTIONS */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200/80 pb-6 dark:border-slate-800">
+      <div className="flex flex-col gap-4 border-b border-slate-200/80 pb-6 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
         <div className="space-y-1">
-          <h1 className="font-sans text-2xl font-black tracking-tight text-slate-900 sm:text-3xl dark:text-white flex items-center gap-2.5">
+          <h1 className="flex items-center gap-2.5 font-sans text-2xl font-black tracking-tight text-slate-900 sm:text-3xl dark:text-white">
             <HardDrive className="h-7 w-7 text-purple-600" />
             Storage Manager & Quota Console
           </h1>
           <p className="text-xs font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">
-            Enterprise cloud storage directory, quota allocation, usage visualization, and account restrictions.
+            Enterprise cloud storage directory, quota allocation, usage visualization, and account
+            restrictions.
           </p>
         </div>
 
         <button
           type="button"
           onClick={fetchLiveStorageUsers}
-          className="inline-flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-extrabold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 transition-all shadow-xs"
+          className="inline-flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-extrabold text-slate-700 shadow-xs transition-all hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
         >
           <RefreshCw className="h-4 w-4" />
           <span>Refresh Directory</span>
@@ -352,8 +453,8 @@ export const AdminStoragePage: React.FC = () => {
       {/* 2. SEARCH, FILTERS & SORTING BAR */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         {/* Search */}
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <div className="relative max-w-md flex-1">
+          <Search className="absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             value={searchQuery}
@@ -362,13 +463,13 @@ export const AdminStoragePage: React.FC = () => {
               setCurrentPage(1)
             }}
             placeholder="Search by Name, Email, or Plan..."
-            className="w-full rounded-2xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-xs font-semibold text-slate-900 focus:border-purple-600 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+            className="w-full rounded-2xl border border-slate-200 bg-white py-2.5 pr-4 pl-10 text-xs font-semibold text-slate-900 focus:border-purple-600 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white"
           />
         </div>
 
         {/* Filter Pills & Sort Options */}
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex rounded-2xl bg-slate-100 p-1 dark:bg-slate-800 text-xs font-extrabold">
+          <div className="flex rounded-2xl bg-slate-100 p-1 text-xs font-extrabold dark:bg-slate-800">
             {(['All', 'Free', 'Pro', 'Family', 'Near Limit', 'Suspended'] as const).map((t) => (
               <button
                 key={t}
@@ -390,7 +491,9 @@ export const AdminStoragePage: React.FC = () => {
 
           <select
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
+            onChange={(e) =>
+              setSortBy(e.target.value as 'Storage Used' | 'Plan' | 'Name' | 'Newest' | 'Oldest')
+            }
             className="rounded-2xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-extrabold text-slate-700 focus:border-purple-600 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
           >
             <option value="Storage Used">Sort: Highest Storage</option>
@@ -406,19 +509,24 @@ export const AdminStoragePage: React.FC = () => {
       <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
         {loading ? (
           // SKELETON LOADERS
-          <div className="p-6 space-y-4">
+          <div className="space-y-4 p-6">
             {Array.from({ length: 4 }).map((_, idx) => (
-              <div key={idx} className="h-12 w-full animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" />
+              <div
+                key={idx}
+                className="h-12 w-full animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800"
+              />
             ))}
           </div>
         ) : errorState ? (
           // ERROR STATE
-          <div className="p-12 text-center flex flex-col items-center justify-center space-y-3">
+          <div className="flex flex-col items-center justify-center space-y-3 p-12 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50 text-rose-600 dark:bg-rose-950 dark:text-rose-400">
               <AlertTriangle className="h-7 w-7" />
             </div>
             <h3 className="text-sm font-black text-slate-900 dark:text-white">{errorState}</h3>
-            <p className="text-xs font-semibold text-slate-400">Database query encountered a temporary error.</p>
+            <p className="text-xs font-semibold text-slate-400">
+              Database query encountered a temporary error.
+            </p>
             <button
               type="button"
               onClick={fetchLiveStorageUsers}
@@ -439,7 +547,7 @@ export const AdminStoragePage: React.FC = () => {
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/40 font-semibold">
+              <tbody className="divide-y divide-slate-100 font-semibold dark:divide-slate-800/40">
                 {paginatedUsers.map((u) => {
                   const used = u.storageUsedBytes
                   const limit = u.storageLimitBytes
@@ -447,16 +555,21 @@ export const AdminStoragePage: React.FC = () => {
                   const colors = getStorageColor(pct)
 
                   return (
-                    <tr key={u.user_id} className="transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                    <tr
+                      key={u.user_id}
+                      className="transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/30"
+                    >
                       {/* User Info */}
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-100 font-extrabold text-xs text-purple-700 dark:bg-purple-950 dark:text-purple-300">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-100 text-xs font-extrabold text-purple-700 dark:bg-purple-950 dark:text-purple-300">
                             {u.email.charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <span className="block font-bold text-slate-900 dark:text-white">{u.name}</span>
-                            <span className="text-[11px] text-slate-400 font-mono">{u.email}</span>
+                            <span className="block font-bold text-slate-900 dark:text-white">
+                              {u.name}
+                            </span>
+                            <span className="font-mono text-[11px] text-slate-400">{u.email}</span>
                           </div>
                         </div>
                       </td>
@@ -468,17 +581,23 @@ export const AdminStoragePage: React.FC = () => {
 
                       {/* Color-Coded Storage Visualization */}
                       <td className="px-6 py-4">
-                        <div className="space-y-1 max-w-[200px]">
+                        <div className="max-w-[200px] space-y-1">
                           <div className="flex items-center justify-between text-[11px] font-bold">
                             <span className="text-slate-900 dark:text-white">
-                              {formatBytes(used)} <span className="text-slate-400 font-normal">/ {formatBytes(limit)}</span>
+                              {formatBytes(used)}{' '}
+                              <span className="font-normal text-slate-400">
+                                / {formatBytes(limit)}
+                              </span>
                             </span>
                             <span className={colors.text}>{pct}%</span>
                           </div>
 
                           {/* Progress Bar */}
-                          <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                            <div className={`h-full ${colors.bar} rounded-full transition-all duration-300`} style={{ width: `${pct}%` }} />
+                          <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                            <div
+                              className={`h-full ${colors.bar} rounded-full transition-all duration-300`}
+                              style={{ width: `${pct}%` }}
+                            />
                           </div>
                         </div>
                       </td>
@@ -501,7 +620,7 @@ export const AdminStoragePage: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setDrawerUser(u)}
-                          className="inline-flex items-center gap-1.5 rounded-xl bg-purple-600 px-3.5 py-2 text-xs font-black text-white hover:bg-purple-700 shadow-xs transition-all active:scale-98"
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-purple-600 px-3.5 py-2 text-xs font-black text-white shadow-xs transition-all hover:bg-purple-700 active:scale-98"
                         >
                           <HardDrive className="h-3.5 w-3.5" />
                           <span>Manage Storage</span>
@@ -515,18 +634,18 @@ export const AdminStoragePage: React.FC = () => {
           </div>
         ) : (
           // PREMIUM EMPTY STATE
-          <div className="p-12 text-center flex flex-col items-center justify-center space-y-3">
+          <div className="flex flex-col items-center justify-center space-y-3 p-12 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400">
               <Inbox className="h-7 w-7" />
             </div>
             <h3 className="text-sm font-black text-slate-900 dark:text-white">No Users Found</h3>
-            <p className="text-xs font-semibold text-slate-400 max-w-sm">
+            <p className="max-w-sm text-xs font-semibold text-slate-400">
               Storage information will automatically appear when users register.
             </p>
             <button
               type="button"
               onClick={fetchLiveStorageUsers}
-              className="inline-flex items-center gap-2 rounded-2xl bg-purple-600 px-4 py-2 text-xs font-extrabold text-white hover:bg-purple-700 mt-2"
+              className="mt-2 inline-flex items-center gap-2 rounded-2xl bg-purple-600 px-4 py-2 text-xs font-extrabold text-white hover:bg-purple-700"
             >
               <RefreshCw className="h-4 w-4" /> Refresh Directory
             </button>
@@ -535,9 +654,18 @@ export const AdminStoragePage: React.FC = () => {
 
         {/* PAGINATION FOOTER (20 USERS / PAGE) */}
         {filteredUsers.length > 0 && (
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-t border-slate-100 p-4 text-xs font-semibold text-slate-500 dark:border-slate-800">
+          <div className="flex flex-col gap-3 border-t border-slate-100 p-4 text-xs font-semibold text-slate-500 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
             <div>
-              Showing <strong className="text-slate-900 dark:text-white">{(currentPage - 1) * itemsPerPage + 1}</strong>–<strong className="text-slate-900 dark:text-white">{Math.min(currentPage * itemsPerPage, filteredUsers.length)}</strong> of <strong className="text-slate-900 dark:text-white">{filteredUsers.length}</strong> registered accounts
+              Showing{' '}
+              <strong className="text-slate-900 dark:text-white">
+                {(currentPage - 1) * itemsPerPage + 1}
+              </strong>
+              –
+              <strong className="text-slate-900 dark:text-white">
+                {Math.min(currentPage * itemsPerPage, filteredUsers.length)}
+              </strong>{' '}
+              of <strong className="text-slate-900 dark:text-white">{filteredUsers.length}</strong>{' '}
+              registered accounts
             </div>
 
             <div className="flex items-center gap-2">
@@ -545,7 +673,7 @@ export const AdminStoragePage: React.FC = () => {
                 type="button"
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                className="flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-1.5 text-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
+                className="flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-1.5 text-slate-700 hover:bg-slate-50 disabled:opacity-40 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
               >
                 <ChevronLeft className="h-4 w-4" /> Previous
               </button>
@@ -556,7 +684,7 @@ export const AdminStoragePage: React.FC = () => {
                 type="button"
                 disabled={currentPage >= totalPages}
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                className="flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-1.5 text-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
+                className="flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-1.5 text-slate-700 hover:bg-slate-50 disabled:opacity-40 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
               >
                 Next <ChevronRight className="h-4 w-4" />
               </button>
@@ -583,18 +711,20 @@ export const AdminStoragePage: React.FC = () => {
                 animate={{ x: 0 }}
                 exit={{ x: '100%' }}
                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                className="w-screen max-w-md bg-white p-6 shadow-2xl dark:bg-slate-900 flex flex-col justify-between text-left"
+                className="flex w-screen max-w-md flex-col justify-between bg-white p-6 text-left shadow-2xl dark:bg-slate-900"
               >
                 <div className="space-y-6 overflow-y-auto pr-1">
                   {/* Drawer Header */}
                   <div className="flex items-center justify-between border-b border-slate-100 pb-4 dark:border-slate-800">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-purple-600 text-white font-black text-sm shadow-md">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-purple-600 text-sm font-black text-white shadow-md">
                         {drawerUser.email.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <h3 className="font-sans text-base font-black text-slate-900 dark:text-white">{drawerUser.name}</h3>
-                        <p className="text-xs font-mono text-slate-400">{drawerUser.email}</p>
+                        <h3 className="font-sans text-base font-black text-slate-900 dark:text-white">
+                          {drawerUser.name}
+                        </h3>
+                        <p className="font-mono text-xs text-slate-400">{drawerUser.email}</p>
                       </div>
                     </div>
 
@@ -609,23 +739,38 @@ export const AdminStoragePage: React.FC = () => {
 
                   {/* Storage Progress & Metrics Card */}
                   {(() => {
-                    const pct = Math.min(100, Math.round((drawerUser.storageUsedBytes / drawerUser.storageLimitBytes) * 100)) || 1
+                    const pct =
+                      Math.min(
+                        100,
+                        Math.round(
+                          (drawerUser.storageUsedBytes / drawerUser.storageLimitBytes) * 100
+                        )
+                      ) || 1
                     const colors = getStorageColor(pct)
 
                     return (
-                      <div className="rounded-3xl bg-slate-50 p-5 dark:bg-slate-800/50 space-y-3">
-                        <div className="flex justify-between items-center text-xs font-bold">
-                          <span className="text-slate-500 uppercase text-[10px]">Cloud Quota Usage</span>
+                      <div className="space-y-3 rounded-3xl bg-slate-50 p-5 dark:bg-slate-800/50">
+                        <div className="flex items-center justify-between text-xs font-bold">
+                          <span className="text-[10px] text-slate-500 uppercase">
+                            Cloud Quota Usage
+                          </span>
                           <span className={colors.text}>{pct}% Used</span>
                         </div>
 
-                        <div className="h-3 w-full rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                          <div className={`h-full ${colors.bar} rounded-full`} style={{ width: `${pct}%` }} />
+                        <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                          <div
+                            className={`h-full ${colors.bar} rounded-full`}
+                            style={{ width: `${pct}%` }}
+                          />
                         </div>
 
-                        <div className="flex justify-between text-xs font-semibold text-slate-600 dark:text-slate-300 pt-1">
-                          <span>Used: <strong>{formatBytes(drawerUser.storageUsedBytes)}</strong></span>
-                          <span>Quota: <strong>{formatBytes(drawerUser.storageLimitBytes)}</strong></span>
+                        <div className="flex justify-between pt-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                          <span>
+                            Used: <strong>{formatBytes(drawerUser.storageUsedBytes)}</strong>
+                          </span>
+                          <span>
+                            Quota: <strong>{formatBytes(drawerUser.storageLimitBytes)}</strong>
+                          </span>
                         </div>
                       </div>
                     )
@@ -640,10 +785,11 @@ export const AdminStoragePage: React.FC = () => {
                     <button
                       type="button"
                       onClick={handleIncreaseQuota}
-                      className="w-full flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-3.5 text-slate-800 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                      className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white p-3.5 text-slate-800 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                     >
                       <span className="flex items-center gap-2">
-                        <Plus className="h-4 w-4 text-emerald-600" /> Increase Storage Quota (+10 GB)
+                        <Plus className="h-4 w-4 text-emerald-600" /> Increase Storage Quota (+10
+                        GB)
                       </span>
                       <span className="text-[11px] font-bold text-slate-400">Expand Limit</span>
                     </button>
@@ -651,7 +797,7 @@ export const AdminStoragePage: React.FC = () => {
                     <button
                       type="button"
                       onClick={handleReduceQuota}
-                      className="w-full flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-3.5 text-slate-800 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                      className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white p-3.5 text-slate-800 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                     >
                       <span className="flex items-center gap-2">
                         <Minus className="h-4 w-4 text-amber-600" /> Reduce Storage Quota (-5 GB)
@@ -679,7 +825,7 @@ export const AdminStoragePage: React.FC = () => {
                     <button
                       type="button"
                       onClick={handleToggleSuspendUploads}
-                      className={`w-full flex items-center justify-between rounded-2xl border p-3.5 transition-colors ${
+                      className={`flex w-full items-center justify-between rounded-2xl border p-3.5 transition-colors ${
                         drawerUser.status === 'Active'
                           ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-900/40 dark:bg-rose-950/40'
                           : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-950/40'
@@ -687,20 +833,22 @@ export const AdminStoragePage: React.FC = () => {
                     >
                       <span className="flex items-center gap-2">
                         <UserX className="h-4 w-4" />
-                        {drawerUser.status === 'Active' ? 'Suspend Cloud Uploads' : 'Reactivate Cloud Uploads'}
+                        {drawerUser.status === 'Active'
+                          ? 'Suspend Cloud Uploads'
+                          : 'Reactivate Cloud Uploads'}
                       </span>
                       <span className="text-[11px] font-bold">{drawerUser.status}</span>
                     </button>
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                <div className="border-t border-slate-100 pt-4 dark:border-slate-800">
                   <button
                     type="button"
                     onClick={() => {
                       setDrawerUser(null)
                     }}
-                    className="w-full rounded-2xl bg-purple-600 py-3 text-xs font-black text-white hover:bg-purple-700 shadow-md"
+                    className="w-full rounded-2xl bg-purple-600 py-3 text-xs font-black text-white shadow-md hover:bg-purple-700"
                   >
                     Close Console
                   </button>

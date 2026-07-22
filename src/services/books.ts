@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { storageService } from './storage'
+import { auditService } from './audit'
 
 export interface Book {
   id: string
@@ -388,6 +389,13 @@ export const booksService = {
 
     if (error || !data) throw error || new Error('Failed to create book record')
 
+    await auditService.insertLog({
+      event: 'Book Upload',
+      category: 'Storage & Files',
+      severity: 'Info',
+      metadata: { bookId: data.id, title: data.title, fileSize: file.size },
+    })
+
     return {
       id: data.id,
       title: data.title,
@@ -408,31 +416,60 @@ export const booksService = {
   },
 
   async deleteBook(id: string): Promise<void> {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+
     const { data: book } = await supabase
       .from('books')
-      .select('file_url, cover_url')
+      .select('file_url, cover_url, title, user_id')
       .eq('id', id)
-      .single()
+      .maybeSingle()
 
-    if (book) {
-      const bookPath = getPathFromUrl(book.file_url, 'books')
-      const coverPath = getPathFromUrl(book.cover_url, 'covers')
+    if (!book) throw new Error('Book not found')
 
-      if (bookPath) {
-        await storageService.deleteBook(bookPath).catch((err) => {
-          console.error('Failed to delete book file from storage:', err)
-        })
-      }
+    // Validate ownership / permissions (Must be owner or super admin)
+    const { data: roleData } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    const isSuperAdmin = roleData?.role === 'super_admin'
 
-      if (coverPath && !book.cover_url.includes('unsplash.com')) {
-        await storageService.deleteCover(coverPath).catch((err) => {
-          console.error('Failed to delete cover file from storage:', err)
-        })
-      }
+    if (book.user_id !== user.id && !isSuperAdmin) {
+      throw new Error('Permission denied. You do not own this book.')
     }
 
+    // 1. Delete from database first to avoid orphaned records if delete fails
     const { error } = await supabase.from('books').delete().eq('id', id)
-    if (error) throw error
+    if (error) {
+      console.error('Failed to delete book record from database:', error)
+      throw error
+    }
+
+    // 2. Delete Supabase Storage files only after DB record deletion succeeded
+    const bookPath = getPathFromUrl(book.file_url, 'books')
+    const coverPath = getPathFromUrl(book.cover_url, 'covers')
+
+    if (bookPath) {
+      await storageService.deleteBook(bookPath).catch((err) => {
+        console.error('Failed to delete book file from storage:', err)
+      })
+    }
+
+    if (coverPath && !book.cover_url.includes('unsplash.com')) {
+      await storageService.deleteCover(coverPath).catch((err) => {
+        console.error('Failed to delete cover file from storage:', err)
+      })
+    }
+
+    await auditService.insertLog({
+      event: 'Book Delete',
+      category: 'Storage & Files',
+      severity: 'Warning',
+      metadata: { bookId: id, title: book.title },
+    })
   },
 
   async renameBook(id: string, newTitle: string): Promise<void> {
@@ -573,8 +610,14 @@ export const booksService = {
 
     // Queue updates when offline
     if (!isOnline) {
-      const queue = JSON.parse(localStorage.getItem('librovia-progress-queue') || '[]')
-      const filtered = queue.filter((q: any) => q.bookId !== bookId)
+      const queue = JSON.parse(localStorage.getItem('librovia-progress-queue') || '[]') as {
+        bookId: string
+        page: number
+        totalPages: number
+        additionalSeconds: number
+        timestamp: string
+      }[]
+      const filtered = queue.filter((q) => q.bookId !== bookId)
       filtered.push({
         bookId,
         page,
@@ -687,9 +730,21 @@ export const booksService = {
 
   async syncOfflineProgress(): Promise<void> {
     const queueStr = localStorage.getItem('librovia-progress-queue') || '[]'
-    let queue: any[] = []
+    let queue: {
+      bookId: string
+      page: number
+      totalPages: number
+      additionalSeconds: number
+      timestamp: string
+    }[]
     try {
-      queue = JSON.parse(queueStr)
+      queue = JSON.parse(queueStr) as {
+        bookId: string
+        page: number
+        totalPages: number
+        additionalSeconds: number
+        timestamp: string
+      }[]
     } catch {
       return
     }
@@ -714,10 +769,7 @@ export const booksService = {
 
   async getUserStorageUsed(userId: string): Promise<number> {
     try {
-      const { data, error } = await supabase
-        .from('books')
-        .select('file_size')
-        .eq('user_id', userId)
+      const { data, error } = await supabase.from('books').select('file_size').eq('user_id', userId)
 
       if (error || !data) {
         return 0

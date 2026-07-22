@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { booksService } from './books'
+import { auditService } from './audit'
 
 export interface Note {
   id: string
@@ -86,7 +87,10 @@ export const notesService = {
   },
 
   async saveNote(
-    note: Omit<Note, 'id' | 'userId' | 'createdAt' | 'updatedAt'> & { id?: string; bookTitle?: string }
+    note: Omit<Note, 'id' | 'userId' | 'createdAt' | 'updatedAt'> & {
+      id?: string
+      bookTitle?: string
+    }
   ): Promise<Note> {
     const {
       data: { user },
@@ -111,8 +115,13 @@ export const notesService = {
     // If offline, save locally and push to offline queue
     if (!isOnline) {
       const saved = this.saveLocalNote({ ...note, bookTitle: resolvedBookTitle }, user.id)
-      const queue = JSON.parse(localStorage.getItem('librovia-notes-queue') || '[]')
-      const filtered = queue.filter((q: any) => q.noteId !== saved.id)
+      const queue = JSON.parse(localStorage.getItem('librovia-notes-queue') || '[]') as {
+        type: 'save' | 'delete'
+        noteId: string
+        payload?: Note
+        timestamp?: string
+      }[]
+      const filtered = queue.filter((q) => q.noteId !== saved.id)
       filtered.push({
         type: 'save',
         noteId: saved.id,
@@ -142,7 +151,15 @@ export const notesService = {
         }
 
         let result
+        let prevBookmarked = false
         if (note.id) {
+          const { data: oldNote } = await supabase
+            .from('notes')
+            .select('is_bookmarked')
+            .eq('id', note.id)
+            .maybeSingle()
+          prevBookmarked = oldNote?.is_bookmarked || false
+
           // Update
           const { data, error } = await supabase
             .from('notes')
@@ -152,6 +169,19 @@ export const notesService = {
             .single()
           if (error) throw error
           result = data
+
+          if (result.is_bookmarked !== prevBookmarked) {
+            await auditService.insertLog({
+              event: result.is_bookmarked ? 'Bookmark Create' : 'Bookmark Delete',
+              category: 'Storage & Files',
+              severity: 'Info',
+              metadata: {
+                noteId: result.id,
+                bookId: result.book_id,
+                pageNumber: result.page_number,
+              },
+            })
+          }
         } else {
           // Insert
           const { data, error } = await supabase
@@ -161,6 +191,31 @@ export const notesService = {
             .single()
           if (error) throw error
           result = data
+
+          if (result.is_bookmarked) {
+            await auditService.insertLog({
+              event: 'Bookmark Create',
+              category: 'Storage & Files',
+              severity: 'Info',
+              metadata: {
+                noteId: result.id,
+                bookId: result.book_id,
+                pageNumber: result.page_number,
+              },
+            })
+          }
+          if (result.note_text) {
+            await auditService.insertLog({
+              event: 'Note Create',
+              category: 'Storage & Files',
+              severity: 'Info',
+              metadata: {
+                noteId: result.id,
+                bookId: result.book_id,
+                pageNumber: result.page_number,
+              },
+            })
+          }
         }
 
         return {
@@ -183,8 +238,13 @@ export const notesService = {
       } catch (err) {
         console.error('Failed to save to Supabase, falling back to local and queuing:', err)
         const saved = this.saveLocalNote({ ...note, bookTitle: resolvedBookTitle }, user.id)
-        const queue = JSON.parse(localStorage.getItem('librovia-notes-queue') || '[]')
-        const filtered = queue.filter((q: any) => q.noteId !== saved.id)
+        const queue = JSON.parse(localStorage.getItem('librovia-notes-queue') || '[]') as {
+          type: 'save' | 'delete'
+          noteId: string
+          payload?: Note
+          timestamp?: string
+        }[]
+        const filtered = queue.filter((q) => q.noteId !== saved.id)
         filtered.push({
           type: 'save',
           noteId: saved.id,
@@ -207,8 +267,13 @@ export const notesService = {
     // If offline, delete locally and push delete to offline queue
     if (!isOnline) {
       this.deleteLocalNote(id)
-      const queue = JSON.parse(localStorage.getItem('librovia-notes-queue') || '[]')
-      const filtered = queue.filter((q: any) => q.noteId !== id)
+      const queue = JSON.parse(localStorage.getItem('librovia-notes-queue') || '[]') as {
+        type: 'save' | 'delete'
+        noteId: string
+        payload?: Note
+        timestamp?: string
+      }[]
+      const filtered = queue.filter((q) => q.noteId !== id)
       filtered.push({
         type: 'delete',
         noteId: id,
@@ -221,13 +286,61 @@ export const notesService = {
     const isLive = await this.isSupabaseAvailable()
     if (isLive) {
       try {
+        const { data: existing } = await supabase
+          .from('notes')
+          .select('is_bookmarked, note_text, book_id, page_number, user_id')
+          .eq('id', id)
+          .maybeSingle()
+
+        if (!existing) throw new Error('Note not found')
+
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+        if (!user) throw new Error('User not authenticated')
+
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .maybeSingle()
+        const isSuperAdmin = roleData?.role === 'super_admin'
+
+        if (existing.user_id !== user.id && !isSuperAdmin) {
+          throw new Error('Permission denied. You do not own this note.')
+        }
+
         const { error } = await supabase.from('notes').delete().eq('id', id)
         if (error) throw error
+
+        if (existing) {
+          if (existing.is_bookmarked) {
+            await auditService.insertLog({
+              event: 'Bookmark Delete',
+              category: 'Storage & Files',
+              severity: 'Warning',
+              metadata: { noteId: id, bookId: existing.book_id, pageNumber: existing.page_number },
+            })
+          }
+          if (existing.note_text) {
+            await auditService.insertLog({
+              event: 'Note Delete',
+              category: 'Storage & Files',
+              severity: 'Warning',
+              metadata: { noteId: id, bookId: existing.book_id, pageNumber: existing.page_number },
+            })
+          }
+        }
       } catch (err) {
         console.error('Failed to delete from Supabase, falling back to local and queuing:', err)
         this.deleteLocalNote(id)
-        const queue = JSON.parse(localStorage.getItem('librovia-notes-queue') || '[]')
-        const filtered = queue.filter((q: any) => q.noteId !== id)
+        const queue = JSON.parse(localStorage.getItem('librovia-notes-queue') || '[]') as {
+          type: 'save' | 'delete'
+          noteId: string
+          payload?: Note
+          timestamp?: string
+        }[]
+        const filtered = queue.filter((q) => q.noteId !== id)
         filtered.push({
           type: 'delete',
           noteId: id,
@@ -298,7 +411,10 @@ export const notesService = {
   },
 
   saveLocalNote(
-    note: Omit<Note, 'id' | 'userId' | 'createdAt' | 'updatedAt'> & { id?: string; bookTitle?: string },
+    note: Omit<Note, 'id' | 'userId' | 'createdAt' | 'updatedAt'> & {
+      id?: string
+      bookTitle?: string
+    },
     userId: string
   ): Note {
     const allNotesStr = localStorage.getItem(LOCAL_NOTES_KEY) || '[]'
@@ -396,7 +512,12 @@ export const notesService = {
     if (!user) return
 
     const queueStr = localStorage.getItem('librovia-notes-queue') || '[]'
-    let queue: any[] = []
+    let queue: {
+      type: 'save' | 'delete'
+      noteId: string
+      payload?: Note
+      timestamp?: string
+    }[]
     try {
       queue = JSON.parse(queueStr)
     } catch {
@@ -409,6 +530,7 @@ export const notesService = {
       try {
         if (item.type === 'save') {
           const noteData = item.payload
+          if (!noteData) continue
           // Check if it already exists in Supabase
           const { data: existing } = await supabase
             .from('notes')
@@ -443,7 +565,7 @@ export const notesService = {
             await supabase.from('notes').insert({
               ...payload,
               id: item.noteId,
-              created_at: noteData.createdAt || new Date().toISOString()
+              created_at: noteData.createdAt || new Date().toISOString(),
             })
           }
         } else if (item.type === 'delete') {

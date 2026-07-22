@@ -26,6 +26,7 @@ import { collectionsService, type Collection } from '../../services/collections'
 import { notesService, type Note } from '../../services/notes'
 import { formatBytes } from '../../utils/helpers'
 import { useSubscription } from '../../context/SubscriptionContext'
+import { useToast } from '../../context/ToastContext'
 
 interface BookDetails {
   id: string
@@ -135,6 +136,7 @@ const mapBookToDetails = (b: Book, collectionName: string): BookDetails => {
 
 export const BookDetailsPage: React.FC = () => {
   const { refreshSubscription } = useSubscription()
+  const { showError, showInfo } = useToast()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
@@ -142,6 +144,7 @@ export const BookDetailsPage: React.FC = () => {
   const [rawBook, setRawBook] = useState<Book | null>(null)
   const [relatedBooks, setRelatedBooks] = useState<Book[]>([])
   const [loading, setLoading] = useState(true)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [collections, setCollections] = useState<Collection[]>([])
 
@@ -239,12 +242,18 @@ export const BookDetailsPage: React.FC = () => {
     if (!rawBook) return
     if (!confirm('Are you sure you want to delete this book? This will permanently erase it.'))
       return
+    setIsDeleting(true)
     try {
       await booksService.deleteBook(rawBook.id)
+      showInfo(`Removed "${rawBook.title}" from library cabinet. 🗑️`)
       await refreshSubscription().catch(console.error)
       navigate(ROUTES.LIBRARY)
     } catch (e) {
       console.error(e)
+      const msg = e instanceof Error ? e.message : 'Failed to delete book'
+      showError(msg)
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -466,11 +475,12 @@ export const BookDetailsPage: React.FC = () => {
                     Export PDF
                   </button>
                   <button
+                    disabled={isDeleting}
                     onClick={handleDeleteBook}
-                    className="text-red-655 flex h-9 cursor-pointer items-center justify-center rounded-xl border border-red-200 bg-red-50 text-[10px] font-bold tracking-wider uppercase hover:bg-red-100"
+                    className="text-red-655 flex h-9 cursor-pointer items-center justify-center rounded-xl border border-red-200 bg-red-50 text-[10px] font-bold tracking-wider uppercase hover:bg-red-100 disabled:opacity-50"
                   >
                     <Trash2 className="mr-1 h-3.5 w-3.5" />
-                    Delete Book
+                    {isDeleting ? 'Deleting...' : 'Delete Book'}
                   </button>
                 </div>
               </div>

@@ -18,7 +18,6 @@ import {
   ChevronRight,
   Sun,
   Moon,
-  Layers,
   Crown,
   ShieldCheck,
 } from 'lucide-react'
@@ -65,7 +64,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { name: 'My Library', to: ROUTES.LIBRARY, icon: Library },
     { name: 'Collections', to: ROUTES.COLLECTIONS, icon: Folder },
     { name: 'Notes', to: ROUTES.NOTES, icon: MessageSquare },
-    { name: 'AI Flashcards', to: ROUTES.FLASHCARDS, icon: Layers },
     { name: 'Analytics', to: ROUTES.ANALYTICS, icon: BarChart3 },
     { name: 'Subscription', to: ROUTES.SUBSCRIPTION, icon: Crown },
     ...(user?.role === 'super_admin'

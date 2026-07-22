@@ -2,11 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { PageWrapper } from '../../components/common/PageWrapper'
-import { MarkdownRenderer } from '../../components/MarkdownRenderer'
 import { ROUTES } from '../../constants/routes'
 import { useToast } from '../../context/ToastContext'
-import { aiService, type AiActionType } from '../../services/ai'
-
 
 import {
   ArrowLeft,
@@ -28,17 +25,14 @@ import {
   CheckCircle,
   Edit2,
   Plus,
-  Sparkles,
   Download,
 } from 'lucide-react'
 import { booksService, type Book } from '../../services/books'
 import { notesService, type Note } from '../../services/notes'
 import { notificationsService } from '../../services/notifications'
-import { flashcardsService } from '../../services/flashcards'
 import { offlineStorageService } from '../../services/offlineStorage'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/TextLayer.css'
-
 
 // Set react-pdf worker source to CDN worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
@@ -104,37 +98,7 @@ export const ReaderPage: React.FC = () => {
   const [popupNoteTitle, setPopupNoteTitle] = useState('')
   const [popupNoteText, setPopupNoteText] = useState('')
 
-  // Right sidebar tab state & AI variables
-  const [rightSidebarTab, setRightSidebarTab] = useState<'journal' | 'ai'>('journal')
-  const [selectedTextForAi, setSelectedTextForAi] = useState('')
-  const [customAiText, setCustomAiText] = useState('')
-  const [aiAction, setAiAction] = useState<AiActionType | null>(null)
-  const [aiResponse, setAiResponse] = useState<string | null>(null)
-  const [aiLoading, setAiLoading] = useState(false)
-  const [aiError, setAiError] = useState<string | null>(null)
   const [sidebarWidth, setSidebarWidth] = useState(320)
-
-  // Premium AI additional states
-  interface Conversation {
-    id: string
-    action: AiActionType
-    selectedText: string
-    response: string
-    timestamp: string
-    helpful?: 'yes' | 'no' | null
-  }
-
-  const [aiConversations, setAiConversations] = useState<Conversation[]>(() => {
-    if (!id) return []
-    const saved = localStorage.getItem(`librovia-conversations-${id}`)
-    return saved ? JSON.parse(saved) : []
-  })
-  const [aiSearchQuery, setAiSearchQuery] = useState('')
-  const [isTyping, setIsTyping] = useState(false)
-  const [displayingResponse, setDisplayingResponse] = useState('')
-  const [copiedIndex, setCopiedIndex] = useState<string | null>(null)
-  const abortControllerRef = useRef<AbortController | null>(null)
-  const typingTimerRef = useRef<number | null>(null)
 
   // Window width listener for responsiveness
   const [windowWidth, setWindowWidth] = useState(window.innerWidth)
@@ -143,15 +107,6 @@ export const ReaderPage: React.FC = () => {
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
-
-
-
-  // Persist conversations
-  useEffect(() => {
-    if (id) {
-      localStorage.setItem(`librovia-conversations-${id}`, JSON.stringify(aiConversations))
-    }
-  }, [aiConversations, id])
 
   const isResizingRef = useRef(false)
 
@@ -185,113 +140,6 @@ export const ReaderPage: React.FC = () => {
     }
   }, [resize, stopResizing])
 
-  const handleStopGeneration = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
-      abortControllerRef.current = null
-    }
-    if (typingTimerRef.current) {
-      window.clearInterval(typingTimerRef.current)
-      typingTimerRef.current = null
-    }
-    setIsTyping(false)
-    setAiLoading(false)
-    showInfo('Generation stopped.')
-  }
-
-  const handleAiActionDirect = async (textToUse: string, action: AiActionType) => {
-    if (!isOnline) {
-      showInfo("AI requires an internet connection. Your reading progress and notes are still being saved locally.")
-      return
-    }
-
-    // Stop any active generation first
-    handleStopGeneration()
-
-    setAiAction(action)
-    setAiLoading(true)
-    setAiError(null)
-    setAiResponse(null)
-    setDisplayingResponse('')
-
-    const controller = new AbortController()
-    abortControllerRef.current = controller
-
-    try {
-      // Simulate real call or call service with controller signal if supported
-      const result = await aiService.runAiAction(textToUse, action, 'en-US')
-      
-      if (controller.signal.aborted) return
-
-      setAiResponse(result)
-      setAiLoading(false)
-
-      // typing progressive animation effect
-      setIsTyping(true)
-      const words = result.split(' ')
-      let wordIndex = 0
-
-      // clear any old typing timer
-      if (typingTimerRef.current) {
-        window.clearInterval(typingTimerRef.current)
-      }
-
-      typingTimerRef.current = window.setInterval(() => {
-        if (wordIndex < words.length) {
-          setDisplayingResponse((prev) => prev + (wordIndex === 0 ? '' : ' ') + words[wordIndex])
-          wordIndex++
-        } else {
-          if (typingTimerRef.current) {
-            window.clearInterval(typingTimerRef.current)
-            typingTimerRef.current = null
-          }
-          setIsTyping(false)
-
-          // Save to local book history
-          const newConv: Conversation = {
-            id: Math.random().toString(36).substring(2, 9),
-            action,
-            selectedText: textToUse,
-            response: result,
-            timestamp: new Date().toISOString(),
-            helpful: null,
-          }
-          setAiConversations((prev) => [newConv, ...prev])
-        }
-      }, 40) // speed of typing
-    } catch (err: any) {
-      if (controller.signal.aborted) return
-      setAiError('AI is currently unavailable. Please try again.')
-      setAiLoading(false)
-    }
-  }
-
-  const handleCopyAiResponse = (responseVal?: string, idVal?: string) => {
-    const textToCopy = typeof responseVal === 'string' ? responseVal : aiResponse || ''
-    if (!textToCopy) return
-    const cleanText = textToCopy.replace(/[#*`]/g, '')
-    navigator.clipboard.writeText(cleanText)
-    if (typeof idVal === 'string') {
-      setCopiedIndex(idVal)
-      setTimeout(() => setCopiedIndex(null), 2000)
-    } else {
-      showSuccess('AI response copied to clipboard!')
-    }
-  }
-
-  const handleDeleteConversation = (convId: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    setAiConversations((prev) => prev.filter((c) => c.id !== convId))
-    showSuccess('Conversation deleted.')
-  }
-
-  const handleFeedback = (convId: string, helpful: 'yes' | 'no') => {
-    setAiConversations((prev) =>
-      prev.map((c) => (c.id === convId ? { ...c, helpful: c.helpful === helpful ? null : helpful } : c))
-    )
-    showSuccess('Thank you for your feedback!')
-  }
-
   const handleOpenAddNotePopup = () => {
     const selection = window.getSelection()?.toString().trim() || modalHighlightText
     if (!selection) return
@@ -323,37 +171,6 @@ export const ReaderPage: React.FC = () => {
       showSuccess('Note saved successfully! 📝')
     } catch (err) {
       console.error(err)
-    }
-  }
-
-  const handleTriggerAskAi = () => {
-    const selection = window.getSelection()?.toString().trim() || modalHighlightText
-    if (!selection) return
-    setSelectedTextForAi(selection)
-    setAiAction(null)
-    setAiResponse(null)
-    setAiLoading(false)
-    setAiError(null)
-    setRightSidebarTab('ai')
-    setRightSidebarOpen(true)
-    setFloatingToolbarPos(null)
-    window.getSelection()?.removeAllRanges()
-  }
-
-  const handleGenerateFlashcards = async () => {
-    const selection = window.getSelection()?.toString().trim() || modalHighlightText
-    if (!id || !selection) return
-
-    setFloatingToolbarPos(null)
-    window.getSelection()?.removeAllRanges()
-    showInfo('Generating study flashcards via AI... Please wait.')
-
-    try {
-      const cards = await flashcardsService.generateFlashcards(id, page, selection)
-      showSuccess(`Successfully generated ${cards.length} AI study flashcards! 🃏`)
-    } catch (err: any) {
-      console.error(err)
-      showError(err.message || 'Failed to generate flashcards.')
     }
   }
 
@@ -403,8 +220,6 @@ export const ReaderPage: React.FC = () => {
     left: number
   } | null>(null)
 
-
-
   // Toast notifications
   const [showToast, setShowToast] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
@@ -435,7 +250,9 @@ export const ReaderPage: React.FC = () => {
   }, [id])
 
   // Offline / Online state
-  const [isOnline, setIsOnline] = useState(() => typeof navigator !== 'undefined' ? navigator.onLine : true)
+  const [isOnline, setIsOnline] = useState(() =>
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  )
 
   useEffect(() => {
     const handleOnline = async () => {
@@ -507,7 +324,9 @@ export const ReaderPage: React.FC = () => {
 
         if (!data) {
           if (!navigator.onLine && !localBlobUrl) {
-            setErrorMsg('This book is not available offline.\n\nPlease connect to the internet or download it before going offline.')
+            setErrorMsg(
+              'This book is not available offline.\n\nPlease connect to the internet or download it before going offline.'
+            )
           } else {
             setErrorMsg('This book is no longer available.')
           }
@@ -519,7 +338,9 @@ export const ReaderPage: React.FC = () => {
         if (localBlobUrl) {
           data = { ...data, filePath: localBlobUrl }
         } else if (!navigator.onLine) {
-          setErrorMsg('This book is not available offline.\n\nPlease connect to the internet or download it before going offline.')
+          setErrorMsg(
+            'This book is not available offline.\n\nPlease connect to the internet or download it before going offline.'
+          )
           setLoading(false)
           return
         }
@@ -534,7 +355,7 @@ export const ReaderPage: React.FC = () => {
         lastSavedPageRef.current = targetPage
         setLoading(false)
         fetchNotes()
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(err)
         setErrorMsg(
           !navigator.onLine
@@ -581,10 +402,12 @@ export const ReaderPage: React.FC = () => {
       setIsDownloaded(true)
       setIsDownloading(false)
       showSuccess(`"${rawBook.title}" is now available offline! 💾`)
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err)
       setIsDownloading(false)
-      showError(err.message || 'Failed to download book for offline reading.')
+      const errMsg =
+        err instanceof Error ? err.message : 'Failed to download book for offline reading.'
+      showError(errMsg)
     }
   }
 
@@ -627,6 +450,7 @@ export const ReaderPage: React.FC = () => {
 
     const targetNote = bookNotes.find((n) => n.id === noteIdParam)
     if (targetNote && targetNote.pageNumber !== page) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPage(targetNote.pageNumber)
     }
   }, [loading, bookNotes, searchParams, page])
@@ -773,7 +597,7 @@ export const ReaderPage: React.FC = () => {
       if (target.closest('.floating-ai-toolbar')) {
         return
       }
-      
+
       // Let selection state settle
       setTimeout(() => {
         const selection = window.getSelection()
@@ -1025,8 +849,6 @@ export const ReaderPage: React.FC = () => {
     window.getSelection()?.removeAllRanges()
   }
 
-
-
   // Sticky note helpers removed to support native page experience
 
   const handleSaveNote = async (e: React.FormEvent) => {
@@ -1201,9 +1023,11 @@ export const ReaderPage: React.FC = () => {
               By {rawBook.author}
             </p>
           </div>
-          <div className="flex items-center gap-1.5 ml-3 pl-3 border-l border-slate-200 dark:border-slate-800">
-            <span className={`inline-block h-2 w-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
-            <span className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+          <div className="ml-3 flex items-center gap-1.5 border-l border-slate-200 pl-3 dark:border-slate-800">
+            <span
+              className={`inline-block h-2 w-2 rounded-full ${isOnline ? 'animate-pulse bg-emerald-500' : 'bg-rose-500'}`}
+            />
+            <span className="text-[9px] font-extrabold tracking-widest text-slate-400 uppercase dark:text-slate-500">
               {isOnline ? 'Online' : 'Offline (Changes will sync automatically)'}
             </span>
           </div>
@@ -1308,14 +1132,14 @@ export const ReaderPage: React.FC = () => {
             ) : isDownloaded ? (
               <>
                 <CheckCircle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span className="hidden text-[10px] font-extrabold uppercase tracking-wider sm:inline">
+                <span className="hidden text-[10px] font-extrabold tracking-wider uppercase sm:inline">
                   Offline
                 </span>
               </>
             ) : (
               <>
                 <Download className="h-3.5 w-3.5" />
-                <span className="hidden text-[10px] font-extrabold uppercase tracking-wider sm:inline">
+                <span className="hidden text-[10px] font-extrabold tracking-wider uppercase sm:inline">
                   Download
                 </span>
               </>
@@ -1766,464 +1590,154 @@ export const ReaderPage: React.FC = () => {
                     : { width: 0, opacity: 0 }
               }
               transition={{ duration: 0.25, ease: 'easeInOut' }}
-              className={`
-                flex flex-col border-slate-100 bg-white text-left dark:border-slate-800 dark:bg-slate-900 overflow-hidden h-full
-                ${
-                  windowWidth < 640
-                    ? 'fixed bottom-0 left-0 right-0 z-40 h-[70vh] border-t rounded-t-[24px] shadow-2xl'
-                    : windowWidth < 1024
-                      ? 'fixed right-0 top-0 bottom-0 z-40 border-l shadow-2xl w-[360px]'
-                      : 'relative z-10 border-l shrink-0'
-                }
-              `}
+              className={`flex h-full flex-col overflow-hidden border-slate-100 bg-white text-left dark:border-slate-800 dark:bg-slate-900 ${
+                windowWidth < 640
+                  ? 'fixed right-0 bottom-0 left-0 z-40 h-[70vh] rounded-t-[24px] border-t shadow-2xl'
+                  : windowWidth < 1024
+                    ? 'fixed top-0 right-0 bottom-0 z-40 w-[360px] border-l shadow-2xl'
+                    : 'relative z-10 shrink-0 border-l'
+              } `}
               style={windowWidth >= 1024 ? { width: sidebarWidth } : {}}
             >
               {/* Resize Handle (only show on desktop >= 1024px) */}
               {windowWidth >= 1024 && (
                 <div
                   onMouseDown={startResizing}
-                  className="absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-purple-500/30 transition-colors z-30"
+                  className="absolute top-0 bottom-0 left-0 z-30 w-1 cursor-ew-resize transition-colors hover:bg-purple-500/30"
                 />
               )}
 
-              <div className="dark:bg-slate-850 flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50/45 px-4 py-3 dark:border-slate-800">
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setRightSidebarTab('journal')}
-                    className={`text-[9px] font-extrabold tracking-widest uppercase py-1 px-2.5 rounded-lg transition-all cursor-pointer ${
-                      rightSidebarTab === 'journal'
-                        ? 'bg-purple-50 text-purple-650 dark:bg-purple-950/20 dark:text-purple-400 font-black'
-                        : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
-                    }`}
-                  >
-                    Journal
-                  </button>
-                  <button
-                    onClick={() => setRightSidebarTab('ai')}
-                    className={`text-[9px] font-extrabold tracking-widest uppercase py-1 px-2.5 rounded-lg transition-all cursor-pointer ${
-                      rightSidebarTab === 'ai'
-                        ? 'bg-purple-50 text-purple-650 dark:bg-purple-950/20 dark:text-purple-400 font-black'
-                        : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
-                    }`}
-                  >
-                    ✨ Ask AI
-                  </button>
-                </div>
+              <div className="dark:bg-slate-855 flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50/45 px-4 py-3 dark:border-slate-800">
+                <span className="rounded-lg px-2.5 py-1 text-[9px] font-black font-extrabold tracking-widest text-slate-800 uppercase dark:text-slate-200">
+                  Journal
+                </span>
                 <button
                   onClick={() => setRightSidebarOpen(false)}
-                  className="cursor-pointer font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm"
+                  className="cursor-pointer text-sm font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                 >
                   ✕
                 </button>
               </div>
 
-              {rightSidebarTab === 'journal' ? (
-                <div className="flex-1 space-y-4 p-4 overflow-y-auto">
-                  {bookNotes.length === 0 ? (
-                    <p className="py-8 text-center text-[10px] leading-relaxed text-slate-400">
-                      No annotations saved. Select text on a page to highlight or click "+ Add Note"
-                      inside the panel.
-                    </p>
-                  ) : (
-                    bookNotes.map((n) => (
-                      <div
-                        key={n.id}
-                        onClick={() => {
-                          setPage(n.pageNumber)
-                          setTimeout(() => {
-                            const mark = document.querySelector(`mark[data-note-id="${n.id}"]`)
-                            if (mark) {
-                              mark.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                              mark.classList.add('ring-4', 'ring-purple-500/30', 'animate-pulse')
-                              setTimeout(() => {
-                                mark.classList.remove('ring-4', 'ring-purple-500/30', 'animate-pulse')
-                              }, 2000)
-                            }
-                          }, 350)
-                        }}
-                        className={`hover:border-purple-550/35 cursor-pointer space-y-2 rounded-2xl border border-slate-100 bg-slate-50/40 p-3 text-xs shadow-xs transition-all hover:bg-white dark:border-slate-800 dark:bg-slate-950/20 ${
-                          n.pageNumber === page
-                            ? 'border-purple-500/40 bg-white ring-1 ring-purple-500/10'
-                            : ''
-                        }`}
-                      >
-                        <div className="text-purple-655 flex items-center justify-between text-[9px] font-extrabold uppercase">
-                          <span className="flex items-center gap-1">
-                            {n.xPosition !== undefined ? '📌 Sticky Note' : '📄 Page Note'} (p.{' '}
-                            {n.pageNumber})
-                          </span>
-                          {n.isBookmarked && (
-                            <Bookmark className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                          )}
-                        </div>
-
-                        {n.noteTitle && (
-                          <h4 className="truncate text-[11px] font-bold text-slate-900 dark:text-white">
-                            {n.noteTitle}
-                          </h4>
-                        )}
-
-                        {n.rating && (
-                          <div className="flex gap-0.5 text-amber-400">
-                            {Array.from({ length: 5 }).map((_, idx) => (
-                              <Star
-                                key={idx}
-                                className={`h-3 w-3 ${idx < n.rating! ? 'fill-current' : 'text-slate-200 dark:text-slate-800'}`}
-                              />
-                            ))}
-                          </div>
-                        )}
-
-                        {n.highlightedText && (
-                          <p className="line-clamp-3 border-l-2 border-purple-400 bg-slate-50 py-0.5 pl-2 font-serif text-[9px] leading-relaxed italic dark:bg-slate-800">
-                            "{n.highlightedText}"
-                          </p>
-                        )}
-
-                        {n.noteText && (
-                          <p className="leading-relaxed font-semibold text-slate-800 dark:text-slate-200">
-                            {n.noteText}
-                          </p>
-                        )}
-
-                        {n.tags && n.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {n.tags.map((t) => (
-                              <span
-                                key={t}
-                                className="rounded bg-slate-100 px-1.5 py-0.5 text-[8px] font-bold tracking-wider text-slate-500 uppercase dark:bg-slate-800 dark:text-slate-400"
-                              >
-                                {t}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-
-                        <div className="dark:border-slate-855 flex shrink-0 justify-end gap-2 border-t border-slate-50 pt-2 text-[10px] font-bold tracking-wider uppercase">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setEditingNoteId(n.id)
-                              setModalNoteTitle(n.noteTitle || '')
-                              setModalRating(n.rating)
-                              setModalNoteText(n.noteText)
-                              setModalHighlightText(n.highlightedText || '')
-                              setModalBookmark(n.isBookmarked)
-                              setModalTags(n.tags)
-                              if (n.xPosition !== undefined) {
-                                setStickyNotePromptPos({
-                                  top: 0,
-                                  left: 0,
-                                  percentX: n.xPosition,
-                                  percentY: n.yPosition || 0,
-                                })
-                              } else {
-                                setStickyNotePromptPos(null)
-                              }
-                              setIsNotesModalOpen(true)
-                            }}
-                            className="hover:text-slate-655 text-slate-400"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={(e) => handleDeleteNote(n.id, e)}
-                            className="text-slate-400 hover:text-red-500"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              ) : (
-                <div className="flex-1 flex flex-col min-h-0 bg-slate-50/50 dark:bg-slate-950/10 overflow-hidden font-sans">
-                  {/* Search Box */}
-                  {aiConversations.length > 0 && (
-                    <div className="p-3 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 shrink-0">
-                      <input
-                        type="text"
-                        placeholder="Search AI conversations..."
-                        value={aiSearchQuery}
-                        onChange={(e) => setAiSearchQuery(e.target.value)}
-                        className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-950/20 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-purple-500 font-sans transition-all"
-                      />
-                    </div>
-                  )}
-
-                  {/* Scrollable Conversation Stream */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
-                    {/* Active Prompt Creator (when not loading) */}
-                    {!aiLoading && !isTyping && (
-                      <div className="rounded-3xl border border-slate-100 bg-white p-4.5 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-3">
-                        <span className="text-[9px] font-black uppercase text-purple-650 tracking-widest block">
-                          Selected Excerpt
+              <div className="flex-1 space-y-4 overflow-y-auto p-4">
+                {bookNotes.length === 0 ? (
+                  <p className="py-8 text-center text-[10px] leading-relaxed text-slate-400">
+                    No annotations saved. Select text on a page to highlight or click "+ Add Note"
+                    inside the panel.
+                  </p>
+                ) : (
+                  bookNotes.map((n) => (
+                    <div
+                      key={n.id}
+                      onClick={() => {
+                        setPage(n.pageNumber)
+                        setTimeout(() => {
+                          const mark = document.querySelector(`mark[data-note-id="${n.id}"]`)
+                          if (mark) {
+                            mark.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                            mark.classList.add('ring-4', 'ring-purple-500/30', 'animate-pulse')
+                            setTimeout(() => {
+                              mark.classList.remove('ring-4', 'ring-purple-500/30', 'animate-pulse')
+                            }, 2000)
+                          }
+                        }, 100)
+                      }}
+                      className={`group dark:bg-slate-855/40 cursor-pointer rounded-2xl border p-4 transition-all hover:bg-slate-50 dark:hover:bg-slate-800/40 ${
+                        n.pageNumber === page
+                          ? 'border-purple-500/40 bg-white ring-1 ring-purple-500/10'
+                          : 'border-slate-100 dark:border-slate-800'
+                      }`}
+                    >
+                      <div className="text-purple-655 flex items-center justify-between text-[9px] font-extrabold uppercase">
+                        <span className="flex items-center gap-1">
+                          {n.xPosition !== undefined ? '📌 Sticky Note' : '📄 Page Note'} (p.{' '}
+                          {n.pageNumber})
                         </span>
-                        {selectedTextForAi ? (
-                          <div className="space-y-3">
-                            <p className="line-clamp-4 font-serif text-[10.5px] leading-relaxed italic text-slate-600 dark:text-slate-400 border-l-2 border-purple-400 pl-2">
-                              "{selectedTextForAi}"
-                            </p>
-                            <div className="flex justify-end">
-                              <button
-                                onClick={() => setSelectedTextForAi('')}
-                                className="text-[8px] font-extrabold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 uppercase cursor-pointer"
-                              >
-                                Clear Selection
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            <textarea
-                              placeholder="Type or paste text here to ask the AI assistant..."
-                              value={customAiText}
-                              onChange={(e) => setCustomAiText(e.target.value)}
-                              className="w-full text-xs p-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/30 dark:bg-slate-855 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-purple-500 font-sans resize-none transition-all"
-                              rows={3}
-                            />
-                          </div>
+                        {n.isBookmarked && (
+                          <Bookmark className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
                         )}
+                      </div>
 
-                        {/* Action Pickers */}
-                        <div className="grid grid-cols-2 gap-2 pt-1.5">
-                          {[
-                            { id: 'explain', label: '✨ Explain', desc: 'Simple terms' },
-                            { id: 'summarize', label: '📝 Summary', desc: 'Concise review' },
-                            { id: 'key-points', label: '💡 Key Points', desc: 'Main takeaways' },
-                            { id: 'simplify', label: '📚 Simplify', desc: 'For beginners' },
-                            { id: 'translate', label: '🌍 Translate', desc: 'To target lang' }
-                          ].map((act) => (
-                            <button
-                              key={act.id}
-                              onClick={() => {
-                                const text = selectedTextForAi || customAiText.trim()
-                                if (text) {
-                                  setSelectedTextForAi(text)
-                                  handleAiActionDirect(text, act.id as any)
-                                }
-                              }}
-                              disabled={!selectedTextForAi && !customAiText.trim()}
-                              className="text-left rounded-2xl border border-slate-100 hover:border-purple-200 bg-slate-50/30 hover:bg-purple-50/20 p-2.5 transition-all cursor-pointer dark:border-slate-800 dark:bg-slate-950/20 dark:hover:bg-purple-950/15 disabled:opacity-40 disabled:pointer-events-none"
-                            >
-                              <span className="block text-[10.5px] font-extrabold text-slate-800 dark:text-white">
-                                {act.label}
-                              </span>
-                              <span className="block text-[8px] text-slate-400 font-medium">
-                                {act.desc}
-                              </span>
-                            </button>
+                      {n.noteTitle && (
+                        <h4 className="mt-1 truncate text-[11px] font-bold text-slate-900 dark:text-white">
+                          {n.noteTitle}
+                        </h4>
+                      )}
+
+                      {n.rating && (
+                        <div className="mt-1 flex gap-0.5 text-amber-400">
+                          {Array.from({ length: 5 }).map((_, idx) => (
+                            <Star
+                              key={idx}
+                              className={`h-3 w-3 ${idx < n.rating! ? 'fill-current' : 'text-slate-200 dark:text-slate-800'}`}
+                            />
                           ))}
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Active Loading Thinking Block */}
-                    {aiLoading && (
-                      <div className="rounded-3xl border border-slate-100 bg-white p-4.5 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[9px] font-black uppercase text-purple-650 tracking-wider">
-                            ✨ Gemini is thinking...
-                          </span>
-                          <button
-                            onClick={handleStopGeneration}
-                            className="text-[9px] font-black uppercase text-red-500 hover:text-red-650 px-2.5 py-1 rounded-xl border border-red-200 dark:border-red-800 bg-red-50/30 cursor-pointer transition-colors"
-                          >
-                            Stop
-                          </button>
-                        </div>
-                        <div className="space-y-2.5 animate-pulse">
-                          <div className="h-3 w-full rounded-md bg-slate-100 dark:bg-slate-800" />
-                          <div className="h-3 w-[92%] rounded-md bg-slate-100 dark:bg-slate-800" />
-                          <div className="h-3 w-[85%] rounded-md bg-slate-100 dark:bg-slate-800" />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Active Error Block */}
-                    {aiError && (
-                      <div className="rounded-3xl border border-red-500/20 bg-red-500/10 p-4.5 space-y-3 text-center">
-                        <p className="text-xs font-bold text-red-500">
-                          Unable to generate a response. Please try again.
+                      {n.highlightedText && (
+                        <p className="mt-2 line-clamp-3 border-l-2 border-purple-400 bg-slate-50 py-0.5 pl-2 font-serif text-[9px] leading-relaxed italic dark:bg-slate-800">
+                          "{n.highlightedText}"
                         </p>
+                      )}
+
+                      {n.noteText && (
+                        <p className="mt-2 leading-relaxed font-semibold text-slate-800 dark:text-slate-200">
+                          {n.noteText}
+                        </p>
+                      )}
+
+                      {n.tags && n.tags.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-1">
+                          {n.tags.map((t) => (
+                            <span
+                              key={t}
+                              className="rounded bg-slate-100 px-1.5 py-0.5 text-[8px] font-bold tracking-wider text-slate-500 uppercase dark:bg-slate-800 dark:text-slate-400"
+                            >
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="dark:border-slate-855 mt-3 flex shrink-0 justify-end gap-2 border-t border-slate-50 pt-2 text-[10px] font-bold tracking-wider uppercase">
                         <button
-                          onClick={() => {
-                            const text = selectedTextForAi || customAiText.trim()
-                            if (text && aiAction) {
-                              handleAiActionDirect(text, aiAction)
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setEditingNoteId(n.id)
+                            setModalNoteTitle(n.noteTitle || '')
+                            setModalRating(n.rating)
+                            setModalNoteText(n.noteText)
+                            setModalHighlightText(n.highlightedText || '')
+                            setModalBookmark(n.isBookmarked)
+                            setModalTags(n.tags)
+                            if (n.xPosition !== undefined) {
+                              setStickyNotePromptPos({
+                                top: 0,
+                                left: 0,
+                                percentX: n.xPosition,
+                                percentY: n.yPosition || 0,
+                              })
+                            } else {
+                              setStickyNotePromptPos(null)
                             }
+                            setIsNotesModalOpen(true)
                           }}
-                          className="text-[9px] font-black uppercase text-white bg-red-500 px-3.5 py-1.5 rounded-xl transition-all active:scale-95 cursor-pointer shadow-md shadow-red-500/10"
+                          className="hover:text-slate-655 cursor-pointer text-slate-400"
                         >
-                          Retry
+                          Edit
+                        </button>
+                        <button
+                          onClick={(e) => handleDeleteNote(n.id, e)}
+                          className="cursor-pointer text-slate-400 hover:text-red-500"
+                        >
+                          Delete
                         </button>
                       </div>
-                    )}
-
-                    {/* Active Typing Stream Block */}
-                    {isTyping && displayingResponse && (
-                      <div className="rounded-3xl border border-slate-100 bg-white p-4.5 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-3">
-                        <div className="flex items-center justify-between border-b border-slate-50 pb-2 dark:border-slate-800/40">
-                          <div className="space-y-0.5">
-                            <span className="text-[8px] font-black uppercase text-purple-650 tracking-widest">
-                              Active Response
-                            </span>
-                            <span className="block text-[8px] text-slate-400 capitalize">
-                              Action: {aiAction}
-                            </span>
-                          </div>
-                          <button
-                            onClick={handleStopGeneration}
-                            className="text-[9px] font-black uppercase text-red-500 hover:text-red-650 px-2.5 py-1 rounded-xl border border-red-200 dark:border-red-800 bg-red-50/30 cursor-pointer transition-colors"
-                          >
-                            Stop
-                          </button>
-                        </div>
-                        <div className="relative text-xs leading-relaxed text-slate-800 dark:text-slate-200">
-                          <MarkdownRenderer text={displayingResponse} />
-                          <span className="inline-block w-1.5 h-3 ml-0.5 bg-purple-600 animate-pulse align-middle" />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Empty State */}
-                    {aiConversations.length === 0 && !aiLoading && !isTyping && !aiError && (
-                      <div className="flex flex-col items-center justify-center p-6 text-center text-slate-450 space-y-4 py-8">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-400 shadow-2xs">
-                          <Sparkles className="h-6 w-6" />
-                        </div>
-                        <div className="space-y-1">
-                          <h4 className="text-xs font-black text-slate-900 dark:text-white">
-                            💡 Ask AI about this book
-                          </h4>
-                          <p className="text-[10px] font-semibold text-slate-400 leading-relaxed max-w-xs">
-                            Ask questions, summarize chapters, explain difficult concepts, or analyze selected text.
-                          </p>
-                        </div>
-                        <div className="w-full space-y-2 pt-2 text-left">
-                          <span className="text-[8.5px] font-extrabold text-slate-400 uppercase tracking-wider block">
-                            Suggested Prompts
-                          </span>
-                          {[
-                            'Summarize this chapter',
-                            'Explain key concepts in simple terms',
-                            'Extract 3 main takeaways',
-                            'Generate study flashcards',
-                          ].map((promptText) => (
-                            <button
-                              key={promptText}
-                              onClick={() => {
-                                setCustomAiText(promptText)
-                              }}
-                              className="w-full text-left rounded-xl border border-slate-200/80 bg-white p-2.5 text-[10.5px] font-bold text-slate-700 shadow-2xs hover:border-purple-300 hover:text-purple-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-purple-800 dark:hover:text-purple-400 transition-all cursor-pointer"
-                            >
-                              ✨ "{promptText}"
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Previous Conversations History List */}
-                    {aiConversations
-                      .filter((c) => {
-                        if (!aiSearchQuery.trim()) return true
-                        const query = aiSearchQuery.toLowerCase()
-                        return (
-                          (c.selectedText && c.selectedText.toLowerCase().includes(query)) ||
-                          (c.response && c.response.toLowerCase().includes(query)) ||
-                          c.action.toLowerCase().includes(query)
-                        )
-                      })
-                      .map((c) => (
-                        <div
-                          key={c.id}
-                          className="rounded-3xl border border-slate-100 bg-white p-4.5 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-3 relative hover:shadow-md transition-shadow duration-200 text-left animate-fade-in"
-                        >
-                          {/* Card Header */}
-                          <div className="flex items-center justify-between border-b border-slate-50 pb-2 dark:border-slate-800/40">
-                            <div className="space-y-0.5">
-                              <span className="text-[8px] font-extrabold uppercase text-purple-650 tracking-widest bg-purple-50 px-2 py-0.5 rounded-lg dark:bg-purple-950/20 dark:text-purple-400">
-                                {c.action === 'key-points' ? '💡 Key Points' : c.action === 'explain' ? '✨ Explain' : c.action === 'summarize' ? '📝 Summarize' : c.action === 'simplify' ? '📚 Simplify' : '🌍 Translate'}
-                              </span>
-                              <span className="block text-[7.5px] text-slate-400 font-bold uppercase tracking-wider">
-                                {new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                            </div>
-                            <button
-                              onClick={(e) => handleDeleteConversation(c.id, e)}
-                              className="text-slate-350 hover:text-red-500 cursor-pointer p-1 transition-colors"
-                              title="Delete conversation"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-
-                          {/* Excerpt Excerpt Text */}
-                          {c.selectedText && (
-                            <div className="bg-slate-50/50 dark:bg-slate-800/25 p-2.5 rounded-2xl border border-slate-50/80 dark:border-slate-800/40">
-                              <span className="block text-[7.5px] font-black uppercase text-slate-400 tracking-wider mb-0.5">
-                                Selected Text Excerpt
-                              </span>
-                              <p className="line-clamp-2 font-serif text-[9px] leading-relaxed italic text-slate-550 dark:text-slate-455 border-l-2 border-purple-300 pl-1.5">
-                                "{c.selectedText}"
-                              </p>
-                            </div>
-                          )}
-
-                          {/* Body content */}
-                          <div className="relative text-xs leading-relaxed text-slate-800 dark:text-slate-200">
-                            <MarkdownRenderer text={c.response} />
-                          </div>
-
-                          {/* Actions footer */}
-                          <div className="flex items-center justify-between border-t border-slate-50 pt-2.5 dark:border-slate-800/40">
-                            <div className="flex gap-3">
-                              <button
-                                onClick={() => handleCopyAiResponse(c.response, c.id)}
-                                className="text-[9px] font-extrabold uppercase text-slate-400 hover:text-purple-650 dark:hover:text-purple-400 transition-colors flex items-center gap-1 cursor-pointer"
-                              >
-                                {copiedIndex === c.id ? 'Copied successfully. ✅' : '📋 Copy'}
-                              </button>
-                              <button
-                                onClick={() => handleAiActionDirect(c.selectedText, c.action)}
-                                className="text-[9px] font-extrabold uppercase text-slate-400 hover:text-purple-650 dark:hover:text-purple-400 transition-colors flex items-center gap-1 cursor-pointer"
-                              >
-                                🔄 Regenerate
-                              </button>
-                            </div>
-                            
-                            <div className="flex gap-1.5 items-center">
-                              <button
-                                onClick={() => handleFeedback(c.id, 'yes')}
-                                className={`text-[10px] p-1 rounded-md transition-all cursor-pointer ${
-                                  c.helpful === 'yes'
-                                    ? 'bg-emerald-50 text-emerald-650 dark:bg-emerald-950/20 dark:text-emerald-400'
-                                    : 'text-slate-350 hover:text-emerald-500'
-                                }`}
-                                title="Helpful"
-                              >
-                                👍
-                              </button>
-                              <button
-                                onClick={() => handleFeedback(c.id, 'no')}
-                                className={`text-[10px] p-1 rounded-md transition-all cursor-pointer ${
-                                  c.helpful === 'no'
-                                    ? 'bg-rose-50 text-rose-650 dark:bg-rose-950/20 dark:text-rose-400'
-                                    : 'text-slate-350 hover:text-rose-500'
-                                }`}
-                                title="Not Helpful"
-                              >
-                                👎
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
+                    </div>
+                  ))
+                )}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -2289,22 +1803,9 @@ export const ReaderPage: React.FC = () => {
           >
             <button
               onClick={handleOpenAddNotePopup}
-              className="text-purple-300 flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase transition-colors hover:bg-white/10"
+              className="flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold text-purple-300 uppercase transition-colors hover:bg-white/10"
             >
               📝 Add Note
-            </button>
-            <button
-              onClick={handleTriggerAskAi}
-              className="text-purple-300 flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase transition-colors hover:bg-white/10"
-            >
-              ✨ Ask AI
-            </button>
-            <button
-              onClick={handleGenerateFlashcards}
-              className="text-purple-300 flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase transition-colors hover:bg-white/10"
-              title="Generate study flashcards from selection"
-            >
-              🃏 Flashcards
             </button>
             <button
               onClick={handleQuickHighlight}
@@ -2314,13 +1815,13 @@ export const ReaderPage: React.FC = () => {
             </button>
             <button
               onClick={toggleBookmark}
-              className="text-amber-300 flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase transition-colors hover:bg-white/10"
+              className="flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold text-amber-300 uppercase transition-colors hover:bg-white/10"
             >
               🔖 Bookmark
             </button>
             <button
               onClick={handleCopySelectionText}
-              className="text-slate-300 flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase transition-colors hover:bg-white/10"
+              className="flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold text-slate-300 uppercase transition-colors hover:bg-white/10"
             >
               📋 Copy
             </button>
@@ -2505,12 +2006,12 @@ export const ReaderPage: React.FC = () => {
               className="w-full max-w-md rounded-3xl border border-slate-100 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900"
             >
               <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800/40">
-                <span className="text-[10px] font-black uppercase text-purple-650 tracking-widest">
+                <span className="text-purple-650 text-[10px] font-black tracking-widest uppercase">
                   📝 Add Note (Page {page})
                 </span>
                 <button
                   onClick={() => setIsAddNotePopupOpen(false)}
-                  className="cursor-pointer font-bold text-slate-400 hover:text-slate-600 text-xs"
+                  className="cursor-pointer text-xs font-bold text-slate-400 hover:text-slate-600"
                 >
                   ✕
                 </button>
@@ -2518,7 +2019,7 @@ export const ReaderPage: React.FC = () => {
 
               <form onSubmit={handleSavePopupNote} className="space-y-4">
                 <div className="space-y-1">
-                  <label className="text-[9px] font-extrabold uppercase text-slate-400 tracking-wider">
+                  <label className="text-[9px] font-extrabold tracking-wider text-slate-400 uppercase">
                     Note Title
                   </label>
                   <input
@@ -2526,30 +2027,30 @@ export const ReaderPage: React.FC = () => {
                     placeholder="Enter note title..."
                     value={popupNoteTitle}
                     onChange={(e) => setPopupNoteTitle(e.target.value)}
-                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-850 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500/25"
+                    className="dark:bg-slate-850 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-800 focus:ring-2 focus:ring-purple-500/25 focus:outline-none dark:border-slate-700 dark:text-slate-100"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] font-extrabold uppercase text-slate-400 tracking-wider">
+                  <label className="text-[9px] font-extrabold tracking-wider text-slate-400 uppercase">
                     Personal Thoughts & Notes
                   </label>
                   <textarea
                     placeholder="Add your reading insights or annotations..."
                     value={popupNoteText}
                     onChange={(e) => setPopupNoteText(e.target.value)}
-                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-850 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500/25 font-sans"
+                    className="dark:bg-slate-850 w-full rounded-xl border border-slate-200 bg-white p-2.5 font-sans text-xs text-slate-800 focus:ring-2 focus:ring-purple-500/25 focus:outline-none dark:border-slate-700 dark:text-slate-100"
                     rows={4}
                     required
                   />
                 </div>
 
                 {modalHighlightText && (
-                  <div className="space-y-1 bg-slate-50/50 dark:bg-slate-800/20 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
-                    <span className="text-[8px] font-extrabold uppercase text-slate-400 tracking-wider">
+                  <div className="space-y-1 rounded-2xl border border-slate-100 bg-slate-50/50 p-3 dark:border-slate-800 dark:bg-slate-800/20">
+                    <span className="text-[8px] font-extrabold tracking-wider text-slate-400 uppercase">
                       Selected Text
                     </span>
-                    <p className="line-clamp-3 font-serif text-[10px] leading-relaxed italic text-slate-500 dark:text-slate-400 border-l-2 border-purple-400 pl-2">
+                    <p className="line-clamp-3 border-l-2 border-purple-400 pl-2 font-serif text-[10px] leading-relaxed text-slate-500 italic dark:text-slate-400">
                       "{modalHighlightText}"
                     </p>
                   </div>
@@ -2559,13 +2060,13 @@ export const ReaderPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setIsAddNotePopupOpen(false)}
-                    className="cursor-pointer text-xs font-bold text-slate-500 hover:text-slate-700 border border-slate-200 rounded-xl px-4 py-2 hover:bg-slate-50 dark:border-slate-850 dark:hover:bg-slate-800"
+                    className="dark:border-slate-850 cursor-pointer rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50 hover:text-slate-700 dark:hover:bg-slate-800"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="cursor-pointer text-xs font-bold text-white bg-purple-600 rounded-xl px-5 py-2 hover:bg-purple-750 active:scale-95 transition-all shadow-md shadow-purple-600/10"
+                    className="hover:bg-purple-750 cursor-pointer rounded-xl bg-purple-600 px-5 py-2 text-xs font-bold text-white shadow-md shadow-purple-600/10 transition-all active:scale-95"
                   >
                     Save
                   </button>

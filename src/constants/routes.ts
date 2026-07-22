@@ -18,7 +18,6 @@ export const ROUTES = {
   DESIGN_SYSTEM: '/design-system',
   FORGOT_PASSWORD: '/forgot-password',
   RESET_PASSWORD: '/reset-password',
-  FLASHCARDS: '/flashcards',
   SUBSCRIPTION: '/subscription',
   ADMIN: '/admin',
   ADMIN_USERS: '/admin/users',

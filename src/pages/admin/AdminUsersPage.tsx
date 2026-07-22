@@ -4,6 +4,7 @@ import { PageWrapper } from '../../components/common/PageWrapper'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
 import { supabase } from '../../services/supabase'
+import { auditService } from '../../services/audit'
 import {
   Users,
   Search,
@@ -50,8 +51,12 @@ export const AdminUsersPage: React.FC = () => {
 
   // Controls & Filters
   const [searchQuery, setSearchQuery] = useState('')
-  const [filterType, setFilterType] = useState<'All' | 'Free' | 'Pro' | 'Family' | 'Admins' | 'Suspended'>('All')
-  const [sortBy, setSortBy] = useState<'Newest' | 'Oldest' | 'Highest Storage' | 'Lowest Storage'>('Newest')
+  const [filterType, setFilterType] = useState<
+    'All' | 'Free' | 'Pro' | 'Family' | 'Admins' | 'Suspended'
+  >('All')
+  const [sortBy, setSortBy] = useState<'Newest' | 'Oldest' | 'Highest Storage' | 'Lowest Storage'>(
+    'Newest'
+  )
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
@@ -59,7 +64,9 @@ export const AdminUsersPage: React.FC = () => {
 
   // Right-side Drawer State
   const [drawerUser, setDrawerUser] = useState<DBUserRecord | null>(null)
-  const [drawerTab, setDrawerTab] = useState<'profile' | 'subscription' | 'storage' | 'books' | 'payments' | 'activity' | 'devices'>('profile')
+  const [drawerTab, setDrawerTab] = useState<
+    'profile' | 'subscription' | 'storage' | 'books' | 'payments' | 'activity' | 'devices'
+  >('profile')
 
   // Drawer edit states
   const [editPlanId, setEditPlanId] = useState('free')
@@ -92,13 +99,15 @@ export const AdminUsersPage: React.FC = () => {
       if (subsErr) console.error('Error fetching user subscriptions:', subsErr)
 
       // 3. Fetch books to calculate storage
-      const { data: booksData, error: booksErr } = await supabase.from('books').select('user_id, file_size')
+      const { data: booksData, error: booksErr } = await supabase
+        .from('books')
+        .select('user_id, file_size')
       if (booksErr) console.error('Error fetching books storage:', booksErr)
 
       // Group storage in memory
       const storageMap: Record<string, number> = {}
       if (booksData) {
-        booksData.forEach((b: any) => {
+        booksData.forEach((b: { user_id?: string; file_size?: number }) => {
           if (b.user_id) {
             storageMap[b.user_id] = (storageMap[b.user_id] || 0) + (b.file_size || 0)
           }
@@ -107,12 +116,15 @@ export const AdminUsersPage: React.FC = () => {
 
       if (roles) {
         const mapped: DBUserRecord[] = roles.map((row) => {
-          const sub = subs?.find((s: any) => s.user_id === row.user_id)
+          const sub = subs?.find((s: { user_id?: string }) => s.user_id === row.user_id)
           const storageUsed = storageMap[row.user_id] || 0
-          
+
           let storageLimit = 5368709120 // 5 GB default fallback
           if (sub) {
-            if (sub.custom_storage_limit_bytes !== null && sub.custom_storage_limit_bytes !== undefined) {
+            if (
+              sub.custom_storage_limit_bytes !== null &&
+              sub.custom_storage_limit_bytes !== undefined
+            ) {
               storageLimit = Number(sub.custom_storage_limit_bytes)
             } else if (sub.plan) {
               storageLimit = sub.plan.storage_limit_bytes
@@ -122,7 +134,7 @@ export const AdminUsersPage: React.FC = () => {
           return {
             user_id: row.user_id,
             email: row.email || 'N/A',
-            role: (row.role as any) || 'user',
+            role: (row.role as 'user' | 'super_admin') || 'user',
             created_at: row.created_at || new Date().toISOString(),
             name: row.email ? row.email.split('@')[0] : 'Registered User',
             plan: sub?.plan?.plan_name || 'FREE',
@@ -132,7 +144,7 @@ export const AdminUsersPage: React.FC = () => {
             current_period_end: sub?.current_period_end || null,
             cancel_at_period_end: sub?.cancel_at_period_end || false,
             plan_id: sub?.plan_id || 'free',
-            billing_cycle: sub?.billing_cycle || 'monthly'
+            billing_cycle: sub?.billing_cycle || 'monthly',
           }
         })
 
@@ -150,7 +162,7 @@ export const AdminUsersPage: React.FC = () => {
             storageLimitBytes: currentUser.role === 'super_admin' ? 1099511627776 : 5368709120,
             status: 'Active',
             plan_id: currentUser.role === 'super_admin' ? 'family' : 'free',
-            billing_cycle: 'monthly'
+            billing_cycle: 'monthly',
           })
         }
 
@@ -164,15 +176,19 @@ export const AdminUsersPage: React.FC = () => {
   }, [currentUser])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchLiveUsers()
   }, [fetchLiveUsers])
 
   useEffect(() => {
     if (drawerUser) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEditPlanId(drawerUser.plan_id || 'free')
       setEditBillingCycle(drawerUser.billing_cycle || 'monthly')
       setEditStatus(drawerUser.status === 'Suspended' ? 'suspended' : 'active')
-      setEditStorageLimitGB(Math.round((drawerUser.storageLimitBytes || 5368709120) / (1024 * 1024 * 1024)))
+      setEditStorageLimitGB(
+        Math.round((drawerUser.storageLimitBytes || 5368709120) / (1024 * 1024 * 1024))
+      )
     }
   }, [drawerUser])
 
@@ -202,8 +218,10 @@ export const AdminUsersPage: React.FC = () => {
       return matchesSearch && matchesFilter
     })
     .sort((a, b) => {
-      if (sortBy === 'Newest') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      if (sortBy === 'Oldest') return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      if (sortBy === 'Newest')
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      if (sortBy === 'Oldest')
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       if (sortBy === 'Highest Storage') return (b.storageUsedBytes || 0) - (a.storageUsedBytes || 0)
       if (sortBy === 'Lowest Storage') return (a.storageUsedBytes || 0) - (b.storageUsedBytes || 0)
       return 0
@@ -211,7 +229,10 @@ export const AdminUsersPage: React.FC = () => {
 
   // Pagination Slice
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage) || 1
-  const paginatedUsers = filteredUsers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+  const paginatedUsers = filteredUsers.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  )
 
   // Actions
   const handleExportCSV = () => {
@@ -220,14 +241,24 @@ export const AdminUsersPage: React.FC = () => {
       return
     }
     const headers = ['User ID', 'Email', 'Role', 'Plan', 'Status', 'Created At']
-    const rows = users.map((u) => [u.user_id, u.email, u.role, u.plan || 'Free', u.status || 'Active', u.created_at])
+    const rows = users.map((u) => [
+      u.user_id,
+      u.email,
+      u.role,
+      u.plan || 'Free',
+      u.status || 'Active',
+      u.created_at,
+    ])
     const csvContent = [headers.join(','), ...rows.map((e) => e.join(','))].join('\n')
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.setAttribute('href', url)
-    link.setAttribute('download', `librovia_users_export_${new Date().toISOString().split('T')[0]}.csv`)
+    link.setAttribute(
+      'download',
+      `librovia_users_export_${new Date().toISOString().split('T')[0]}.csv`
+    )
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -260,25 +291,42 @@ export const AdminUsersPage: React.FC = () => {
       const target = users.find((u) => u.user_id === userId)
       if (!target) return
       const newStatus = target.status === 'Active' ? 'suspended' : 'active'
-      
-      const { error } = await supabase
-        .from('user_subscriptions')
-        .upsert({
+
+      const { error } = await supabase.from('user_subscriptions').upsert(
+        {
           user_id: userId,
           plan_id: target.plan_id || 'free',
           status: newStatus,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'user_id' })
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id' }
+      )
 
       if (error) throw error
 
+      await auditService.insertLog({
+        event: 'User Suspend/Activate',
+        category: 'RBAC & Roles',
+        severity: newStatus === 'suspended' ? 'Warning' : 'Info',
+        metadata: {
+          action: newStatus === 'suspended' ? 'suspend' : 'activate',
+          targetUserId: userId,
+          targetUserEmail: target.email,
+        },
+      })
+
       setUsers((prev) =>
-        prev.map((u) => (u.user_id === userId ? { ...u, status: newStatus === 'suspended' ? 'Suspended' : 'Active' } : u))
+        prev.map((u) =>
+          u.user_id === userId
+            ? { ...u, status: newStatus === 'suspended' ? 'Suspended' : 'Active' }
+            : u
+        )
       )
       showSuccess(`Subscription status updated to ${newStatus}.`)
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err)
-      showError(err.message || 'Failed to update suspension status.')
+      const errMsg = err instanceof Error ? err.message : 'Failed to update suspension status.'
+      showError(errMsg)
     }
     setActiveMenuId(null)
   }
@@ -288,12 +336,20 @@ export const AdminUsersPage: React.FC = () => {
     try {
       const { error } = await supabase.from('user_roles').delete().eq('user_id', userId)
       if (error) throw error
-      
+
+      await auditService.insertLog({
+        event: 'User Delete',
+        category: 'RBAC & Roles',
+        severity: 'Warning',
+        metadata: { targetUserId: userId, targetUserEmail: email },
+      })
+
       setUsers((prev) => prev.filter((u) => u.user_id !== userId))
       showSuccess(`Deleted account ${email}.`)
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err)
-      showError(err.message || 'Failed to delete user.')
+      const errMsg = err instanceof Error ? err.message : 'Failed to delete user.'
+      showError(errMsg)
     }
     setActiveMenuId(null)
   }
@@ -307,9 +363,9 @@ export const AdminUsersPage: React.FC = () => {
   return (
     <PageWrapper className="min-h-screen space-y-8 pb-20 text-left select-none">
       {/* 1. HEADER & GLOBAL ACTIONS */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200/80 pb-6 dark:border-slate-800">
+      <div className="flex flex-col gap-4 border-b border-slate-200/80 pb-6 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
         <div className="space-y-1">
-          <h1 className="font-sans text-2xl font-black tracking-tight text-slate-900 sm:text-3xl dark:text-white flex items-center gap-2.5">
+          <h1 className="flex items-center gap-2.5 font-sans text-2xl font-black tracking-tight text-slate-900 sm:text-3xl dark:text-white">
             <Users className="h-7 w-7 text-purple-600" />
             User Account Management
           </h1>
@@ -322,7 +378,7 @@ export const AdminUsersPage: React.FC = () => {
           <button
             type="button"
             onClick={handleExportCSV}
-            className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-extrabold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 transition-all shadow-xs"
+            className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-extrabold text-slate-700 shadow-xs transition-all hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
           >
             <Download className="h-4 w-4" />
             <span>Export CSV</span>
@@ -331,7 +387,7 @@ export const AdminUsersPage: React.FC = () => {
           <button
             type="button"
             onClick={() => setIsAddUserOpen(true)}
-            className="inline-flex items-center gap-2 rounded-2xl bg-purple-600 px-4 py-2.5 text-xs font-black text-white hover:bg-purple-700 transition-all shadow-md shadow-purple-600/20 active:scale-98"
+            className="inline-flex items-center gap-2 rounded-2xl bg-purple-600 px-4 py-2.5 text-xs font-black text-white shadow-md shadow-purple-600/20 transition-all hover:bg-purple-700 active:scale-98"
           >
             <UserPlus className="h-4 w-4" />
             <span>Add User</span>
@@ -343,42 +399,46 @@ export const AdminUsersPage: React.FC = () => {
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
           <span className="text-[10px] font-extrabold text-slate-400 uppercase">Total Users</span>
-          <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-2">
+          <h3 className="mt-2 text-2xl font-black text-slate-900 dark:text-white">
             {loading ? '...' : totalUsers}
           </h3>
-          <p className="text-[11px] font-semibold text-slate-500 mt-1">Live database count</p>
+          <p className="mt-1 text-[11px] font-semibold text-slate-500">Live database count</p>
         </div>
 
         <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
           <span className="text-[10px] font-extrabold text-purple-600 uppercase">Super Admins</span>
-          <h3 className="text-2xl font-black text-purple-600 mt-2">
+          <h3 className="mt-2 text-2xl font-black text-purple-600">
             {loading ? '...' : superAdminsCount}
           </h3>
-          <p className="text-[11px] font-semibold text-slate-500 mt-1">RBAC privileged accounts</p>
+          <p className="mt-1 text-[11px] font-semibold text-slate-500">RBAC privileged accounts</p>
         </div>
 
         <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-          <span className="text-[10px] font-extrabold text-emerald-600 uppercase">Active Users</span>
-          <h3 className="text-2xl font-black text-emerald-600 mt-2">
+          <span className="text-[10px] font-extrabold text-emerald-600 uppercase">
+            Active Users
+          </span>
+          <h3 className="mt-2 text-2xl font-black text-emerald-600">
             {loading ? '...' : activeUsersCount}
           </h3>
-          <p className="text-[11px] font-semibold text-slate-500 mt-1">Operational accounts</p>
+          <p className="mt-1 text-[11px] font-semibold text-slate-500">Operational accounts</p>
         </div>
 
         <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-          <span className="text-[10px] font-extrabold text-rose-600 uppercase">Suspended Users</span>
-          <h3 className="text-2xl font-black text-rose-600 mt-2">
+          <span className="text-[10px] font-extrabold text-rose-600 uppercase">
+            Suspended Users
+          </span>
+          <h3 className="mt-2 text-2xl font-black text-rose-600">
             {loading ? '...' : suspendedUsersCount}
           </h3>
-          <p className="text-[11px] font-semibold text-slate-500 mt-1">Restricted accounts</p>
+          <p className="mt-1 text-[11px] font-semibold text-slate-500">Restricted accounts</p>
         </div>
       </div>
 
       {/* 3. SEARCH & FILTERS BAR */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         {/* Search */}
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <div className="relative max-w-md flex-1">
+          <Search className="absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             value={searchQuery}
@@ -387,7 +447,7 @@ export const AdminUsersPage: React.FC = () => {
               setCurrentPage(1)
             }}
             placeholder="Search users by Name, Email, Plan, or Role..."
-            className="w-full rounded-2xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-xs font-semibold text-slate-900 focus:border-purple-600 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+            className="w-full rounded-2xl border border-slate-200 bg-white py-2.5 pr-4 pl-10 text-xs font-semibold text-slate-900 focus:border-purple-600 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white"
           />
         </div>
 
@@ -418,7 +478,11 @@ export const AdminUsersPage: React.FC = () => {
           <div className="relative">
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
+              onChange={(e) =>
+                setSortBy(
+                  e.target.value as 'Newest' | 'Oldest' | 'Highest Storage' | 'Lowest Storage'
+                )
+              }
               className="rounded-2xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-extrabold text-slate-700 focus:border-purple-600 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
             >
               <option value="Newest">Sort: Newest First</option>
@@ -451,7 +515,7 @@ export const AdminUsersPage: React.FC = () => {
                 Array.from({ length: 3 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
                     <td className="px-6 py-4">
-                      <div className="h-4 w-32 rounded bg-slate-200 dark:bg-slate-800 mb-1" />
+                      <div className="mb-1 h-4 w-32 rounded bg-slate-200 dark:bg-slate-800" />
                       <div className="h-3 w-48 rounded bg-slate-100 dark:bg-slate-800/60" />
                     </td>
                     <td className="px-6 py-4">
@@ -467,7 +531,7 @@ export const AdminUsersPage: React.FC = () => {
                       <div className="h-5 w-16 rounded-full bg-slate-200 dark:bg-slate-800" />
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <div className="h-6 w-6 rounded bg-slate-200 dark:bg-slate-800 ml-auto" />
+                      <div className="ml-auto h-6 w-6 rounded bg-slate-200 dark:bg-slate-800" />
                     </td>
                   </tr>
                 ))
@@ -480,16 +544,21 @@ export const AdminUsersPage: React.FC = () => {
                   const pct = Math.min(100, Math.round((used / limit) * 100)) || 1
 
                   return (
-                    <tr key={u.user_id} className="transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                    <tr
+                      key={u.user_id}
+                      className="transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/30"
+                    >
                       {/* User Avatar & Info */}
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-100 font-extrabold text-xs text-purple-700 dark:bg-purple-950 dark:text-purple-300">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-100 text-xs font-extrabold text-purple-700 dark:bg-purple-950 dark:text-purple-300">
                             {u.email.charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <span className="block font-bold text-slate-900 dark:text-white">{u.name}</span>
-                            <span className="text-[11px] text-slate-400 font-mono">{u.email}</span>
+                            <span className="block font-bold text-slate-900 dark:text-white">
+                              {u.name}
+                            </span>
+                            <span className="font-mono text-[11px] text-slate-400">{u.email}</span>
                           </div>
                         </div>
                       </td>
@@ -501,13 +570,16 @@ export const AdminUsersPage: React.FC = () => {
 
                       {/* Visual Storage Progress Bar */}
                       <td className="px-6 py-4">
-                        <div className="space-y-1 max-w-[160px]">
+                        <div className="max-w-[160px] space-y-1">
                           <div className="flex items-center justify-between text-[10.5px] font-semibold text-slate-600 dark:text-slate-300">
                             <span>{formatStorageMB(used)}</span>
                             <span className="text-slate-400">{pct}%</span>
                           </div>
-                          <div className="h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                            <div className="h-full bg-purple-600 rounded-full" style={{ width: `${pct}%` }} />
+                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                            <div
+                              className="h-full rounded-full bg-purple-600"
+                              style={{ width: `${pct}%` }}
+                            />
                           </div>
                         </div>
                       </td>
@@ -546,11 +618,13 @@ export const AdminUsersPage: React.FC = () => {
                       </td>
 
                       {/* Modern Overflow Menu (...) */}
-                      <td className="px-6 py-4 text-right relative">
+                      <td className="relative px-6 py-4 text-right">
                         <button
                           type="button"
-                          onClick={() => setActiveMenuId(activeMenuId === u.user_id ? null : u.user_id)}
-                          className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
+                          onClick={() =>
+                            setActiveMenuId(activeMenuId === u.user_id ? null : u.user_id)
+                          }
+                          className="rounded-xl p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                           title="Actions menu"
                         >
                           <MoreHorizontal className="h-4 w-4" />
@@ -558,14 +632,14 @@ export const AdminUsersPage: React.FC = () => {
 
                         {/* Overflow Dropdown */}
                         {activeMenuId === u.user_id && (
-                          <div className="absolute right-6 top-12 z-30 w-44 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-slate-800 dark:bg-slate-900 text-left text-xs font-semibold space-y-0.5">
+                          <div className="absolute top-12 right-6 z-30 w-44 space-y-0.5 rounded-2xl border border-slate-200 bg-white p-1.5 text-left text-xs font-semibold shadow-xl dark:border-slate-800 dark:bg-slate-900">
                             <button
                               type="button"
                               onClick={() => {
                                 setDrawerUser(u)
                                 setActiveMenuId(null)
                               }}
-                              className="w-full flex items-center gap-2 rounded-xl px-3 py-2 text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
                             >
                               <Eye className="h-3.5 w-3.5 text-purple-600" /> View Details
                             </button>
@@ -576,7 +650,7 @@ export const AdminUsersPage: React.FC = () => {
                                 setDrawerTab('profile')
                                 setActiveMenuId(null)
                               }}
-                              className="w-full flex items-center gap-2 rounded-xl px-3 py-2 text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
                             >
                               <Edit className="h-3.5 w-3.5 text-indigo-600" /> Edit User
                             </button>
@@ -587,22 +661,23 @@ export const AdminUsersPage: React.FC = () => {
                                 setDrawerTab('subscription')
                                 setActiveMenuId(null)
                               }}
-                              className="w-full flex items-center gap-2 rounded-xl px-3 py-2 text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
                             >
                               <Crown className="h-3.5 w-3.5 text-amber-500" /> Upgrade Plan
                             </button>
                             <button
                               type="button"
                               onClick={() => handleToggleSuspend(u.user_id)}
-                              className="w-full flex items-center gap-2 rounded-xl px-3 py-2 text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
                             >
-                              <UserX className="h-3.5 w-3.5 text-amber-600" /> {u.status === 'Active' ? 'Suspend' : 'Reactivate'}
+                              <UserX className="h-3.5 w-3.5 text-amber-600" />{' '}
+                              {u.status === 'Active' ? 'Suspend' : 'Reactivate'}
                             </button>
                             {!isSuperAdmin && (
                               <button
                                 type="button"
                                 onClick={() => handleDeleteUser(u.user_id, u.email)}
-                                className="w-full flex items-center gap-2 rounded-xl px-3 py-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                                className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40"
                               >
                                 <Trash2 className="h-3.5 w-3.5 text-rose-600" /> Delete User
                               </button>
@@ -621,8 +696,10 @@ export const AdminUsersPage: React.FC = () => {
                       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400">
                         <Inbox className="h-6 w-6" />
                       </div>
-                      <h4 className="text-sm font-black text-slate-900 dark:text-white">No registered users yet.</h4>
-                      <p className="text-xs font-semibold text-slate-400 max-w-xs leading-relaxed">
+                      <h4 className="text-sm font-black text-slate-900 dark:text-white">
+                        No registered users yet.
+                      </h4>
+                      <p className="max-w-xs text-xs leading-relaxed font-semibold text-slate-400">
                         No accounts match your current search query or filter settings.
                       </p>
                     </div>
@@ -634,9 +711,18 @@ export const AdminUsersPage: React.FC = () => {
         </div>
 
         {/* 6. PAGINATION FOOTER */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-t border-slate-100 p-4 text-xs font-semibold text-slate-500 dark:border-slate-800">
+        <div className="flex flex-col gap-3 border-t border-slate-100 p-4 text-xs font-semibold text-slate-500 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
           <div>
-            Showing <strong className="text-slate-900 dark:text-white">{filteredUsers.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}</strong>–<strong className="text-slate-900 dark:text-white">{Math.min(currentPage * itemsPerPage, filteredUsers.length)}</strong> of <strong className="text-slate-900 dark:text-white">{filteredUsers.length}</strong> users
+            Showing{' '}
+            <strong className="text-slate-900 dark:text-white">
+              {filteredUsers.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}
+            </strong>
+            –
+            <strong className="text-slate-900 dark:text-white">
+              {Math.min(currentPage * itemsPerPage, filteredUsers.length)}
+            </strong>{' '}
+            of <strong className="text-slate-900 dark:text-white">{filteredUsers.length}</strong>{' '}
+            users
           </div>
 
           <div className="flex items-center gap-2">
@@ -644,7 +730,7 @@ export const AdminUsersPage: React.FC = () => {
               type="button"
               disabled={currentPage === 1}
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              className="flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-1.5 text-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-1.5 text-slate-700 hover:bg-slate-50 disabled:opacity-40 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               <ChevronLeft className="h-4 w-4" /> Previous
             </button>
@@ -655,7 +741,7 @@ export const AdminUsersPage: React.FC = () => {
               type="button"
               disabled={currentPage >= totalPages}
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              className="flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-1.5 text-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-1.5 text-slate-700 hover:bg-slate-50 disabled:opacity-40 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               Next <ChevronRight className="h-4 w-4" />
             </button>
@@ -683,18 +769,20 @@ export const AdminUsersPage: React.FC = () => {
                 animate={{ x: 0 }}
                 exit={{ x: '100%' }}
                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                className="w-screen max-w-md bg-white p-6 shadow-2xl dark:bg-slate-900 flex flex-col justify-between"
+                className="flex w-screen max-w-md flex-col justify-between bg-white p-6 shadow-2xl dark:bg-slate-900"
               >
                 <div className="space-y-6 overflow-y-auto pr-1">
                   {/* Drawer Header */}
                   <div className="flex items-center justify-between border-b border-slate-100 pb-4 dark:border-slate-800">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-purple-600 text-white font-black text-sm shadow-md">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-purple-600 text-sm font-black text-white shadow-md">
                         {drawerUser.email.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <h3 className="font-sans text-base font-black text-slate-900 dark:text-white">{drawerUser.name}</h3>
-                        <p className="text-xs font-mono text-slate-400">{drawerUser.email}</p>
+                        <h3 className="font-sans text-base font-black text-slate-900 dark:text-white">
+                          {drawerUser.name}
+                        </h3>
+                        <p className="font-mono text-xs text-slate-400">{drawerUser.email}</p>
                       </div>
                     </div>
 
@@ -708,13 +796,23 @@ export const AdminUsersPage: React.FC = () => {
                   </div>
 
                   {/* Drawer Tabs */}
-                  <div className="flex flex-wrap gap-1 rounded-2xl bg-slate-100 p-1 dark:bg-slate-800 text-[11px] font-extrabold">
-                    {(['profile', 'subscription', 'storage', 'books', 'payments', 'activity', 'devices'] as const).map((t) => (
+                  <div className="flex flex-wrap gap-1 rounded-2xl bg-slate-100 p-1 text-[11px] font-extrabold dark:bg-slate-800">
+                    {(
+                      [
+                        'profile',
+                        'subscription',
+                        'storage',
+                        'books',
+                        'payments',
+                        'activity',
+                        'devices',
+                      ] as const
+                    ).map((t) => (
                       <button
                         key={t}
                         type="button"
                         onClick={() => setDrawerTab(t)}
-                        className={`capitalize rounded-xl px-2.5 py-1.5 transition-colors ${
+                        className={`rounded-xl px-2.5 py-1.5 capitalize transition-colors ${
                           drawerTab === t
                             ? 'bg-purple-600 text-white shadow-xs'
                             : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
@@ -726,32 +824,40 @@ export const AdminUsersPage: React.FC = () => {
                   </div>
 
                   {/* Drawer Tab Content */}
-                  <div className="space-y-4 text-xs font-semibold text-slate-600 dark:text-slate-300 pt-2">
+                  <div className="space-y-4 pt-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
                     {drawerTab === 'profile' && (
                       <div className="space-y-3 rounded-2xl bg-slate-50 p-4 dark:bg-slate-800/50">
-                        <div className="flex justify-between py-1 border-b border-slate-200/60 dark:border-slate-700/60">
+                        <div className="flex justify-between border-b border-slate-200/60 py-1 dark:border-slate-700/60">
                           <span>User ID:</span>
-                          <span className="font-mono font-bold text-slate-900 dark:text-white">{drawerUser.user_id}</span>
+                          <span className="font-mono font-bold text-slate-900 dark:text-white">
+                            {drawerUser.user_id}
+                          </span>
                         </div>
-                        <div className="flex justify-between py-1 border-b border-slate-200/60 dark:border-slate-700/60">
+                        <div className="flex justify-between border-b border-slate-200/60 py-1 dark:border-slate-700/60">
                           <span>Role:</span>
-                          <span className="font-bold text-purple-600 dark:text-purple-400">{drawerUser.role}</span>
+                          <span className="font-bold text-purple-600 dark:text-purple-400">
+                            {drawerUser.role}
+                          </span>
                         </div>
-                        <div className="flex justify-between py-1 border-b border-slate-200/60 dark:border-slate-700/60">
+                        <div className="flex justify-between border-b border-slate-200/60 py-1 dark:border-slate-700/60">
                           <span>Account Status:</span>
                           <span className="font-bold text-emerald-600">{drawerUser.status}</span>
                         </div>
                         <div className="flex justify-between py-1">
                           <span>Created At:</span>
-                          <span className="font-mono">{new Date(drawerUser.created_at).toLocaleDateString()}</span>
+                          <span className="font-mono">
+                            {new Date(drawerUser.created_at).toLocaleDateString()}
+                          </span>
                         </div>
                       </div>
                     )}
 
                     {drawerTab === 'subscription' && (
-                      <div className="space-y-4 rounded-2xl bg-slate-50 p-4 dark:bg-slate-800/50 text-left">
+                      <div className="space-y-4 rounded-2xl bg-slate-50 p-4 text-left dark:bg-slate-800/50">
                         <div>
-                          <label className="block text-[10px] font-extrabold uppercase text-slate-400 mb-1">Select Subscription Plan</label>
+                          <label className="mb-1 block text-[10px] font-extrabold text-slate-400 uppercase">
+                            Select Subscription Plan
+                          </label>
                           <select
                             value={editPlanId}
                             onChange={(e) => setEditPlanId(e.target.value)}
@@ -764,10 +870,14 @@ export const AdminUsersPage: React.FC = () => {
                         </div>
 
                         <div>
-                          <label className="block text-[10px] font-extrabold uppercase text-slate-400 mb-1">Billing Cycle</label>
+                          <label className="mb-1 block text-[10px] font-extrabold text-slate-400 uppercase">
+                            Billing Cycle
+                          </label>
                           <select
                             value={editBillingCycle}
-                            onChange={(e) => setEditBillingCycle(e.target.value as any)}
+                            onChange={(e) =>
+                              setEditBillingCycle(e.target.value as 'monthly' | 'yearly')
+                            }
                             className="w-full rounded-xl border border-slate-200 bg-white p-2 text-xs font-semibold text-slate-900 focus:border-purple-600 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white"
                           >
                             <option value="monthly">Monthly billing</option>
@@ -776,10 +886,14 @@ export const AdminUsersPage: React.FC = () => {
                         </div>
 
                         <div>
-                          <label className="block text-[10px] font-extrabold uppercase text-slate-400 mb-1">Subscription Status</label>
+                          <label className="mb-1 block text-[10px] font-extrabold text-slate-400 uppercase">
+                            Subscription Status
+                          </label>
                           <select
                             value={editStatus}
-                            onChange={(e) => setEditStatus(e.target.value as any)}
+                            onChange={(e) =>
+                              setEditStatus(e.target.value as 'active' | 'suspended' | 'canceled')
+                            }
                             className="w-full rounded-xl border border-slate-200 bg-white p-2 text-xs font-semibold text-slate-900 focus:border-purple-600 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white"
                           >
                             <option value="active">Active (Auto-renewing)</option>
@@ -790,8 +904,10 @@ export const AdminUsersPage: React.FC = () => {
 
                         {drawerUser.current_period_end && (
                           <div>
-                            <span className="block text-[10px] font-extrabold uppercase text-slate-400">Current Period End / Renewal</span>
-                            <span className="font-bold text-slate-900 dark:text-white font-mono">
+                            <span className="block text-[10px] font-extrabold text-slate-400 uppercase">
+                              Current Period End / Renewal
+                            </span>
+                            <span className="font-mono font-bold text-slate-900 dark:text-white">
                               {new Date(drawerUser.current_period_end).toLocaleDateString()}
                             </span>
                           </div>
@@ -811,30 +927,35 @@ export const AdminUsersPage: React.FC = () => {
                                   periodEnd.setMonth(periodEnd.getMonth() + 1)
                                 }
 
-                                const { error } = await supabase
-                                  .from('user_subscriptions')
-                                  .upsert({
+                                const { error } = await supabase.from('user_subscriptions').upsert(
+                                  {
                                     user_id: drawerUser.user_id,
                                     plan_id: editPlanId,
                                     billing_cycle: editBillingCycle,
                                     status: editStatus,
                                     current_period_end: periodEnd.toISOString(),
-                                    updated_at: new Date().toISOString()
-                                  }, { onConflict: 'user_id' })
+                                    updated_at: new Date().toISOString(),
+                                  },
+                                  { onConflict: 'user_id' }
+                                )
 
                                 if (error) throw error
 
                                 showSuccess('User subscription updated successfully!')
                                 fetchLiveUsers()
                                 setDrawerUser(null)
-                              } catch (err: any) {
+                              } catch (err: unknown) {
                                 console.error(err)
-                                showError(err.message || 'Failed to update subscription.')
+                                const errMsg =
+                                  err instanceof Error
+                                    ? err.message
+                                    : 'Failed to update subscription.'
+                                showError(errMsg)
                               } finally {
                                 setIsSaving(false)
                               }
                             }}
-                            className="w-full rounded-xl bg-purple-600 py-2.5 text-xs font-black text-white hover:bg-purple-700 shadow-md"
+                            className="w-full rounded-xl bg-purple-600 py-2.5 text-xs font-black text-white shadow-md hover:bg-purple-700"
                           >
                             {isSaving ? 'Saving Changes...' : 'Save Subscription Settings'}
                           </button>
@@ -843,38 +964,51 @@ export const AdminUsersPage: React.FC = () => {
                     )}
 
                     {drawerTab === 'storage' && (
-                      <div className="space-y-4 rounded-2xl bg-slate-50 p-4 dark:bg-slate-800/50 text-left">
+                      <div className="space-y-4 rounded-2xl bg-slate-50 p-4 text-left dark:bg-slate-800/50">
                         <div>
-                          <span className="text-[10px] uppercase text-slate-400 block font-bold">Storage Quota</span>
-                          <h4 className="text-sm font-black text-slate-900 dark:text-white mt-1">
+                          <span className="block text-[10px] font-bold text-slate-400 uppercase">
+                            Storage Quota
+                          </span>
+                          <h4 className="mt-1 text-sm font-black text-slate-900 dark:text-white">
                             {formatStorageMB(drawerUser.storageUsedBytes)} Used of{' '}
                             {(drawerUser.storageLimitBytes || 5368709120) >= 1099511627776
                               ? `${((drawerUser.storageLimitBytes || 5368709120) / 1099511627776).toFixed(0)} TB`
                               : `${((drawerUser.storageLimitBytes || 5368709120) / 1024 / 1024 / 1024).toFixed(0)} GB`}
                           </h4>
-                          <div className="h-2 w-full rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden mt-2">
+                          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
                             <div
                               className="h-full bg-purple-600"
                               style={{
                                 width: `${Math.min(
                                   100,
-                                  Math.round(((drawerUser.storageUsedBytes || 0) / (drawerUser.storageLimitBytes || 5368709120)) * 100)
-                                )}%`
+                                  Math.round(
+                                    ((drawerUser.storageUsedBytes || 0) /
+                                      (drawerUser.storageLimitBytes || 5368709120)) *
+                                      100
+                                  )
+                                )}%`,
                               }}
                             />
                           </div>
                         </div>
 
-                        <div className="border-t border-slate-200 dark:border-slate-700 pt-3">
-                          <label className="block text-[10px] font-extrabold uppercase text-slate-400 mb-1">Custom Storage Override (GB)</label>
+                        <div className="border-t border-slate-200 pt-3 dark:border-slate-700">
+                          <label className="mb-1 block text-[10px] font-extrabold text-slate-400 uppercase">
+                            Custom Storage Override (GB)
+                          </label>
                           <input
                             type="number"
                             value={editStorageLimitGB}
-                            onChange={(e) => setEditStorageLimitGB(Math.max(1, Number(e.target.value)))}
+                            onChange={(e) =>
+                              setEditStorageLimitGB(Math.max(1, Number(e.target.value)))
+                            }
                             className="w-full rounded-xl border border-slate-200 bg-white p-2 text-xs font-semibold text-slate-900 focus:border-purple-600 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white"
                             placeholder="e.g. 5, 50, 300"
                           />
-                          <p className="text-[10px] text-slate-400 mt-1">Specify custom storage limit. Changing this overrides the subscription plan's default storage limit.</p>
+                          <p className="mt-1 text-[10px] text-slate-400">
+                            Specify custom storage limit. Changing this overrides the subscription
+                            plan's default storage limit.
+                          </p>
                         </div>
 
                         <div className="pt-2">
@@ -886,29 +1020,34 @@ export const AdminUsersPage: React.FC = () => {
                                 setIsSaving(true)
                                 const limitBytes = editStorageLimitGB * 1024 * 1024 * 1024
 
-                                const { error } = await supabase
-                                  .from('user_subscriptions')
-                                  .upsert({
+                                const { error } = await supabase.from('user_subscriptions').upsert(
+                                  {
                                     user_id: drawerUser.user_id,
                                     plan_id: drawerUser.plan_id || 'free',
                                     custom_storage_limit_bytes: limitBytes,
                                     custom_limit_bytes: limitBytes,
-                                    updated_at: new Date().toISOString()
-                                  }, { onConflict: 'user_id' })
+                                    updated_at: new Date().toISOString(),
+                                  },
+                                  { onConflict: 'user_id' }
+                                )
 
                                 if (error) throw error
 
                                 showSuccess('Custom storage limit override saved!')
                                 fetchLiveUsers()
                                 setDrawerUser(null)
-                              } catch (err: any) {
+                              } catch (err: unknown) {
                                 console.error(err)
-                                showError(err.message || 'Failed to save storage override.')
+                                const errMsg =
+                                  err instanceof Error
+                                    ? err.message
+                                    : 'Failed to save storage override.'
+                                showError(errMsg)
                               } finally {
                                 setIsSaving(false)
                               }
                             }}
-                            className="w-full rounded-xl bg-purple-600 py-2.5 text-xs font-black text-white hover:bg-purple-700 shadow-md"
+                            className="w-full rounded-xl bg-purple-600 py-2.5 text-xs font-black text-white shadow-md hover:bg-purple-700"
                           >
                             {isSaving ? 'Updating Limit...' : 'Save Storage Override'}
                           </button>
@@ -916,21 +1055,28 @@ export const AdminUsersPage: React.FC = () => {
                       </div>
                     )}
 
-                    {(drawerTab === 'books' || drawerTab === 'payments' || drawerTab === 'activity' || drawerTab === 'devices') && (
-                      <div className="flex flex-col items-center justify-center py-8 text-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-800/30 space-y-1">
+                    {(drawerTab === 'books' ||
+                      drawerTab === 'payments' ||
+                      drawerTab === 'activity' ||
+                      drawerTab === 'devices') && (
+                      <div className="flex flex-col items-center justify-center space-y-1 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 py-8 text-center dark:border-slate-800 dark:bg-slate-800/30">
                         <Inbox className="h-5 w-5 text-slate-400" />
-                        <span className="font-bold text-slate-900 dark:text-white capitalize">{drawerTab} data empty</span>
-                        <span className="text-[11px] text-slate-400">Ready for live event streams.</span>
+                        <span className="font-bold text-slate-900 capitalize dark:text-white">
+                          {drawerTab} data empty
+                        </span>
+                        <span className="text-[11px] text-slate-400">
+                          Ready for live event streams.
+                        </span>
                       </div>
                     )}
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                <div className="border-t border-slate-100 pt-4 dark:border-slate-800">
                   <button
                     type="button"
                     onClick={() => setDrawerUser(null)}
-                    className="w-full rounded-2xl bg-purple-600 py-3 text-xs font-black text-white hover:bg-purple-700 shadow-md"
+                    className="w-full rounded-2xl bg-purple-600 py-3 text-xs font-black text-white shadow-md hover:bg-purple-700"
                   >
                     Close User Details
                   </button>
@@ -956,7 +1102,7 @@ export const AdminUsersPage: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="relative w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900 space-y-4 text-left"
+              className="relative w-full max-w-md space-y-4 rounded-3xl border border-slate-200 bg-white p-6 text-left shadow-2xl dark:border-slate-800 dark:bg-slate-900"
             >
               <button
                 type="button"
@@ -966,14 +1112,16 @@ export const AdminUsersPage: React.FC = () => {
                 <X className="h-5 w-5" />
               </button>
 
-              <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+              <h3 className="flex items-center gap-2 text-lg font-black text-slate-900 dark:text-white">
                 <UserPlus className="h-5 w-5 text-purple-600" />
                 Add New User Account
               </h3>
 
               <form onSubmit={handleAddUserSubmit} className="space-y-4 pt-2">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Display Name</label>
+                  <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Display Name
+                  </label>
                   <input
                     type="text"
                     value={newUserName}
@@ -984,7 +1132,9 @@ export const AdminUsersPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Email Address</label>
+                  <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Email Address
+                  </label>
                   <input
                     type="email"
                     value={newUserEmail}
@@ -996,10 +1146,12 @@ export const AdminUsersPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Initial Role</label>
+                  <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Initial Role
+                  </label>
                   <select
                     value={newUserRole}
-                    onChange={(e) => setNewUserRole(e.target.value as any)}
+                    onChange={(e) => setNewUserRole(e.target.value as 'user' | 'super_admin')}
                     className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 focus:border-purple-600 focus:outline-none dark:border-slate-800 dark:bg-slate-800 dark:text-white"
                   >
                     <option value="user">Standard User (user)</option>
@@ -1009,7 +1161,7 @@ export const AdminUsersPage: React.FC = () => {
 
                 <button
                   type="submit"
-                  className="w-full rounded-2xl bg-purple-600 py-3 text-xs font-black text-white hover:bg-purple-700 shadow-md shadow-purple-600/20"
+                  className="w-full rounded-2xl bg-purple-600 py-3 text-xs font-black text-white shadow-md shadow-purple-600/20 hover:bg-purple-700"
                 >
                   Create User Account
                 </button>

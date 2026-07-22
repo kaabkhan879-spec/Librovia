@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { booksService } from './books'
+import { auditService } from './audit'
 
 export interface Collection {
   id: string
@@ -131,7 +132,14 @@ export const collectionsService = {
         return []
       }
 
-      return ((data as any) || []).map((col: any) => ({
+      return (
+        (data as {
+          id: string
+          name: string
+          created_at: string
+          collection_books?: { book_id: string }[]
+        }[]) || []
+      ).map((col) => ({
         id: col.id,
         name: col.name,
         createdAt: col.created_at,
@@ -165,6 +173,14 @@ export const collectionsService = {
         .single()
 
       if (error) throw error
+
+      await auditService.insertLog({
+        event: 'Collection Create',
+        category: 'Storage & Files',
+        severity: 'Info',
+        metadata: { collectionId: data.id, name: data.name },
+      })
+
       return {
         id: data.id,
         name: data.name,
@@ -207,10 +223,41 @@ export const collectionsService = {
   },
 
   async deleteCollection(id: string): Promise<void> {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+
     const isLive = await this.isSupabaseAvailable()
     if (isLive) {
+      const { data: col } = await supabase
+        .from('collections')
+        .select('name, user_id')
+        .eq('id', id)
+        .maybeSingle()
+
+      if (!col) throw new Error('Collection not found')
+
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      const isSuperAdmin = roleData?.role === 'super_admin'
+
+      if (col.user_id !== user.id && !isSuperAdmin) {
+        throw new Error('Permission denied. You do not own this collection.')
+      }
+
       const { error } = await supabase.from('collections').delete().eq('id', id)
       if (error) throw error
+
+      await auditService.insertLog({
+        event: 'Collection Delete',
+        category: 'Storage & Files',
+        severity: 'Warning',
+        metadata: { collectionId: id, name: col.name },
+      })
     } else {
       const collectionsStr = localStorage.getItem(LOCAL_COLLECTIONS_KEY) || '[]'
       let collections: Collection[] = JSON.parse(collectionsStr)
@@ -247,8 +294,32 @@ export const collectionsService = {
   },
 
   async removeBookFromCollection(collectionId: string, bookId: string): Promise<void> {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+
     const isLive = await this.isSupabaseAvailable()
     if (isLive) {
+      const { data: col } = await supabase
+        .from('collections')
+        .select('user_id')
+        .eq('id', collectionId)
+        .maybeSingle()
+
+      if (!col) throw new Error('Collection not found')
+
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      const isSuperAdmin = roleData?.role === 'super_admin'
+
+      if (col.user_id !== user.id && !isSuperAdmin) {
+        throw new Error('Permission denied. You do not own this collection.')
+      }
+
       const { error } = await supabase
         .from('collection_books')
         .delete()

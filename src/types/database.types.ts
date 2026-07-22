@@ -498,6 +498,81 @@ export interface Database {
         }
         Relationships: []
       }
+      announcements: {
+        Row: {
+          id: string
+          title: string
+          content: string
+          target_audience: string
+          type: string
+          priority: string
+          schedule_mode: string
+          scheduled_date_time: string | null
+          status: string
+          delivery_rate_pct: number
+          open_rate_pct: number
+          attachment_name: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          content: string
+          target_audience?: string
+          type?: string
+          priority?: string
+          schedule_mode?: string
+          scheduled_date_time?: string | null
+          status?: string
+          delivery_rate_pct?: number
+          open_rate_pct?: number
+          attachment_name?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          content?: string
+          target_audience?: string
+          type?: string
+          priority?: string
+          schedule_mode?: string
+          scheduled_date_time?: string | null
+          status?: string
+          delivery_rate_pct?: number
+          open_rate_pct?: number
+          attachment_name?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      system_settings: {
+        Row: {
+          id: number
+          maintenance_mode: boolean
+          allow_registrations: boolean
+          default_storage_gb: number
+          max_upload_size_mb: number
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          maintenance_mode?: boolean
+          allow_registrations?: boolean
+          default_storage_gb?: number
+          max_upload_size_mb?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          maintenance_mode?: boolean
+          allow_registrations?: boolean
+          default_storage_gb?: number
+          max_upload_size_mb?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [key: string]: never

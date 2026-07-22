@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { supabase } from '../services/supabase'
+import { auditService } from '../services/audit'
 
 export interface User {
   id: string
@@ -122,6 +123,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       setUser(loggedUser)
       setLoading(false)
+
+      await auditService.insertLog({
+        event: 'User Login',
+        category: 'Authentication',
+        severity: 'Info',
+        actor_email: userEmail,
+        actor_role: role,
+        metadata: { userId: data.user.id },
+      })
+
       return loggedUser
     }
     setLoading(false)
@@ -144,6 +155,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false)
       throw error
     }
+
+    await auditService.insertLog({
+      event: 'User Signup',
+      category: 'Authentication',
+      severity: 'Info',
+      actor_email: email,
+      actor_role: 'user',
+      metadata: { email, displayName },
+    })
   }
 
   const logout = async () => {
