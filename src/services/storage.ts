@@ -17,6 +17,11 @@ export const STORAGE_LIMITS = {
     allowedTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
     allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
   },
+  SCREENSHOT: {
+    maxSize: 5 * 1024 * 1024, // 5 MB
+    allowedTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
+    allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+  },
 } as const
 
 export class StorageError extends Error {
@@ -32,7 +37,7 @@ export class StorageError extends Error {
 // Helper to validate files before sending to network
 function validateFile(
   file: File,
-  config: typeof STORAGE_LIMITS.BOOK | typeof STORAGE_LIMITS.COVER | typeof STORAGE_LIMITS.AVATAR,
+  config: { maxSize: number; allowedTypes: readonly string[]; allowedExtensions: readonly string[] },
   label: string
 ) {
   if (file.size > config.maxSize) {
@@ -142,6 +147,31 @@ export const storageService = {
 
   async getAvatarURL(path: string, expiresIn = 3600): Promise<string> {
     const { data, error } = await supabase.storage.from('avatars').createSignedUrl(path, expiresIn)
+    if (error) throw new StorageError(error.message, error.name)
+    return data.signedUrl
+  },
+
+  // Screenshots uploads for payment verification
+  async uploadScreenshot(file: File): Promise<string> {
+    validateFile(file, STORAGE_LIMITS.SCREENSHOT, 'screenshots')
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) throw new StorageError('User not authenticated', 'UNAUTHENTICATED')
+
+    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+    const filePath = `${user.id}/${Date.now()}.${fileExt}`
+
+    const { data, error } = await supabase.storage
+      .from('payments')
+      .upload(filePath, file, { cacheControl: '3600', upsert: false })
+
+    if (error) throw new StorageError(error.message, error.name)
+    return data.path
+  },
+
+  async getScreenshotURL(path: string, expiresIn = 3600): Promise<string> {
+    const { data, error } = await supabase.storage.from('payments').createSignedUrl(path, expiresIn)
     if (error) throw new StorageError(error.message, error.name)
     return data.signedUrl
   },

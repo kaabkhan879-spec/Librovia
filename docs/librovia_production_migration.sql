@@ -781,3 +781,81 @@ CREATE POLICY "Super admins can manage announcements" ON public.announcements FO
 
 CREATE POLICY "Allow public read access to system_settings" ON public.system_settings FOR SELECT USING (true);
 CREATE POLICY "Super admins can manage system_settings" ON public.system_settings FOR ALL USING (public.is_super_admin(auth.uid())) WITH CHECK (true);
+
+-- ==========================================================
+-- LIBROVIA MANUAL PAYMENT GATEWAY IMPLEMENTATION (V1.0)
+-- ==========================================================
+
+-- 1. ALTER SYSTEM SETTINGS FOR MANUAL PAYMENT DETALS
+ALTER TABLE public.system_settings 
+ADD COLUMN IF NOT EXISTS easypaisa_number VARCHAR(100),
+ADD COLUMN IF NOT EXISTS easypaisa_name VARCHAR(255),
+ADD COLUMN IF NOT EXISTS jazzcash_number VARCHAR(100),
+ADD COLUMN IF NOT EXISTS jazzcash_name VARCHAR(255),
+ADD COLUMN IF NOT EXISTS bank_name VARCHAR(255),
+ADD COLUMN IF NOT EXISTS bank_account_number VARCHAR(100),
+ADD COLUMN IF NOT EXISTS bank_account_name VARCHAR(255),
+ADD COLUMN IF NOT EXISTS payment_instructions TEXT;
+
+-- Seed default manual payment gateway credentials
+UPDATE public.system_settings 
+SET 
+  easypaisa_number = '03001234567', 
+  easypaisa_name = 'Librovia EasyPaisa Wallet', 
+  jazzcash_number = '03007654321', 
+  jazzcash_name = 'Librovia JazzCash Wallet', 
+  bank_name = 'Meezan Bank Ltd', 
+  bank_account_number = '1234-5678-9012-34', 
+  bank_account_name = 'Librovia Private Limited', 
+  payment_instructions = 'Please transfer the correct subscription amount based on your selected billing interval to any of the wallets/accounts listed below, capture a screenshot of the confirmation message showing the transaction details, and upload it below along with your transaction ID.'
+WHERE id = 1;
+
+-- 2. CREATE PAYMENT REQUESTS TABLE
+CREATE TABLE IF NOT EXISTS public.payment_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    plan_id VARCHAR(50) REFERENCES public.subscription_plans(id) ON DELETE SET NULL,
+    payment_method VARCHAR(50) NOT NULL,
+    transaction_id VARCHAR(100) NOT NULL UNIQUE,
+    amount NUMERIC NOT NULL,
+    screenshot_url TEXT NOT NULL,
+    note TEXT,
+    status VARCHAR(50) NOT NULL DEFAULT 'Pending Verification',
+    rejection_reason TEXT,
+    reviewed_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    reviewed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Attach update timestamp trigger
+CREATE OR REPLACE TRIGGER trigger_payment_requests_updated_at BEFORE UPDATE ON public.payment_requests FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- Enable RLS
+ALTER TABLE public.payment_requests ENABLE ROW LEVEL SECURITY;
+
+-- 3. RLS POLICIES FOR PAYMENT REQUESTS
+CREATE POLICY "Users can create own payment_requests" ON public.payment_requests FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can view own payment_requests" ON public.payment_requests FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Super admins can manage all payment_requests" ON public.payment_requests FOR ALL USING (public.is_super_admin(auth.uid())) WITH CHECK (true);
+
+-- 4. SUPABASE STORAGE BUCKET AND POLICIES FOR PAYMENT SCREENSHOTS
+INSERT INTO storage.buckets (id, name, public) VALUES ('payments', 'payments', false) ON CONFLICT (id) DO NOTHING;
+
+CREATE POLICY "Allow users to upload payment screenshots to own folder" ON storage.objects
+  FOR INSERT WITH CHECK (
+    bucket_id = 'payments' 
+    AND auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+CREATE POLICY "Allow users to view own payment screenshots" ON storage.objects
+  FOR SELECT USING (
+    bucket_id = 'payments' 
+    AND auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+CREATE POLICY "Allow super admins to view all payment screenshots" ON storage.objects
+  FOR SELECT USING (
+    bucket_id = 'payments' 
+    AND public.is_super_admin(auth.uid())
+  );

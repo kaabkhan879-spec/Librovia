@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { PageWrapper } from '../../components/common/PageWrapper'
 import { useToast } from '../../context/ToastContext'
 import { supabase } from '../../services/supabase'
 import { ROUTES } from '../../constants/routes'
+import { subscriptionsService, type PaymentRequest } from '../../services/subscriptions'
+import { storageService } from '../../services/storage'
 import {
   CreditCard,
   Search,
@@ -22,6 +24,8 @@ import {
   Building2,
   Smartphone,
   Landmark,
+  Check,
+  ShieldAlert,
 } from 'lucide-react'
 
 export interface DBPaymentRecord {
@@ -42,26 +46,35 @@ export const AdminPaymentsPage: React.FC = () => {
   const navigate = useNavigate()
   const { showSuccess, showError } = useToast()
 
-  const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState<'manual' | 'automatic'>('manual')
+  const [loadingAuto, setLoadingAuto] = useState(true)
+  const [loadingManual, setLoadingManual] = useState(true)
   const [payments, setPayments] = useState<DBPaymentRecord[]>([])
+  const [manualRequests, setManualRequests] = useState<PaymentRequest[]>([])
 
   // Filters & Controls
   const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'All' | 'Completed' | 'Pending' | 'Failed' | 'Refunded'>('All')
+  const [statusFilter, setStatusFilter] = useState<'All' | 'Completed' | 'Pending' | 'Failed' | 'Refunded' | 'Approved' | 'Rejected' | 'Pending Verification'>('All')
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
 
-  // Right-side Drawer State
+  // Slide-over Drawer state
   const [selectedPayment, setSelectedPayment] = useState<DBPaymentRecord | null>(null)
+  const [selectedRequest, setSelectedRequest] = useState<PaymentRequest | null>(null)
+  const [signedScreenshotUrl, setSignedScreenshotUrl] = useState<string | null>(null)
 
-  // Fetch Live Payments from Supabase `payments` table
+  // Rejection modal state
+  const [showRejectModal, setShowRejectModal] = useState(false)
+  const [rejectionReasonInput, setRejectionReasonInput] = useState('')
+  const [actionProcessing, setActionProcessing] = useState(false)
+
+  // Fetch Auto Invoices
   const fetchLivePayments = async () => {
     try {
-      setLoading(true)
+      setLoadingAuto(true)
       const { data, error } = await supabase.from('payments').select('*')
-
       if (error) {
         console.error('Payments table query notice:', error)
         setPayments([])
@@ -80,35 +93,113 @@ export const AdminPaymentsPage: React.FC = () => {
         }))
         setPayments(mapped)
       }
-      setLoading(false)
     } catch (err) {
       console.error('Failed to load payments:', err)
       setPayments([])
-      setLoading(false)
+    } finally {
+      setLoadingAuto(false)
     }
+  }
+
+  // Fetch Manual Requests
+  const fetchManualRequests = useCallback(async () => {
+    try {
+      setLoadingManual(true)
+      const data = await subscriptionsService.getAllPaymentRequests()
+      setManualRequests(data)
+    } catch (err) {
+      console.error('Failed to load manual requests:', err)
+      setManualRequests([])
+    } finally {
+      setLoadingManual(false)
+    }
+  }, [])
+
+  const handleRefresh = () => {
+    fetchLivePayments()
+    fetchManualRequests()
+    showSuccess('Refreshed payment datasets.')
   }
 
   useEffect(() => {
     fetchLivePayments()
-  }, [])
+    fetchManualRequests()
+  }, [fetchManualRequests])
+
+  // Get Signed URL on Request selection
+  useEffect(() => {
+    if (selectedRequest && selectedRequest.screenshot_url) {
+      storageService
+        .getScreenshotURL(selectedRequest.screenshot_url)
+        .then((url) => setSignedScreenshotUrl(url))
+        .catch((err) => {
+          console.error('Failed to load signed screenshot:', err)
+          setSignedScreenshotUrl(null)
+        })
+    } else {
+      setSignedScreenshotUrl(null)
+    }
+  }, [selectedRequest])
+
+  // Review actions
+  const handleApproveRequest = async (reqId: string) => {
+    if (
+      window.confirm(
+        'Are you sure you want to APPROVE this payment? This will upgrade the user subscription and storage limit immediately.'
+      )
+    ) {
+      setActionProcessing(true)
+      try {
+        await subscriptionsService.reviewPaymentRequest(reqId, 'Approved')
+        showSuccess('Payment request has been approved and subscription activated!')
+        fetchManualRequests()
+        setSelectedRequest(null)
+      } catch (err: any) {
+        console.error(err)
+        showError(err.message || 'Failed to approve payment request')
+      } finally {
+        setActionProcessing(false)
+      }
+    }
+  }
+
+  const handleRejectRequest = async () => {
+    if (!selectedRequest) return
+    if (!rejectionReasonInput.trim()) {
+      showError('Please provide a rejection reason')
+      return
+    }
+    setActionProcessing(true)
+    try {
+      await subscriptionsService.reviewPaymentRequest(selectedRequest.id, 'Rejected', rejectionReasonInput)
+      showSuccess('Payment request has been rejected.')
+      fetchManualRequests()
+      setSelectedRequest(null)
+      setShowRejectModal(false)
+      setRejectionReasonInput('')
+    } catch (err: any) {
+      console.error(err)
+      showError(err.message || 'Failed to reject payment request')
+    } finally {
+      setActionProcessing(false)
+    }
+  }
 
   // Calculations derived directly from database records
   const totalRevenue = payments
     .filter((p) => p.status === 'Completed')
     .reduce((acc, p) => acc + p.amount_pkr, 0)
 
-  const todayStr = new Date().toISOString().split('T')[0]
-  const todayRevenue = payments
-    .filter((p) => p.status === 'Completed' && p.created_at.startsWith(todayStr))
-    .reduce((acc, p) => acc + p.amount_pkr, 0)
+  const manualApprovedRevenue = manualRequests
+    .filter((r) => r.status === 'Approved')
+    .reduce((acc, r) => acc + r.amount, 0)
 
-  const activeSubscribersCount = payments.filter((p) => p.status === 'Completed').length
-  const successfulPaymentsCount = payments.filter((p) => p.status === 'Completed').length
-  const pendingPaymentsCount = payments.filter((p) => p.status === 'Pending').length
-  const refundedPaymentsCount = payments.filter((p) => p.status === 'Refunded').length
+  const pendingVerificationCount = manualRequests.filter((r) => r.status === 'Pending Verification').length
+  const totalApprovedManualRequests = manualRequests.filter((r) => r.status === 'Approved').length
+  const totalRejectedManualRequests = manualRequests.filter((r) => r.status === 'Rejected').length
 
   // Filter & Search Logic
-  const filteredPayments = payments.filter((p) => {
+  const filteredAutoPayments = payments.filter((p) => {
     const q = searchQuery.toLowerCase()
     const matchesSearch =
       p.customer_name.toLowerCase().includes(q) ||
@@ -119,42 +210,77 @@ export const AdminPaymentsPage: React.FC = () => {
     return matchesSearch && matchesStatus
   })
 
+  const filteredManualRequests = manualRequests.filter((r) => {
+    const q = searchQuery.toLowerCase()
+    const matchesSearch =
+      (r.user?.email || '').toLowerCase().includes(q) ||
+      (r.user?.display_name || '').toLowerCase().includes(q) ||
+      r.transaction_id.toLowerCase().includes(q) ||
+      r.payment_method.toLowerCase().includes(q)
+
+    const matchesStatus =
+      statusFilter === 'All' ||
+      r.status === statusFilter ||
+      (statusFilter === 'Pending' && r.status === 'Pending Verification')
+    return matchesSearch && matchesStatus
+  })
+
   // Pagination Slice
-  const totalPages = Math.ceil(filteredPayments.length / itemsPerPage) || 1
-  const paginatedPayments = filteredPayments.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+  const currentDataset = activeTab === 'manual' ? filteredManualRequests : filteredAutoPayments
+  const totalPages = Math.ceil(currentDataset.length / itemsPerPage) || 1
+  const paginatedDataset = currentDataset.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+
+  const todayStr = new Date().toISOString().split('T')[0]
 
   // Exports
   const handleExport = (type: 'CSV' | 'Excel' | 'PDF') => {
-    if (payments.length === 0) {
+    const dataset = activeTab === 'manual' ? manualRequests : payments
+    if (dataset.length === 0) {
       showError('No payment records available to export.')
       return
     }
 
-    const headers = ['Transaction ID', 'Customer Name', 'Email', 'Plan', 'Gateway', 'Amount (PKR)', 'Status', 'Date']
-    const rows = payments.map((p) => [
-      p.transaction_id,
-      p.customer_name,
-      p.customer_email,
-      p.plan_name,
-      p.gateway,
-      p.amount_pkr,
-      p.status,
-      p.created_at,
-    ])
-    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
+    let csvContent = ''
+    if (activeTab === 'manual') {
+      const headers = ['Request ID', 'User Email', 'Plan', 'Payment Method', 'Transaction ID', 'Amount (PKR)', 'Status', 'Submitted At']
+      const rows = manualRequests.map((r) => [
+        r.id,
+        r.user?.email || 'N/A',
+        r.plan_id,
+        r.payment_method,
+        r.transaction_id,
+        r.amount,
+        r.status,
+        r.created_at,
+      ])
+      csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
+    } else {
+      const headers = ['Transaction ID', 'Customer Name', 'Email', 'Plan', 'Gateway', 'Amount (PKR)', 'Status', 'Date']
+      const rows = payments.map((p) => [
+        p.transaction_id,
+        p.customer_name,
+        p.customer_email,
+        p.plan_name,
+        p.gateway,
+        p.amount_pkr,
+        p.status,
+        p.created_at,
+      ])
+      csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
+    }
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.setAttribute('href', url)
-    link.setAttribute('download', `librovia_payments_${type.toLowerCase()}_${todayStr}.csv`)
+    link.setAttribute('download', `librovia_${activeTab}_payments_${type.toLowerCase()}_${todayStr}.csv`)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
     showSuccess(`Exported payments dataset as ${type}!`)
   }
 
-  const getGatewayBadge = (gateway: DBPaymentRecord['gateway']) => {
+  const getGatewayBadge = (gateway: string) => {
     if (gateway === 'Stripe') {
       return (
         <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-0.5 text-[10px] font-extrabold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
@@ -183,31 +309,24 @@ export const AdminPaymentsPage: React.FC = () => {
     )
   }
 
-  const getStatusBadge = (status: DBPaymentRecord['status']) => {
-    if (status === 'Completed') {
+  const getStatusBadge = (status: string) => {
+    if (status === 'Completed' || status === 'Approved') {
       return (
         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-          <CheckCircle2 className="h-3 w-3 text-emerald-600" /> Completed
+          <CheckCircle2 className="h-3 w-3 text-emerald-600" /> {status}
         </span>
       )
     }
-    if (status === 'Pending') {
+    if (status === 'Pending' || status === 'Pending Verification') {
       return (
         <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-extrabold text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
           <Clock className="h-3 w-3 text-amber-600" /> Pending
         </span>
       )
     }
-    if (status === 'Refunded') {
-      return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-[10px] font-extrabold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
-          <AlertCircle className="h-3 w-3 text-indigo-600" /> Refunded
-        </span>
-      )
-    }
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-0.5 text-[10px] font-extrabold text-rose-700 dark:bg-rose-950/50 dark:text-rose-300">
-        <AlertCircle className="h-3 w-3 text-rose-600" /> Failed
+        <AlertCircle className="h-3 w-3 text-rose-600" /> {status}
       </span>
     )
   }
@@ -222,7 +341,7 @@ export const AdminPaymentsPage: React.FC = () => {
             Payment & Billing Center
           </h1>
           <p className="text-xs font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">
-            Real-time transaction logs, revenue streaming, multi-gateway billing, and financial analytics.
+            Verify manual payment receipts, manage active invoices, and handle subscriptions.
           </p>
         </div>
 
@@ -230,7 +349,7 @@ export const AdminPaymentsPage: React.FC = () => {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={fetchLivePayments}
+            onClick={handleRefresh}
             className="inline-flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-extrabold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 transition-all shadow-xs"
           >
             <RefreshCw className="h-4 w-4" />
@@ -273,55 +392,88 @@ export const AdminPaymentsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. REAL DATABASE CALCULATED ANALYTICS CARDS (6 CARDS) */}
+      {/* 2. REAL DATABASE CALCULATED ANALYTICS CARDS */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         <div className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-1">
           <span className="text-[10px] font-extrabold text-slate-400 uppercase block tracking-wider">Total Revenue</span>
-          <h3 className="text-xl font-black text-purple-600 dark:text-purple-400">
-            {loading ? '...' : `PKR ${totalRevenue.toLocaleString()}`}
+          <h3 className="text-xl font-black text-purple-600 dark:text-purple-400 font-mono">
+            PKR {(totalRevenue + manualApprovedRevenue).toLocaleString()}
           </h3>
-          <span className="text-[10.5px] font-semibold text-slate-500">Completed Payments</span>
+          <span className="text-[10.5px] font-semibold text-slate-500">Auto + Approved Manual</span>
         </div>
 
         <div className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-1">
-          <span className="text-[10px] font-extrabold text-slate-400 uppercase block tracking-wider">Today's Revenue</span>
-          <h3 className="text-xl font-black text-slate-900 dark:text-white">
-            {loading ? '...' : `PKR ${todayRevenue.toLocaleString()}`}
+          <span className="text-[10px] font-extrabold text-slate-400 uppercase block tracking-wider">Manual Revenue</span>
+          <h3 className="text-xl font-black text-slate-900 dark:text-white font-mono">
+            PKR {manualApprovedRevenue.toLocaleString()}
           </h3>
-          <span className="text-[10.5px] font-semibold text-emerald-600">Daily Stream</span>
+          <span className="text-[10.5px] font-semibold text-emerald-600 font-bold">{totalApprovedManualRequests} Approved</span>
         </div>
 
         <div className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-1">
-          <span className="text-[10px] font-extrabold text-slate-400 uppercase block tracking-wider">Active Subscribers</span>
-          <h3 className="text-xl font-black text-slate-900 dark:text-white">
-            {loading ? '...' : `${activeSubscribersCount} Subscribers`}
+          <span className="text-[10px] font-extrabold text-amber-600 uppercase block tracking-wider font-extrabold">Awaiting Verification</span>
+          <h3 className="text-xl font-black text-amber-600 font-mono animate-pulse">
+            {pendingVerificationCount} Requests
           </h3>
-          <span className="text-[10.5px] font-semibold text-purple-600 dark:text-purple-400">Active Billing Tiers</span>
+          <span className="text-[10.5px] font-semibold text-slate-500">Manual review needed</span>
         </div>
 
         <div className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-1">
-          <span className="text-[10px] font-extrabold text-emerald-600 uppercase block tracking-wider">Successful Payments</span>
-          <h3 className="text-xl font-black text-emerald-600">
-            {loading ? '...' : `${successfulPaymentsCount} Paid`}
+          <span className="text-[10px] font-extrabold text-rose-500 uppercase block tracking-wider font-extrabold">Declined Payments</span>
+          <h3 className="text-xl font-black text-rose-500 font-mono">
+            {totalRejectedManualRequests} Requests
           </h3>
-          <span className="text-[10.5px] font-semibold text-slate-500">Settled Transactions</span>
+          <span className="text-[10.5px] font-semibold text-slate-500">Manual payment failures</span>
         </div>
 
         <div className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-1">
-          <span className="text-[10px] font-extrabold text-amber-600 uppercase block tracking-wider">Pending Payments</span>
-          <h3 className="text-xl font-black text-amber-600">
-            {loading ? '...' : `${pendingPaymentsCount} Pending`}
+          <span className="text-[10px] font-extrabold text-emerald-600 uppercase block tracking-wider">Auto Completed</span>
+          <h3 className="text-xl font-black text-emerald-600 font-mono">
+            {payments.filter((p) => p.status === 'Completed').length} Paid
           </h3>
-          <span className="text-[10.5px] font-semibold text-slate-500">Awaiting Clearance</span>
+          <span className="text-[10.5px] font-semibold text-slate-500">Automatic gateway logs</span>
         </div>
 
         <div className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-1">
-          <span className="text-[10px] font-extrabold text-indigo-600 uppercase block tracking-wider">Refunded Payments</span>
-          <h3 className="text-xl font-black text-indigo-600">
-            {loading ? '...' : `${refundedPaymentsCount} Refunded`}
+          <span className="text-[10px] font-extrabold text-indigo-600 uppercase block tracking-wider">Total Invoices</span>
+          <h3 className="text-xl font-black text-indigo-600 font-mono">
+            {payments.length} Logs
           </h3>
-          <span className="text-[10.5px] font-semibold text-slate-500">Processed Returns</span>
+          <span className="text-[10.5px] font-semibold text-slate-500">Gateway settlements</span>
         </div>
+      </div>
+
+      {/* Tabs Selector */}
+      <div className="flex border-b border-slate-200 dark:border-slate-800 pb-1.5 gap-3">
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('manual')
+            setCurrentPage(1)
+          }}
+          className={`pb-3 text-sm font-black border-b-2 transition-all ${
+            activeTab === 'manual'
+              ? 'border-purple-600 text-purple-600 dark:text-purple-400'
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+          }`}
+        >
+          Manual Payment Verification ({manualRequests.length})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('automatic')
+            setCurrentPage(1)
+          }}
+          className={`pb-3 text-sm font-black border-b-2 transition-all ${
+            activeTab === 'automatic'
+              ? 'border-purple-600 text-purple-600 dark:text-purple-400'
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+          }`}
+        >
+          Automatic Gateway Logs ({payments.length})
+        </button>
       </div>
 
       {/* 3. SEARCH & STATUS FILTERS BAR */}
@@ -336,94 +488,191 @@ export const AdminPaymentsPage: React.FC = () => {
               setSearchQuery(e.target.value)
               setCurrentPage(1)
             }}
-            placeholder="Search by Customer Name, Email, or Transaction ID..."
-            className="w-full rounded-2xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-xs font-semibold text-slate-900 focus:border-purple-600 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+            placeholder={
+              activeTab === 'manual'
+                ? 'Search by User, Email, Transaction ID, or Wallet...'
+                : 'Search by Customer Name, Email, or Transaction ID...'
+            }
+            className="w-full rounded-2xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-xs font-semibold text-slate-900 focus:border-purple-650 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white"
           />
         </div>
 
         {/* Filter Pills */}
-        <div className="flex rounded-2xl bg-slate-100 p-1 dark:bg-slate-800">
-          {(['All', 'Completed', 'Pending', 'Failed', 'Refunded'] as const).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => {
-                setStatusFilter(s)
-                setCurrentPage(1)
-              }}
-              className={`rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-colors ${
-                statusFilter === s
-                  ? 'bg-purple-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
-              }`}
-            >
-              {s}
-            </button>
-          ))}
+        <div className="flex rounded-2xl bg-slate-100 p-1 dark:bg-slate-800 flex-wrap gap-1">
+          {activeTab === 'manual' ? (
+            (['All', 'Pending Verification', 'Approved', 'Rejected'] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => {
+                  setStatusFilter(s)
+                  setCurrentPage(1)
+                }}
+                className={`rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-colors ${
+                  statusFilter === s
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                }`}
+              >
+                {s === 'Pending Verification' ? 'Pending' : s}
+              </button>
+            ))
+          ) : (
+            (['All', 'Completed', 'Pending', 'Failed', 'Refunded'] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => {
+                  setStatusFilter(s)
+                  setCurrentPage(1)
+                }}
+                className={`rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-colors ${
+                  statusFilter === s
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                }`}
+              >
+                {s}
+              </button>
+            ))
+          )}
         </div>
       </div>
 
-      {/* 4. TRANSACTIONS TABLE / PREMIUM EMPTY STATE */}
+      {/* 4. TRANSACTIONS / VERIFICATION TABLE */}
       <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
-        {loading ? (
-          // Skeleton Table Rows
+        {loadingAuto && activeTab === 'automatic' ? (
           <div className="p-6 space-y-4">
             {Array.from({ length: 3 }).map((_, idx) => (
               <div key={idx} className="h-12 w-full animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" />
             ))}
           </div>
-        ) : paginatedPayments.length > 0 ? (
+        ) : loadingManual && activeTab === 'manual' ? (
+          <div className="p-6 space-y-4">
+            {Array.from({ length: 3 }).map((_, idx) => (
+              <div key={idx} className="h-12 w-full animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" />
+            ))}
+          </div>
+        ) : paginatedDataset.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left text-xs text-slate-500 dark:text-slate-400">
-              <thead className="border-b border-slate-100 bg-slate-50/60 text-[10px] font-bold uppercase dark:border-slate-800/50 dark:bg-slate-800/30">
-                <tr>
-                  <th className="px-6 py-4">Transaction ID</th>
-                  <th className="px-6 py-4">Customer</th>
-                  <th className="px-6 py-4">Subscription Plan</th>
-                  <th className="px-6 py-4">Payment Gateway</th>
-                  <th className="px-6 py-4">Amount</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4">Created At</th>
-                  <th className="px-6 py-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/40 font-semibold">
-                {paginatedPayments.map((p) => (
-                  <tr key={p.id} className="transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-                    <td className="px-6 py-4 font-mono font-bold text-slate-900 dark:text-white">{p.transaction_id}</td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <span className="block font-bold text-slate-900 dark:text-white">{p.customer_name}</span>
-                        <span className="text-[11px] text-slate-400 font-mono">{p.customer_email}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 font-bold text-purple-600 dark:text-purple-400">{p.plan_name}</td>
-                    <td className="px-6 py-4">{getGatewayBadge(p.gateway)}</td>
-                    <td className="px-6 py-4 font-black text-slate-900 dark:text-white">
-                      PKR {p.amount_pkr.toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4">{getStatusBadge(p.status)}</td>
-                    <td className="px-6 py-4 font-mono text-slate-400">
-                      {new Date(p.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedPayment(p)}
-                        className="inline-flex items-center gap-1 rounded-xl p-1.5 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/40"
-                        title="View Details"
-                      >
-                        <Eye className="h-4 w-4" />
-                        <span>Details</span>
-                      </button>
-                    </td>
+            {activeTab === 'manual' ? (
+              // MANUAL VERIFICATIONS QUEUE TABLE
+              <table className="w-full border-collapse text-left text-xs text-slate-500 dark:text-slate-400">
+                <thead className="border-b border-slate-100 bg-slate-50/60 text-[10px] font-bold uppercase dark:border-slate-800/50 dark:bg-slate-800/30">
+                  <tr>
+                    <th className="px-6 py-4">Submitted Date</th>
+                    <th className="px-6 py-4">User / Email</th>
+                    <th className="px-6 py-4">Target Plan</th>
+                    <th className="px-6 py-4">Method / Wallet</th>
+                    <th className="px-6 py-4">Transaction ID</th>
+                    <th className="px-6 py-4">Amount</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/40 font-semibold">
+                  {(paginatedDataset as PaymentRequest[]).map((r) => (
+                    <tr key={r.id} className="transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                      <td className="px-6 py-4 font-mono text-slate-400">
+                        {new Date(r.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div>
+                          <span className="block font-bold text-slate-900 dark:text-white">{r.user?.display_name || 'Bookworm'}</span>
+                          <span className="text-[11px] text-slate-400 font-mono">{r.user?.email || 'N/A'}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 font-bold text-purple-600 dark:text-purple-400 uppercase">{r.plan_id}</td>
+                      <td className="px-6 py-4">
+                        {r.payment_method === 'EasyPaisa' && (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                            <Smartphone className="h-3 w-3 text-emerald-600" /> EasyPaisa
+                          </span>
+                        )}
+                        {r.payment_method === 'JazzCash' && (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-extrabold text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+                            <Smartphone className="h-3 w-3 text-rose-600" /> JazzCash
+                          </span>
+                        )}
+                        {r.payment_method === 'Bank Transfer' && (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-extrabold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                            <Landmark className="h-3 w-3 text-slate-500" /> Bank Transfer
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 font-mono font-bold text-slate-900 dark:text-white">{r.transaction_id}</td>
+                      <td className="px-6 py-4 font-black text-slate-900 dark:text-white font-mono">
+                        PKR {r.amount.toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4">{getStatusBadge(r.status)}</td>
+                      <td className="px-6 py-4 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedRequest(r)}
+                          className="inline-flex items-center gap-1 rounded-xl bg-purple-50 p-1.5 font-bold text-purple-700 hover:bg-purple-100 dark:bg-purple-950/40 dark:text-purple-300 dark:hover:bg-purple-900/40"
+                          title="Verify Manual Payment Receipt"
+                        >
+                          <Eye className="h-4 w-4" />
+                          <span>Verify Receipt</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              // AUTOMATIC GATEWAY LOGS TABLE
+              <table className="w-full border-collapse text-left text-xs text-slate-500 dark:text-slate-400">
+                <thead className="border-b border-slate-100 bg-slate-50/60 text-[10px] font-bold uppercase dark:border-slate-800/50 dark:bg-slate-800/30">
+                  <tr>
+                    <th className="px-6 py-4">Transaction ID</th>
+                    <th className="px-6 py-4">Customer</th>
+                    <th className="px-6 py-4">Subscription Plan</th>
+                    <th className="px-6 py-4">Payment Gateway</th>
+                    <th className="px-6 py-4">Amount</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4">Created At</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/40 font-semibold">
+                  {(paginatedDataset as DBPaymentRecord[]).map((p) => (
+                    <tr key={p.id} className="transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                      <td className="px-6 py-4 font-mono font-bold text-slate-900 dark:text-white">{p.transaction_id}</td>
+                      <td className="px-6 py-4">
+                        <div>
+                          <span className="block font-bold text-slate-900 dark:text-white">{p.customer_name}</span>
+                          <span className="text-[11px] text-slate-400 font-mono">{p.customer_email}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 font-bold text-purple-600 dark:text-purple-400">{p.plan_name}</td>
+                      <td className="px-6 py-4">{getGatewayBadge(p.gateway)}</td>
+                      <td className="px-6 py-4 font-black text-slate-900 dark:text-white font-mono">
+                        PKR {p.amount_pkr.toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4">{getStatusBadge(p.status)}</td>
+                      <td className="px-6 py-4 font-mono text-slate-400">
+                        {new Date(p.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPayment(p)}
+                          className="inline-flex items-center gap-1 rounded-xl p-1.5 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/40"
+                          title="View Details"
+                        >
+                          <Eye className="h-4 w-4" />
+                          <span>Details</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         ) : (
-          // PREMIUM EMPTY STATE (WHEN NO TRANSACTIONS EXIST)
+          // Empty State
           <div className="p-12 text-center flex flex-col items-center justify-center space-y-4">
             <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400 shadow-xs">
               <CreditCard className="h-8 w-8" />
@@ -432,7 +681,9 @@ export const AdminPaymentsPage: React.FC = () => {
             <div className="space-y-1 max-w-sm">
               <h3 className="text-lg font-black text-slate-900 dark:text-white">No Payments Yet</h3>
               <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 leading-relaxed">
-                Subscription payments will automatically appear here once customers purchase a plan.
+                {activeTab === 'manual'
+                  ? 'No manual payment requests have been submitted that match the status filter.'
+                  : 'Subscription invoices will automatically appear here once users purchase plans.'}
               </p>
             </div>
 
@@ -445,10 +696,9 @@ export const AdminPaymentsPage: React.FC = () => {
                 <span>View Subscription Plans</span>
                 <ArrowUpRight className="h-4 w-4" />
               </button>
-
               <button
                 type="button"
-                onClick={fetchLivePayments}
+                onClick={handleRefresh}
                 className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-extrabold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
               >
                 <RefreshCw className="h-4 w-4" />
@@ -459,10 +709,10 @@ export const AdminPaymentsPage: React.FC = () => {
         )}
 
         {/* PAGINATION FOOTER */}
-        {filteredPayments.length > 0 && (
+        {currentDataset.length > 0 && (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-t border-slate-100 p-4 text-xs font-semibold text-slate-500 dark:border-slate-800">
             <div>
-              Showing <strong className="text-slate-900 dark:text-white">{(currentPage - 1) * itemsPerPage + 1}</strong>–<strong className="text-slate-900 dark:text-white">{Math.min(currentPage * itemsPerPage, filteredPayments.length)}</strong> of <strong className="text-slate-900 dark:text-white">{filteredPayments.length}</strong> transactions
+              Showing <strong className="text-slate-900 dark:text-white">{(currentPage - 1) * itemsPerPage + 1}</strong>–<strong className="text-slate-900 dark:text-white">{Math.min(currentPage * itemsPerPage, currentDataset.length)}</strong> of <strong className="text-slate-900 dark:text-white">{currentDataset.length}</strong> records
             </div>
 
             <div className="flex items-center gap-2">
@@ -530,7 +780,7 @@ export const AdminPaymentsPage: React.FC = () => {
                   {/* Summary Box */}
                   <div className="rounded-3xl bg-purple-50/60 p-5 dark:bg-purple-950/30 text-center space-y-1">
                     <span className="text-[10px] font-extrabold text-purple-600 uppercase block tracking-widest">Amount Paid</span>
-                    <h2 className="text-3xl font-black text-slate-900 dark:text-white">
+                    <h2 className="text-3xl font-black text-slate-900 dark:text-white font-mono">
                       PKR {selectedPayment.amount_pkr.toLocaleString()}
                     </h2>
                     <div className="pt-2 flex items-center justify-center gap-2">
@@ -600,6 +850,228 @@ export const AdminPaymentsPage: React.FC = () => {
                 </div>
               </motion.div>
             </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 6. RIGHT-SIDE SLIDE-OVER MANUAL REQUEST REVIEW DRAWER */}
+      <AnimatePresence>
+        {selectedRequest && (
+          <div className="fixed inset-0 z-50 overflow-hidden">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedRequest(null)}
+              className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs"
+            />
+
+            <div className="fixed inset-y-0 right-0 flex max-w-full pl-10 z-50">
+              <motion.div
+                initial={{ x: '100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                className="w-screen max-w-md bg-white p-6 shadow-2xl dark:bg-slate-900 flex flex-col justify-between text-left"
+              >
+                <div className="space-y-6 overflow-y-auto pr-1">
+                  {/* Drawer Header */}
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-4 dark:border-slate-800">
+                    <div>
+                      <h3 className="font-sans text-lg font-black text-slate-900 dark:text-white">Verify Payment Request</h3>
+                      <p className="text-xs font-mono text-purple-600 dark:text-purple-400">Request: {selectedRequest.transaction_id}</p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedRequest(null)}
+                      className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  {/* Summary Box */}
+                  <div className="rounded-3xl bg-purple-50/60 p-5 dark:bg-purple-950/30 text-center space-y-1">
+                    <span className="text-[10px] font-extrabold text-purple-600 uppercase block tracking-widest">Amount Transferred</span>
+                    <h2 className="text-3xl font-black text-slate-900 dark:text-white font-mono">
+                      PKR {selectedRequest.amount.toLocaleString()}
+                    </h2>
+                    <div className="pt-2 flex items-center justify-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-200 px-2.5 py-0.5 text-[10px] font-extrabold text-slate-700">
+                        {selectedRequest.payment_method}
+                      </span>
+                      {getStatusBadge(selectedRequest.status)}
+                    </div>
+                  </div>
+
+                  {/* Metadata Fields */}
+                  <div className="space-y-3 rounded-2xl bg-slate-50 p-4 dark:bg-slate-850 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    <div className="flex justify-between py-1.5 border-b border-slate-200/60 dark:border-slate-700/60">
+                      <span>User Name:</span>
+                      <span className="font-bold text-slate-900 dark:text-white">{selectedRequest.user?.display_name || 'Anonymous'}</span>
+                    </div>
+
+                    <div className="flex justify-between py-1.5 border-b border-slate-200/60 dark:border-slate-700/60">
+                      <span>User Email:</span>
+                      <span className="font-mono text-slate-900 dark:text-white">{selectedRequest.user?.email || 'N/A'}</span>
+                    </div>
+
+                    <div className="flex justify-between py-1.5 border-b border-slate-200/60 dark:border-slate-700/60">
+                      <span>Requested Subscription Plan:</span>
+                      <span className="font-bold text-purple-600 dark:text-purple-400 uppercase">{selectedRequest.plan_id}</span>
+                    </div>
+
+                    <div className="flex justify-between py-1.5 border-b border-slate-200/60 dark:border-slate-700/60">
+                      <span>Transaction ID:</span>
+                      <span className="font-mono font-bold text-slate-900 dark:text-white">{selectedRequest.transaction_id}</span>
+                    </div>
+
+                    <div className="flex justify-between py-1.5 border-b border-slate-200/60 dark:border-slate-700/60">
+                      <span>Submitted Date:</span>
+                      <span className="font-mono">{new Date(selectedRequest.created_at).toLocaleString()}</span>
+                    </div>
+
+                    {selectedRequest.note && (
+                      <div className="py-1">
+                        <span className="text-slate-400 block mb-1">User Note:</span>
+                        <div className="bg-white p-2.5 rounded-xl border border-slate-100 dark:bg-slate-800 dark:border-slate-700 text-slate-700 dark:text-slate-300 leading-relaxed italic">
+                          "{selectedRequest.note}"
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedRequest.rejection_reason && (
+                      <div className="py-1">
+                        <span className="text-rose-500 font-bold block mb-1 flex items-center gap-1">
+                          <ShieldAlert className="h-4 w-4" /> Rejection Reason:
+                        </span>
+                        <div className="bg-rose-50/50 p-2.5 rounded-xl border border-rose-100 dark:bg-rose-950/20 dark:border-rose-900/30 text-rose-700 dark:text-rose-300 leading-relaxed">
+                          "{selectedRequest.rejection_reason}"
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Screenshot Receipt Preview */}
+                  <div className="space-y-2">
+                    <span className="text-xs font-bold text-slate-500 uppercase block">Proof of Payment Screenshot:</span>
+                    {signedScreenshotUrl ? (
+                      <a
+                        href={signedScreenshotUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block relative rounded-2xl overflow-hidden border border-slate-200 group bg-slate-50 hover:opacity-90 dark:border-slate-800"
+                      >
+                        <img
+                          src={signedScreenshotUrl}
+                          alt="Manual payment screenshot receipt proof"
+                          className="w-full h-auto max-h-56 object-cover"
+                        />
+                        <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold">
+                          Open Full Image in New Tab
+                        </div>
+                      </a>
+                    ) : (
+                      <div className="h-32 flex items-center justify-center bg-slate-100 rounded-2xl dark:bg-slate-800/40 text-slate-400">
+                        <Clock className="h-5 w-5 animate-spin mr-2" />
+                        <span>Loading receipt preview...</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Approve / Reject Controls */}
+                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
+                  {selectedRequest.status === 'Pending Verification' && (
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowRejectModal(true)}
+                        disabled={actionProcessing}
+                        className="flex-1 rounded-2xl border border-rose-200 py-3 text-xs font-bold text-rose-600 hover:bg-rose-50 dark:border-rose-900/40 dark:text-rose-400 dark:hover:bg-rose-950/20 transition-all duration-200"
+                      >
+                        Decline Payment
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleApproveRequest(selectedRequest.id)}
+                        disabled={actionProcessing}
+                        className="flex-1 flex items-center justify-center gap-1.5 rounded-2xl bg-emerald-600 py-3 text-xs font-black text-white hover:bg-emerald-700 shadow-md shadow-emerald-600/10 active:scale-98 transition-all"
+                      >
+                        <Check className="h-4 w-4" />
+                        <span>Approve Payment</span>
+                      </button>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRequest(null)}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 text-xs font-extrabold text-slate-700 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-300"
+                  >
+                    Close Verification Drawer
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 7. DECLINE/REJECTION MODAL */}
+      <AnimatePresence>
+        {showRejectModal && selectedRequest && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowRejectModal(false)}
+              className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs"
+            />
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative z-55 w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900 text-left"
+            >
+              <h3 className="text-base font-black text-slate-900 dark:text-white mb-2">
+                Decline Payment Request
+              </h3>
+              <p className="text-xs text-slate-500 font-semibold mb-4">
+                Please provide the reason why this payment request is being declined. This reason will be shown to the user in their billing requests tab and sent via notification alert.
+              </p>
+
+              <textarea
+                value={rejectionReasonInput}
+                onChange={(e) => setRejectionReasonInput(e.target.value)}
+                placeholder="e.g. Transaction ID does not match our bank statement, or Amount paid is incorrect."
+                rows={4}
+                required
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs font-semibold text-slate-900 focus:outline-none focus:border-purple-650 dark:border-slate-800 dark:bg-slate-800 dark:text-white mb-4"
+              />
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowRejectModal(false)}
+                  className="flex-1 rounded-2xl border border-slate-200 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRejectRequest}
+                  disabled={actionProcessing}
+                  className="flex-1 rounded-2xl bg-rose-600 py-3 text-xs font-black text-white hover:bg-rose-700 shadow-md shadow-rose-600/20"
+                >
+                  {actionProcessing ? 'Declining...' : 'Decline & Notify'}
+                </button>
+              </div>
+            </motion.div>
           </div>
         )}
       </AnimatePresence>

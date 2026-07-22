@@ -554,6 +554,14 @@ export interface Database {
           default_storage_gb: number
           max_upload_size_mb: number
           updated_at: string
+          easypaisa_number: string | null
+          easypaisa_name: string | null
+          jazzcash_number: string | null
+          jazzcash_name: string | null
+          bank_name: string | null
+          bank_account_number: string | null
+          bank_account_name: string | null
+          payment_instructions: string | null
         }
         Insert: {
           id?: number
@@ -562,6 +570,14 @@ export interface Database {
           default_storage_gb?: number
           max_upload_size_mb?: number
           updated_at?: string
+          easypaisa_number?: string | null
+          easypaisa_name?: string | null
+          jazzcash_number?: string | null
+          jazzcash_name?: string | null
+          bank_name?: string | null
+          bank_account_number?: string | null
+          bank_account_name?: string | null
+          payment_instructions?: string | null
         }
         Update: {
           id?: number
@@ -570,8 +586,80 @@ export interface Database {
           default_storage_gb?: number
           max_upload_size_mb?: number
           updated_at?: string
+          easypaisa_number?: string | null
+          easypaisa_name?: string | null
+          jazzcash_number?: string | null
+          jazzcash_name?: string | null
+          bank_name?: string | null
+          bank_account_number?: string | null
+          bank_account_name?: string | null
+          payment_instructions?: string | null
         }
         Relationships: []
+      }
+      payment_requests: {
+        Row: {
+          id: string
+          user_id: string
+          plan_id: string | null
+          payment_method: string
+          transaction_id: string
+          amount: number
+          screenshot_url: string
+          note: string | null
+          status: string
+          rejection_reason: string | null
+          reviewed_by: string | null
+          reviewed_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          plan_id?: string | null
+          payment_method: string
+          transaction_id: string
+          amount: number
+          screenshot_url: string
+          note?: string | null
+          status?: string
+          rejection_reason?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          plan_id?: string | null
+          payment_method?: string
+          transaction_id?: string
+          amount?: number
+          screenshot_url?: string
+          note?: string | null
+          status?: string
+          rejection_reason?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_requests_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
       }
     }
     Views: {

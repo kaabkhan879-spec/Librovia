@@ -15,6 +15,16 @@ export const AdminSystemSettingsPage: React.FC = () => {
   const [maxUploadSizeMB, setMaxUploadSizeMB] = useState(100)
   const [loading, setLoading] = useState(true)
 
+  // Manual payment gateway states
+  const [easypaisaNumber, setEasypaisaNumber] = useState('')
+  const [easypaisaName, setEasypaisaName] = useState('')
+  const [jazzcashNumber, setJazzcashNumber] = useState('')
+  const [jazzcashName, setJazzcashName] = useState('')
+  const [bankName, setBankName] = useState('')
+  const [bankAccountNumber, setBankAccountNumber] = useState('')
+  const [bankAccountName, setBankAccountName] = useState('')
+  const [paymentInstructions, setPaymentInstructions] = useState('')
+
   const fetchSettings = useCallback(async () => {
     try {
       setLoading(true)
@@ -31,6 +41,14 @@ export const AdminSystemSettingsPage: React.FC = () => {
         setAllowRegistrations(data.allow_registrations)
         setDefaultStorageGB(data.default_storage_gb)
         setMaxUploadSizeMB(data.max_upload_size_mb)
+        setEasypaisaNumber(data.easypaisa_number || '')
+        setEasypaisaName(data.easypaisa_name || '')
+        setJazzcashNumber(data.jazzcash_number || '')
+        setJazzcashName(data.jazzcash_name || '')
+        setBankName(data.bank_name || '')
+        setBankAccountNumber(data.bank_account_number || '')
+        setBankAccountName(data.bank_account_name || '')
+        setPaymentInstructions(data.payment_instructions || '')
       }
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : 'Failed to fetch settings'
@@ -52,6 +70,14 @@ export const AdminSystemSettingsPage: React.FC = () => {
       allow_registrations: allowRegistrations,
       default_storage_gb: defaultStorageGB,
       max_upload_size_mb: maxUploadSizeMB,
+      easypaisa_number: easypaisaNumber,
+      easypaisa_name: easypaisaName,
+      jazzcash_number: jazzcashNumber,
+      jazzcash_name: jazzcashName,
+      bank_name: bankName,
+      bank_account_number: bankAccountNumber,
+      bank_account_name: bankAccountName,
+      payment_instructions: paymentInstructions,
     }
 
     try {
@@ -62,7 +88,13 @@ export const AdminSystemSettingsPage: React.FC = () => {
         event: 'System Settings Update',
         category: 'System Config',
         severity: 'Info',
-        metadata: { maintenanceMode, allowRegistrations, defaultStorageGB, maxUploadSizeMB },
+        metadata: {
+          maintenanceMode,
+          allowRegistrations,
+          defaultStorageGB,
+          maxUploadSizeMB,
+          manualPaymentsUpdated: true,
+        },
       })
 
       showSuccess('System settings updated and saved.')
@@ -150,6 +182,100 @@ export const AdminSystemSettingsPage: React.FC = () => {
                 value={maxUploadSizeMB}
                 onChange={(e) => setMaxUploadSizeMB(Number(e.target.value))}
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 dark:border-slate-800 dark:bg-slate-800 dark:text-white"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Manual Payment Gateway Credentials */}
+        <div className="space-y-4 rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+          <h3 className="border-b border-slate-100 pb-3 text-base font-black text-slate-900 dark:border-slate-800 dark:text-white">
+            Manual Payment Gateway Details
+          </h3>
+
+          <div className="grid grid-cols-1 gap-4 text-xs font-bold text-slate-700 sm:grid-cols-2 dark:text-slate-300">
+            <div>
+              <label className="mb-1 block">EasyPaisa Account Number</label>
+              <input
+                type="text"
+                value={easypaisaNumber}
+                onChange={(e) => setEasypaisaNumber(e.target.value)}
+                placeholder="e.g. 03001234567"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 dark:border-slate-800 dark:bg-slate-800 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block">EasyPaisa Account Name</label>
+              <input
+                type="text"
+                value={easypaisaName}
+                onChange={(e) => setEasypaisaName(e.target.value)}
+                placeholder="e.g. Librovia EasyPaisa Wallet"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 dark:border-slate-800 dark:bg-slate-800 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block">JazzCash Account Number</label>
+              <input
+                type="text"
+                value={jazzcashNumber}
+                onChange={(e) => setJazzcashNumber(e.target.value)}
+                placeholder="e.g. 03007654321"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 dark:border-slate-800 dark:bg-slate-800 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block">JazzCash Account Name</label>
+              <input
+                type="text"
+                value={jazzcashName}
+                onChange={(e) => setJazzcashName(e.target.value)}
+                placeholder="e.g. Librovia JazzCash Wallet"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 dark:border-slate-800 dark:bg-slate-800 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block">Bank Name</label>
+              <input
+                type="text"
+                value={bankName}
+                onChange={(e) => setBankName(e.target.value)}
+                placeholder="e.g. Meezan Bank"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 dark:border-slate-800 dark:bg-slate-800 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block">Bank Account Number / IBAN</label>
+              <input
+                type="text"
+                value={bankAccountNumber}
+                onChange={(e) => setBankAccountNumber(e.target.value)}
+                placeholder="e.g. PK83 MEZN 0000..."
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 dark:border-slate-800 dark:bg-slate-800 dark:text-white"
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="mb-1 block">Bank Account Holder Name</label>
+              <input
+                type="text"
+                value={bankAccountName}
+                onChange={(e) => setBankAccountName(e.target.value)}
+                placeholder="e.g. Librovia Private Limited"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 dark:border-slate-800 dark:bg-slate-800 dark:text-white"
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="mb-1 block">Payment Instructions for Users</label>
+              <textarea
+                value={paymentInstructions}
+                onChange={(e) => setPaymentInstructions(e.target.value)}
+                placeholder="Provide detailed instructions to users showing how to pay and submit confirmation details..."
+                rows={4}
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 dark:border-slate-800 dark:bg-slate-800 dark:text-white focus:outline-none focus:border-purple-650"
               />
             </div>
           </div>

@@ -1,4 +1,26 @@
 import { supabase } from './supabase'
+import { auditService } from './audit'
+
+export interface PaymentRequest {
+  id: string
+  user_id: string
+  plan_id: string | null
+  payment_method: string
+  transaction_id: string
+  amount: number
+  screenshot_url: string
+  note: string | null
+  status: 'Pending Verification' | 'Approved' | 'Rejected'
+  rejection_reason: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+  created_at: string
+  updated_at: string
+  user?: {
+    email: string
+    display_name?: string
+  }
+}
 
 export interface PlanFeature {
   text: string
@@ -275,5 +297,251 @@ export const subscriptionsService = {
 
   formatFamilyLimit(members: number): string {
     return members > 1 ? `Up to ${members} Family Members` : '1 Member'
+  },
+
+  async submitPaymentRequest(payload: {
+    plan_id: string
+    payment_method: string
+    transaction_id: string
+    amount: number
+    screenshot_url: string
+    note?: string
+  }): Promise<void> {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+
+    const { error } = await supabase.from('payment_requests').insert({
+      user_id: user.id,
+      plan_id: payload.plan_id,
+      payment_method: payload.payment_method,
+      transaction_id: payload.transaction_id,
+      amount: payload.amount,
+      screenshot_url: payload.screenshot_url,
+      note: payload.note || null,
+      status: 'Pending Verification',
+    })
+
+    if (error) {
+      console.error('Failed to insert payment request:', error)
+      throw error
+    }
+
+    const { data: roleData } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    try {
+      await auditService.insertLog({
+        event: 'Payment Submitted',
+        category: 'Billing & Payments',
+        severity: 'Info',
+        actor_email: user.email,
+        actor_role: roleData?.role || 'user',
+        metadata: {
+          planId: payload.plan_id,
+          transactionId: payload.transaction_id,
+          amount: payload.amount,
+        },
+      })
+    } catch (err) {
+      console.error('Failed to write audit log for payment submit:', err)
+    }
+
+    try {
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: user.id,
+          type: 'payment',
+          title: 'Payment Awaiting Verification ⏳',
+          message: `Your payment of PKR ${payload.amount} for the "${payload.plan_id.toUpperCase()}" plan has been submitted and is awaiting admin approval.`,
+        })
+    } catch (err) {
+      console.error('Failed to write notification for payment submit:', err)
+    }
+  },
+
+  async getPaymentRequests(): Promise<PaymentRequest[]> {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return []
+
+    const { data, error } = await supabase
+      .from('payment_requests')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('Error fetching payment requests:', error)
+      return []
+    }
+    return data as unknown as PaymentRequest[]
+  },
+
+  async getAllPaymentRequests(): Promise<PaymentRequest[]> {
+    const { data, error } = await supabase
+      .from('payment_requests')
+      .select('*, user:profiles(email, display_name)')
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('Error fetching admin payment requests:', error)
+      return []
+    }
+
+    return (data || []).map((row: any) => ({
+      ...row,
+      user: {
+        email: row.user?.email || 'Unknown',
+        display_name: row.user?.display_name || 'Anonymous',
+      },
+    })) as unknown as PaymentRequest[]
+  },
+
+  async reviewPaymentRequest(
+    id: string,
+    status: 'Approved' | 'Rejected',
+    rejectionReason?: string
+  ): Promise<void> {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) throw new Error('Reviewer not authenticated')
+
+    const { data: req } = await supabase
+      .from('payment_requests')
+      .select('*, user:profiles(email)')
+      .eq('id', id)
+      .maybeSingle()
+
+    if (!req) throw new Error('Payment request not found')
+
+    const updates: any = {
+      status,
+      reviewed_by: user.id,
+      reviewed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+    if (rejectionReason) {
+      updates.rejection_reason = rejectionReason
+    }
+
+    const { error } = await supabase.from('payment_requests').update(updates).eq('id', id)
+    if (error) throw error
+
+    const { data: adminRoleData } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (status === 'Approved') {
+      const deducedCycle = req.amount === 4999 || req.amount === 8999 ? 'yearly' : 'monthly'
+
+      const periodEnd = new Date()
+      if (deducedCycle === 'yearly') {
+        periodEnd.setFullYear(periodEnd.getFullYear() + 1)
+      } else {
+        periodEnd.setMonth(periodEnd.getMonth() + 1)
+      }
+
+      const { error: subErr } = await supabase.from('user_subscriptions').upsert(
+        {
+          user_id: req.user_id,
+          plan_id: req.plan_id,
+          billing_cycle: deducedCycle,
+          status: 'active',
+          current_period_start: new Date().toISOString(),
+          current_period_end: periodEnd.toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id' }
+      )
+      if (subErr) throw subErr
+
+      const plans = await this.getSubscriptionPlans()
+      const selectedPlan = plans.find((p) => p.id === req.plan_id)
+      const limitBytes = selectedPlan?.storage_limit_bytes || 5 * 1024 * 1024 * 1024
+
+      const { error: storageErr } = await supabase.from('storage_usage').upsert(
+        {
+          user_id: req.user_id,
+          max_limit_bytes: limitBytes,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id' }
+      )
+      if (storageErr) throw storageErr
+
+      try {
+        await auditService.insertLog({
+          event: 'Payment Approved',
+          category: 'Billing & Payments',
+          severity: 'Info',
+          actor_email: user.email,
+          actor_role: adminRoleData?.role || 'super_admin',
+          metadata: {
+            targetUserId: req.user_id,
+            targetUserEmail: req.user?.email || 'Unknown',
+            planId: req.plan_id,
+            transactionId: req.transaction_id,
+            amount: req.amount,
+          },
+        })
+      } catch (err) {
+        console.error('Failed to write audit log for payment approval:', err)
+      }
+
+      try {
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: req.user_id,
+            type: 'subscription',
+            title: 'Subscription Activated! 🎉',
+            message: `Your payment was approved! Your account has been upgraded to the ${req.plan_id.toUpperCase()} plan. Thank you for choosing Librovia!`,
+          })
+      } catch (err) {
+        console.error('Failed to write notification for payment approval:', err)
+      }
+    } else {
+      try {
+        await auditService.insertLog({
+          event: 'Payment Rejected',
+          category: 'Billing & Payments',
+          severity: 'Warning',
+          actor_email: user.email,
+          actor_role: adminRoleData?.role || 'super_admin',
+          metadata: {
+            targetUserId: req.user_id,
+            targetUserEmail: req.user?.email || 'Unknown',
+            planId: req.plan_id,
+            transactionId: req.transaction_id,
+            rejectionReason,
+          },
+        })
+      } catch (err) {
+        console.error('Failed to write audit log for payment rejection:', err)
+      }
+
+      try {
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: req.user_id,
+            type: 'alert',
+            title: 'Payment Request Declined ❌',
+            message: `Your payment verification request for the "${req.plan_id.toUpperCase()}" plan was declined. Reason: "${rejectionReason || 'No reason provided'}".`,
+          })
+      } catch (err) {
+        console.error('Failed to write notification for payment rejection:', err)
+      }
+    }
   },
 }

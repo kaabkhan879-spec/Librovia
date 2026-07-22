@@ -1,8 +1,10 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { PageWrapper } from '../../components/common/PageWrapper'
 import { useSubscription } from '../../context/SubscriptionContext'
 import { useToast } from '../../context/ToastContext'
+import { supabase } from '../../services/supabase'
+import { storageService } from '../../services/storage'
 import { subscriptionsService, type SubscriptionPlan } from '../../services/subscriptions'
 import {
   Crown,
@@ -21,6 +23,8 @@ import {
   X,
   CheckCircle2,
   Lock,
+  Clock,
+  Upload,
 } from 'lucide-react'
 
 // FAQ items
@@ -83,20 +87,58 @@ export const SubscriptionPage: React.FC = () => {
     reactivateSubscription,
   } = useSubscription()
 
-  const { showSuccess, showInfo } = useToast()
+  const { showSuccess, showInfo, showError } = useToast()
 
   // Tab for Future-ready placeholders
   const [activePlaceholderTab, setActivePlaceholderTab] = useState<
-    'invoices' | 'payment_methods' | 'promo'
+    'invoices' | 'payment_methods' | 'promo' | 'requests'
   >('invoices')
 
   // Selected plan for Upgrade Modal
   const [selectedUpgradePlan, setSelectedUpgradePlan] = useState<SubscriptionPlan | null>(null)
-  const [showPaymentGatewayNotice, setShowPaymentGatewayNotice] = useState(false)
-  const [isProcessingUpgrade] = useState(false)
+  const [upgradeStep, setUpgradeStep] = useState<'summary' | 'payment'>('summary')
+  const [paymentRequests, setPaymentRequests] = useState<any[]>([])
+  
+  // Form fields
+  const [paymentMethod, setPaymentMethod] = useState<'EasyPaisa' | 'JazzCash' | 'Bank Transfer'>('EasyPaisa')
+  const [transactionId, setTransactionId] = useState('')
+  const [paidAmount, setPaidAmount] = useState<number>(0)
+  const [screenshotFile, setScreenshotFile] = useState<File | null>(null)
+  const [screenshotPreviewUrl, setScreenshotPreviewUrl] = useState<string | null>(null)
+  const [userNote, setUserNote] = useState('')
+  const [systemSettings, setSystemSettings] = useState<any>(null)
+  const [submittingRequest, setSubmittingRequest] = useState(false)
 
   // FAQ accordion collapse state
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0)
+
+  const fetchUserRequests = useCallback(async () => {
+    try {
+      const reqs = await subscriptionsService.getPaymentRequests()
+      setPaymentRequests(reqs)
+    } catch (err) {
+      console.error('Failed to fetch payment requests:', err)
+    }
+  }, [])
+
+  const fetchSystemSettings = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('*')
+        .eq('id', 1)
+        .maybeSingle()
+      if (error) throw error
+      setSystemSettings(data)
+    } catch (err) {
+      console.error('Failed to fetch system settings:', err)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchUserRequests()
+    fetchSystemSettings()
+  }, [fetchUserRequests, fetchSystemSettings])
 
   // Storage metric calculations driven by DB limit
   const storageUsedGB = (storageUsedBytes / (1024 * 1024 * 1024)).toFixed(1)
@@ -117,24 +159,77 @@ export const SubscriptionPage: React.FC = () => {
       return
     }
     setSelectedUpgradePlan(plan)
+    setUpgradeStep('summary')
   }
 
-  const handleConfirmSubscription = () => {
+  const handleContinueToPayment = () => {
     if (!selectedUpgradePlan) return
-
-    // FUTURE PAYMENT GATEWAY INTEGRATION PLACEHOLDER:
-    // 1. Initialize payment checkout session (e.g., Stripe / JazzCash / EasyPaisa / Checkout.com)
-    // 2. Launch payment gateway modal or redirect to secure payment URL
-    // 3. Only after successful payment verification callback:
-    //    await setPlan(selectedUpgradePlan.id)
-
-    // Demo Mode Notice: User subscription, storage limits, AI limits, and offline limits remain UNCHANGED.
-    setShowPaymentGatewayNotice(true)
+    const price = billingCycle === 'yearly' ? selectedUpgradePlan.price_yearly : selectedUpgradePlan.price_monthly
+    setPaidAmount(price)
+    setUpgradeStep('payment')
   }
 
-  const handleCloseGatewayNotice = () => {
-    setShowPaymentGatewayNotice(false)
+  const handleScreenshotChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setScreenshotFile(file)
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setScreenshotPreviewUrl(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleCloseUpgradeModal = () => {
     setSelectedUpgradePlan(null)
+    setUpgradeStep('summary')
+    setPaymentMethod('EasyPaisa')
+    setTransactionId('')
+    setPaidAmount(0)
+    setScreenshotFile(null)
+    setScreenshotPreviewUrl(null)
+    setUserNote('')
+  }
+
+  const handleSubmitPayment = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedUpgradePlan) return
+    if (!transactionId.trim()) {
+      showError('Transaction ID is required')
+      return
+    }
+    if (!screenshotFile) {
+      showError('Please upload a proof of payment screenshot')
+      return
+    }
+    if (paidAmount <= 0) {
+      showError('Amount paid must be greater than zero')
+      return
+    }
+
+    setSubmittingRequest(true)
+    try {
+      const screenshotPath = await storageService.uploadScreenshot(screenshotFile)
+
+      await subscriptionsService.submitPaymentRequest({
+        plan_id: selectedUpgradePlan.id,
+        payment_method: paymentMethod,
+        transaction_id: transactionId,
+        amount: paidAmount,
+        screenshot_url: screenshotPath,
+        note: userNote,
+      })
+
+      showSuccess('Your payment has been submitted successfully and is awaiting verification.')
+      fetchUserRequests()
+      handleCloseUpgradeModal()
+    } catch (err: any) {
+      console.error(err)
+      showError(err.message || 'Failed to submit payment request')
+    } finally {
+      setSubmittingRequest(false)
+    }
   }
 
   return (
@@ -642,6 +737,19 @@ export const SubscriptionPage: React.FC = () => {
               <Tag className="h-4 w-4" />
               <span>Promo Code</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setActivePlaceholderTab('requests')}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
+                activePlaceholderTab === 'requests'
+                  ? 'bg-purple-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+              }`}
+            >
+              <Clock className="h-4 w-4" />
+              <span>Payment Requests</span>
+            </button>
           </div>
 
           {/* Tab Content */}
@@ -765,6 +873,75 @@ export const SubscriptionPage: React.FC = () => {
                 </p>
               </div>
             )}
+
+            {activePlaceholderTab === 'requests' && (
+              <div className="space-y-4">
+                {paymentRequests.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-100 text-slate-400 uppercase tracking-wider font-extrabold text-[10px] dark:border-slate-800">
+                          <th className="pb-3">Submitted Date</th>
+                          <th className="pb-3">Plan</th>
+                          <th className="pb-3">Method</th>
+                          <th className="pb-3">Amount</th>
+                          <th className="pb-3">Transaction ID</th>
+                          <th className="pb-3">Status</th>
+                          <th className="pb-3 text-right">Details</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50 font-semibold dark:divide-slate-800/40">
+                        {paymentRequests.map((req) => (
+                          <tr key={req.id} className="text-slate-600 dark:text-slate-300">
+                            <td className="py-3.5 font-mono text-slate-400">
+                              {new Date(req.created_at).toLocaleDateString()}
+                            </td>
+                            <td className="py-3.5 font-bold text-purple-600 dark:text-purple-400 uppercase">
+                              {req.plan_id}
+                            </td>
+                            <td className="py-3.5">{req.payment_method}</td>
+                            <td className="py-3.5 text-slate-900 dark:text-white font-bold">
+                              PKR {req.amount.toLocaleString()}
+                            </td>
+                            <td className="py-3.5 font-mono font-bold text-slate-900 dark:text-white">
+                              {req.transaction_id}
+                            </td>
+                            <td className="py-3.5">
+                              {req.status === 'Approved' && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
+                                  Approved
+                                </span>
+                              )}
+                              {req.status === 'Rejected' && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-extrabold text-rose-700 dark:bg-rose-950/40 dark:text-rose-400">
+                                  Rejected
+                                </span>
+                              )}
+                              {req.status === 'Pending Verification' && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-extrabold text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
+                                  Pending Verification
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3.5 text-right">
+                              {req.status === 'Rejected' && req.rejection_reason && (
+                                <span className="text-[10.5px] text-rose-500 font-medium block">
+                                  Reason: {req.rejection_reason}
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-slate-400 dark:text-slate-500">
+                    No payment requests submitted.
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -836,7 +1013,7 @@ export const SubscriptionPage: React.FC = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setSelectedUpgradePlan(null)}
+              onClick={handleCloseUpgradeModal}
               className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs"
             />
 
@@ -850,175 +1027,269 @@ export const SubscriptionPage: React.FC = () => {
               {/* Close Button */}
               <button
                 type="button"
-                onClick={() => setSelectedUpgradePlan(null)}
-                className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                onClick={handleCloseUpgradeModal}
+                disabled={submittingRequest}
+                className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 disabled:opacity-40"
               >
                 <X className="h-5 w-5" />
               </button>
 
-              <div className="space-y-6">
-                {/* Modal Title */}
-                <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-600 text-white shadow-md">
-                    <Crown className="h-6 w-6" />
+              {upgradeStep === 'summary' ? (
+                <div className="space-y-6">
+                  {/* Modal Title */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-600 text-white shadow-md">
+                      <Crown className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <h3 className="font-sans text-xl font-black text-slate-900 dark:text-white">
+                        Upgrade to {selectedUpgradePlan.plan_name} Plan
+                      </h3>
+                      <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                        {billingCycle === 'yearly' ? 'Annual Billing (Save 17%)' : 'Monthly Billing'}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-sans text-xl font-black text-slate-900 dark:text-white">
-                      Upgrade to {selectedUpgradePlan.plan_name} Plan
-                    </h3>
-                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                      {billingCycle === 'yearly' ? 'Annual Billing (Save 17%)' : 'Monthly Billing'}
-                    </p>
+
+                  {/* Plan Summary Box */}
+                  <div className="space-y-3 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+                    <div className="flex justify-between text-xs font-bold text-slate-900 dark:text-white">
+                      <span>Selected Plan</span>
+                      <span>{selectedUpgradePlan.plan_name}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      <span>Base Price</span>
+                      <span>
+                        PKR{' '}
+                        {(billingCycle === 'yearly'
+                          ? selectedUpgradePlan.price_yearly
+                          : selectedUpgradePlan.price_monthly
+                        ).toLocaleString()}
+                      </span>
+                    </div>
+
+                    <div className="border-t border-slate-200 pt-2 flex justify-between text-sm font-black text-slate-900 dark:border-slate-700 dark:text-white">
+                      <span>Total Due Today</span>
+                      <span className="text-purple-600 dark:text-purple-400">
+                        PKR{' '}
+                        {(billingCycle === 'yearly'
+                          ? selectedUpgradePlan.price_yearly
+                          : selectedUpgradePlan.price_monthly
+                        ).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Promo Code Disabled with Coming Soon */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[11px] font-extrabold text-slate-600 uppercase dark:text-slate-300">
+                        Promo Code
+                      </label>
+                      <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[9.5px] font-black text-purple-700 dark:bg-purple-950 dark:text-purple-300">
+                        Coming Soon
+                      </span>
+                    </div>
+                    <input
+                      type="text"
+                      disabled
+                      placeholder="Promo Code (Coming Soon)"
+                      className="w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-100/70 px-3.5 py-2 text-xs font-semibold text-slate-400 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-500"
+                    />
+                  </div>
+
+                  {/* Manual Verification Note */}
+                  <div className="flex items-start gap-2.5 rounded-2xl border border-purple-200/80 bg-purple-50/80 p-3.5 text-xs text-purple-900 dark:border-purple-900/40 dark:bg-purple-950/30 dark:text-purple-200">
+                    <Lock className="h-4 w-4 shrink-0 text-purple-600 dark:text-purple-400 mt-0.5" />
+                    <div className="space-y-0.5 text-[11px] leading-relaxed text-left">
+                      <span className="font-bold block text-purple-900 dark:text-purple-300">Manual Verification</span>
+                      <p className="text-slate-600 dark:text-slate-300">
+                        We support local wallets (JazzCash, EasyPaisa, Bank Transfer). The plan activates immediately upon admin transaction approval.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={handleCloseUpgradeModal}
+                      className="flex-1 rounded-2xl border border-slate-200 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-all duration-200"
+                    >
+                      Cancel
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleContinueToPayment}
+                      className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-purple-600 py-3 text-xs font-black text-white hover:bg-purple-700 shadow-md shadow-purple-600/20 active:scale-98 transition-all duration-200"
+                    >
+                      <Crown className="h-4 w-4" />
+                      <span>Continue to Payment</span>
+                    </button>
                   </div>
                 </div>
-
-                {/* Plan Summary Box */}
-                <div className="space-y-3 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-800/40">
-                  <div className="flex justify-between text-xs font-bold text-slate-900 dark:text-white">
-                    <span>Selected Plan</span>
-                    <span>{selectedUpgradePlan.plan_name}</span>
+              ) : (
+                // Step 2: Payment Gateway & Submission form
+                <form onSubmit={handleSubmitPayment} className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
+                  <div className="flex items-center gap-3 border-b border-slate-100 pb-3 dark:border-slate-800">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100 text-purple-600 dark:bg-purple-950">
+                      <CreditCard className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-slate-900 dark:text-white">
+                        Make a Manual Payment
+                      </h3>
+                      <p className="text-[11px] text-slate-500 font-semibold">
+                        Pay exactly <span className="text-purple-600 dark:text-purple-400 font-bold font-mono">PKR {paidAmount.toLocaleString()}</span> to upgrade
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-xs font-semibold text-slate-600 dark:text-slate-300">
-                    <span>Base Price</span>
-                    <span>
-                      PKR{' '}
-                      {(billingCycle === 'yearly'
-                        ? selectedUpgradePlan.price_yearly
-                        : selectedUpgradePlan.price_monthly
-                      ).toLocaleString()}
-                    </span>
+
+                  {/* Dynamic Instructions */}
+                  <div className="rounded-2xl bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    <p className="font-semibold text-slate-900 dark:text-white mb-1">Instructions:</p>
+                    <p>{systemSettings?.payment_instructions || 'Please transfer the select package price to any details below and upload screenshot.'}</p>
                   </div>
 
-                  <div className="border-t border-slate-200 pt-2 flex justify-between text-sm font-black text-slate-900 dark:border-slate-700 dark:text-white">
-                    <span>Total Due Today</span>
-                    <span className="text-purple-600 dark:text-purple-400">
-                      PKR{' '}
-                      {(billingCycle === 'yearly'
-                        ? selectedUpgradePlan.price_yearly
-                        : selectedUpgradePlan.price_monthly
-                      ).toLocaleString()}
-                    </span>
+                  {/* Payment Details channels */}
+                  <div className="space-y-2 rounded-2xl border border-slate-200/65 bg-slate-50/50 p-3.5 text-[11px] font-semibold text-slate-600 dark:border-slate-800 dark:bg-slate-900/30 dark:text-slate-300">
+                    {systemSettings?.easypaisa_number && (
+                      <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                        <span className="text-emerald-600 font-extrabold">EasyPaisa Wallet:</span>
+                        <span className="font-bold text-slate-900 dark:text-white">{systemSettings.easypaisa_number} ({systemSettings.easypaisa_name})</span>
+                      </div>
+                    )}
+                    {systemSettings?.jazzcash_number && (
+                      <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                        <span className="text-rose-600 font-extrabold">JazzCash Wallet:</span>
+                        <span className="font-bold text-slate-900 dark:text-white">{systemSettings.jazzcash_number} ({systemSettings.jazzcash_name})</span>
+                      </div>
+                    )}
+                    {systemSettings?.bank_name && (
+                      <div className="py-1">
+                        <span className="text-purple-600 font-extrabold block mb-1">Bank Account Transfer:</span>
+                        <div className="pl-2 space-y-0.5 text-slate-500 dark:text-slate-400">
+                          <div>Bank: <strong className="text-slate-700 dark:text-slate-300">{systemSettings.bank_name}</strong></div>
+                          <div>A/C Number: <strong className="text-slate-700 dark:text-slate-300">{systemSettings.bank_account_number}</strong></div>
+                          <div>A/C Title: <strong className="text-slate-700 dark:text-slate-300">{systemSettings.bank_account_name}</strong></div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
 
-                {/* Promo Code Disabled with Coming Soon */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-[11px] font-extrabold text-slate-600 uppercase dark:text-slate-300">
-                      Promo Code
-                    </label>
-                    <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[9.5px] font-black text-purple-700 dark:bg-purple-950 dark:text-purple-300">
-                      Coming Soon
-                    </span>
+                  {/* Form inputs */}
+                  <div className="space-y-3 font-semibold text-xs text-slate-700 dark:text-slate-300">
+                    <div>
+                      <label className="block mb-1 text-[11px] font-extrabold text-slate-500 uppercase">Select Payment Wallet/Method</label>
+                      <select
+                        value={paymentMethod}
+                        onChange={(e: any) => setPaymentMethod(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-bold text-slate-900 focus:outline-none focus:border-purple-650 dark:border-slate-800 dark:bg-slate-800 dark:text-white"
+                      >
+                        <option value="EasyPaisa">EasyPaisa</option>
+                        <option value="JazzCash">JazzCash</option>
+                        <option value="Bank Transfer">Bank Transfer</option>
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block mb-1 text-[11px] font-extrabold text-slate-500 uppercase">Amount Paid (PKR)</label>
+                        <input
+                          type="number"
+                          value={paidAmount}
+                          onChange={(e) => setPaidAmount(Number(e.target.value))}
+                          required
+                          className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 focus:outline-none focus:border-purple-650 dark:border-slate-800 dark:bg-slate-800 dark:text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block mb-1 text-[11px] font-extrabold text-slate-500 uppercase">Transaction ID / Ref ID</label>
+                        <input
+                          type="text"
+                          value={transactionId}
+                          onChange={(e) => setTransactionId(e.target.value)}
+                          required
+                          placeholder="e.g. 1029384756"
+                          className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 focus:outline-none focus:border-purple-650 dark:border-slate-800 dark:bg-slate-800 dark:text-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block mb-1 text-[11px] font-extrabold text-slate-500 uppercase">Upload Receipt Screenshot</label>
+                      <div className="relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-4 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900/40">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleScreenshotChange}
+                          required={!screenshotPreviewUrl}
+                          className="absolute inset-0 cursor-pointer opacity-0"
+                        />
+                        {screenshotPreviewUrl ? (
+                          <div className="relative w-full max-h-32 overflow-hidden rounded-xl border border-slate-100">
+                            <img
+                              src={screenshotPreviewUrl}
+                              alt="Receipt Preview"
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-slate-900/50 flex items-center justify-center text-white text-[10px] font-extrabold tracking-wider uppercase">
+                              Change Screenshot
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-center py-2">
+                            <Upload className="mx-auto h-6 w-6 text-slate-400 mb-1" />
+                            <span className="text-[10px] text-slate-500 font-bold block">
+                              Click or drag screenshot here
+                            </span>
+                            <span className="text-[9px] text-slate-400 font-medium">
+                              JPEG, PNG, WEBP (Max 5MB)
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block mb-1 text-[11px] font-extrabold text-slate-500 uppercase">Optional Note</label>
+                      <textarea
+                        value={userNote}
+                        onChange={(e) => setUserNote(e.target.value)}
+                        placeholder="Add any details for payment verification..."
+                        rows={2}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 focus:outline-none focus:border-purple-650 dark:border-slate-800 dark:bg-slate-800 dark:text-white"
+                      />
+                    </div>
                   </div>
-                  <input
-                    type="text"
-                    disabled
-                    placeholder="Promo Code (Coming Soon)"
-                    className="w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-100/70 px-3.5 py-2 text-xs font-semibold text-slate-400 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-500"
-                  />
-                </div>
 
-                {/* Refined Demo Version Note */}
-                <div className="flex items-start gap-2.5 rounded-2xl border border-purple-200/80 bg-purple-50/80 p-3.5 text-xs text-purple-900 dark:border-purple-900/40 dark:bg-purple-950/30 dark:text-purple-200">
-                  <Lock className="h-4 w-4 shrink-0 text-purple-600 dark:text-purple-400 mt-0.5" />
-                  <div className="space-y-0.5 text-[11px] leading-relaxed text-left">
-                    <span className="font-bold block text-purple-900 dark:text-purple-300">Demo Version</span>
-                    <p className="text-slate-600 dark:text-slate-300">
-                      Payment gateway integration is currently under development. Your subscription will only be upgraded after successful payment verification.
-                    </p>
+                  {/* Action buttons */}
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      disabled={submittingRequest}
+                      onClick={() => setUpgradeStep('summary')}
+                      className="flex-1 rounded-2xl border border-slate-200 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 disabled:opacity-50"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submittingRequest}
+                      className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-purple-600 py-3 text-xs font-black text-white hover:bg-purple-700 disabled:opacity-50 shadow-md shadow-purple-600/20 active:scale-98 transition-all"
+                    >
+                      {submittingRequest ? 'Submitting...' : 'Submit Payment'}
+                    </button>
                   </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedUpgradePlan(null)}
-                    className="flex-1 rounded-2xl border border-slate-200 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-all duration-200"
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleConfirmSubscription}
-                    disabled={isProcessingUpgrade}
-                    className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-purple-600 py-3 text-xs font-black text-white hover:bg-purple-700 shadow-md shadow-purple-600/20 active:scale-98 transition-all duration-200"
-                  >
-                    <Crown className="h-4 w-4" />
-                    <span>Continue to Payment</span>
-                  </button>
-                </div>
-              </div>
+                </form>
+              )}
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* ==================================================================== */}
-      {/* 8. PAYMENT GATEWAY DEMO MODE NOTICE MODAL */}
-      {/* ==================================================================== */}
-      <AnimatePresence>
-        {showPaymentGatewayNotice && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={handleCloseGatewayNotice}
-              className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs"
-            />
 
-            {/* Modal Box */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="relative w-full max-w-md rounded-3xl border border-purple-200 bg-white p-6 text-center shadow-2xl dark:border-slate-800 dark:bg-slate-900"
-            >
-              <button
-                type="button"
-                onClick={handleCloseGatewayNotice}
-                className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-              >
-                <X className="h-5 w-5" />
-              </button>
-
-              <div className="space-y-4 py-2">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-100 text-purple-600 dark:bg-purple-950/70 dark:text-purple-300 shadow-inner">
-                  <CreditCard className="h-7 w-7" />
-                </div>
-
-                <div className="space-y-2">
-                  <h3 className="font-sans text-xl font-black text-slate-900 dark:text-white">
-                    Demo Version
-                  </h3>
-                  <div className="space-y-2 rounded-2xl border border-slate-100 bg-slate-50/70 p-4 text-xs font-medium leading-relaxed text-slate-600 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300 text-left">
-                    <p className="font-bold text-slate-900 dark:text-white">
-                      Payment gateway integration is currently under development.
-                    </p>
-                    <p>
-                      Your subscription will only be upgraded after successful payment verification.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="pt-2">
-                  <button
-                    type="button"
-                    onClick={handleCloseGatewayNotice}
-                    className="w-full cursor-pointer rounded-2xl bg-purple-600 py-3 text-xs font-black text-white hover:bg-purple-700 shadow-md shadow-purple-600/20 transition-all duration-200 active:scale-98"
-                  >
-                    Understood & Close
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </PageWrapper>
   )
 }
