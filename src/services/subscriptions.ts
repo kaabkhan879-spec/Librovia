@@ -385,21 +385,30 @@ export const subscriptionsService = {
   },
 
   async getAllPaymentRequests(): Promise<PaymentRequest[]> {
-    const { data, error } = await supabase
+    const { data: requests, error: reqError } = await supabase
       .from('payment_requests')
-      .select('*, user:profiles(email, display_name)')
+      .select('*')
       .order('created_at', { ascending: false })
 
-    if (error) {
-      console.error('Error fetching admin payment requests:', error)
+    if (reqError) {
+      console.error('Error fetching admin payment requests:', reqError)
       return []
     }
 
-    return (data || []).map((row: any) => ({
+    // Fetch profiles and user_roles in parallel to map emails and display names in-memory
+    const [profilesRes, rolesRes] = await Promise.all([
+      supabase.from('profiles').select('id, display_name'),
+      supabase.from('user_roles').select('user_id, email'),
+    ])
+
+    const profilesMap = new Map(profilesRes.data?.map((p: any) => [p.id, p.display_name]) || [])
+    const rolesMap = new Map(rolesRes.data?.map((r: any) => [r.user_id, r.email]) || [])
+
+    return (requests || []).map((row: any) => ({
       ...row,
       user: {
-        email: row.user?.email || 'Unknown',
-        display_name: row.user?.display_name || 'Anonymous',
+        email: rolesMap.get(row.user_id) || 'Unknown',
+        display_name: profilesMap.get(row.user_id) || 'Anonymous',
       },
     })) as unknown as PaymentRequest[]
   },
@@ -416,11 +425,20 @@ export const subscriptionsService = {
 
     const { data: req } = await supabase
       .from('payment_requests')
-      .select('*, user:profiles(email)')
+      .select('*')
       .eq('id', id)
       .maybeSingle()
 
     if (!req) throw new Error('Payment request not found')
+
+    const { data: roleData } = await supabase
+      .from('user_roles')
+      .select('email')
+      .eq('user_id', req.user_id)
+      .maybeSingle()
+
+    const userEmail = roleData?.email || 'Unknown'
+    req.user = { email: userEmail }
 
     const updates: any = {
       status,

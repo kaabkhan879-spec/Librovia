@@ -211,6 +211,9 @@ export const AdminPaymentsPage: React.FC = () => {
   })
 
   const filteredManualRequests = manualRequests.filter((r) => {
+    // If status is NULL, automatically treat it as pending
+    const status = r.status || 'Pending Verification'
+
     const q = searchQuery.toLowerCase()
     const matchesSearch =
       (r.user?.email || '').toLowerCase().includes(q) ||
@@ -220,9 +223,16 @@ export const AdminPaymentsPage: React.FC = () => {
 
     const matchesStatus =
       statusFilter === 'All' ||
-      r.status === statusFilter ||
-      (statusFilter === 'Pending' && r.status === 'Pending Verification')
+      status === statusFilter ||
+      (statusFilter === 'Pending' && status === 'Pending Verification')
     return matchesSearch && matchesStatus
+  })
+
+  // Console diagnostics audit logs
+  console.log('Payment requests diagnostic audit:', {
+    totalRowsFetched: manualRequests.length,
+    fetchedStatusValues: manualRequests.map((r) => r.status),
+    finalFilteredRowsCount: filteredManualRequests.length,
   })
 
   // Pagination Slice
