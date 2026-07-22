@@ -73,7 +73,7 @@ export const ForgotPasswordForm: React.FC = () => {
               Check your inbox
             </h2>
             <p className="text-text-sub max-w-sm text-xs leading-relaxed">
-              We have simulated sending a password reset link to{' '}
+              We have sent a password reset link to{' '}
               <strong className="text-text-main">{email}</strong>. Please check your emails.
             </p>
           </div>
@@ -95,7 +95,7 @@ export const ForgotPasswordForm: React.FC = () => {
         <div className="space-y-2">
           <h2 className="text-text-main text-2xl font-extrabold tracking-tight">Forgot Password</h2>
           <p className="text-text-muted text-xs leading-relaxed font-semibold">
-            Enter your account email. We will simulate sending you a link to reset your credentials.
+            Enter your account email. We will send you a link to reset your credentials.
           </p>
         </div>
 
