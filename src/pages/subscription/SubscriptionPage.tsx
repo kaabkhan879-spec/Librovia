@@ -25,6 +25,7 @@ import {
   Lock,
   Clock,
   Upload,
+  AlertCircle,
 } from 'lucide-react'
 
 // FAQ items
@@ -1154,27 +1155,72 @@ export const SubscriptionPage: React.FC = () => {
 
                   {/* Payment Details channels */}
                   <div className="space-y-2 rounded-2xl border border-slate-200/65 bg-slate-50/50 p-3.5 text-[11px] font-semibold text-slate-600 dark:border-slate-800 dark:bg-slate-900/30 dark:text-slate-300">
-                    {systemSettings?.easypaisa_number && (
-                      <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                        <span className="text-emerald-600 font-extrabold">EasyPaisa Wallet:</span>
-                        <span className="font-bold text-slate-900 dark:text-white">{systemSettings.easypaisa_number} ({systemSettings.easypaisa_name})</span>
-                      </div>
-                    )}
-                    {systemSettings?.jazzcash_number && (
-                      <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                        <span className="text-rose-600 font-extrabold">JazzCash Wallet:</span>
-                        <span className="font-bold text-slate-900 dark:text-white">{systemSettings.jazzcash_number} ({systemSettings.jazzcash_name})</span>
-                      </div>
-                    )}
-                    {systemSettings?.bank_name && (
-                      <div className="py-1">
-                        <span className="text-purple-600 font-extrabold block mb-1">Bank Account Transfer:</span>
-                        <div className="pl-2 space-y-0.5 text-slate-500 dark:text-slate-400">
-                          <div>Bank: <strong className="text-slate-700 dark:text-slate-300">{systemSettings.bank_name}</strong></div>
-                          <div>A/C Number: <strong className="text-slate-700 dark:text-slate-300">{systemSettings.bank_account_number}</strong></div>
-                          <div>A/C Title: <strong className="text-slate-700 dark:text-slate-300">{systemSettings.bank_account_name}</strong></div>
+                    {paymentMethod === 'EasyPaisa' && (
+                      systemSettings?.easypaisa_number && systemSettings?.easypaisa_name ? (
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                            <span className="text-slate-500">Account Holder:</span>
+                            <span className="font-bold text-slate-900 dark:text-white">{systemSettings.easypaisa_name}</span>
+                          </div>
+                          <div className="flex justify-between py-1">
+                            <span className="text-slate-500">Mobile Number:</span>
+                            <span className="font-bold text-slate-900 dark:text-white font-mono">{systemSettings.easypaisa_number}</span>
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="text-center py-2 text-rose-500 font-bold flex items-center justify-center gap-1.5">
+                          <AlertCircle className="h-4 w-4 text-rose-500 shrink-0" />
+                          <span>Payment details are not configured. Please contact the administrator.</span>
+                        </div>
+                      )
+                    )}
+
+                    {paymentMethod === 'JazzCash' && (
+                      systemSettings?.jazzcash_number && systemSettings?.jazzcash_name ? (
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                            <span className="text-slate-500">Account Holder:</span>
+                            <span className="font-bold text-slate-900 dark:text-white">{systemSettings.jazzcash_name}</span>
+                          </div>
+                          <div className="flex justify-between py-1">
+                            <span className="text-slate-500">Mobile Number:</span>
+                            <span className="font-bold text-slate-900 dark:text-white font-mono">{systemSettings.jazzcash_number}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-2 text-rose-500 font-bold flex items-center justify-center gap-1.5">
+                          <AlertCircle className="h-4 w-4 text-rose-500 shrink-0" />
+                          <span>Payment details are not configured. Please contact the administrator.</span>
+                        </div>
+                      )
+                    )}
+
+                    {paymentMethod === 'Bank Transfer' && (
+                      systemSettings?.bank_name && systemSettings?.bank_account_number && systemSettings?.bank_account_name ? (
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                            <span className="text-slate-500">Bank Name:</span>
+                            <span className="font-bold text-slate-900 dark:text-white">{systemSettings.bank_name}</span>
+                          </div>
+                          <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                            <span className="text-slate-500">Account Holder:</span>
+                            <span className="font-bold text-slate-900 dark:text-white">{systemSettings.bank_account_name}</span>
+                          </div>
+                          <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                            <span className="text-slate-500">Account Number:</span>
+                            <span className="font-bold text-slate-900 dark:text-white font-mono">{systemSettings.bank_account_number}</span>
+                          </div>
+                          <div className="flex justify-between py-1">
+                            <span className="text-slate-500">IBAN:</span>
+                            <span className="font-bold text-slate-900 dark:text-white font-mono">{systemSettings.bank_account_number}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-2 text-rose-500 font-bold flex items-center justify-center gap-1.5">
+                          <AlertCircle className="h-4 w-4 text-rose-500 shrink-0" />
+                          <span>Payment details are not configured. Please contact the administrator.</span>
+                        </div>
+                      )
                     )}
                   </div>
 
