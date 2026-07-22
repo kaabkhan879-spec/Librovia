@@ -131,7 +131,7 @@ export const collectionsService = {
         return []
       }
 
-      return (data || []).map((col) => ({
+      return ((data as any) || []).map((col: any) => ({
         id: col.id,
         name: col.name,
         createdAt: col.created_at,

@@ -711,4 +711,22 @@ export const booksService = {
 
     localStorage.removeItem('librovia-progress-queue')
   },
+
+  async getUserStorageUsed(userId: string): Promise<number> {
+    try {
+      const { data, error } = await supabase
+        .from('books')
+        .select('file_size')
+        .eq('user_id', userId)
+
+      if (error || !data) {
+        return 0
+      }
+
+      return data.reduce((sum, r) => sum + (r.file_size || 0), 0)
+    } catch (err) {
+      console.error('Error calculating storage used:', err)
+      return 0
+    }
+  },
 }

@@ -32,6 +32,8 @@ export interface UserSubscription {
   current_period_start?: string
   current_period_end?: string
   cancel_at_period_end?: boolean
+  custom_storage_limit_bytes?: number | null
+  custom_limit_bytes?: number | null
   plan?: SubscriptionPlan
 }
 
@@ -127,7 +129,7 @@ export const subscriptionsService = {
         return DEFAULT_PLANS
       }
 
-      return data as SubscriptionPlan[]
+      return data as unknown as SubscriptionPlan[]
     } catch (err) {
       console.warn('Failed to load subscription plans from Supabase, using fallback defaults:', err)
       return DEFAULT_PLANS
@@ -140,17 +142,56 @@ export const subscriptionsService = {
   async getUserSubscription(userId: string): Promise<UserSubscription | null> {
     if (!userId) return null
     try {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('user_subscriptions')
         .select('*, plan:subscription_plans(*)')
         .eq('user_id', userId)
         .maybeSingle()
 
-      if (error || !data) {
-        return null
+      if (error) {
+        console.error('Failed to query user subscription:', error.message)
       }
 
-      return data as UserSubscription
+      if (!data) {
+        // Fetch database plans to get free tier features dynamically
+        const plans = await this.getSubscriptionPlans()
+        const freePlan = plans.find((p) => p.id === 'free') || DEFAULT_PLANS[0]
+
+        const periodEnd = new Date()
+        periodEnd.setFullYear(periodEnd.getFullYear() + 10) // 10 years default duration for free tier
+
+        const payload = {
+          user_id: userId,
+          plan_id: 'free',
+          billing_cycle: 'monthly' as const,
+          status: 'active' as const,
+          current_period_start: new Date().toISOString(),
+          current_period_end: periodEnd.toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+
+        const { data: inserted, error: insertError } = await supabase
+          .from('user_subscriptions')
+          .insert(payload)
+          .select('*, plan:subscription_plans(*)')
+          .single()
+
+        if (!insertError && inserted) {
+          data = inserted
+        } else {
+          return {
+            user_id: userId,
+            plan_id: 'free',
+            billing_cycle: 'monthly',
+            status: 'active',
+            current_period_start: payload.current_period_start,
+            current_period_end: payload.current_period_end,
+            plan: freePlan,
+          }
+        }
+      }
+
+      return data as unknown as UserSubscription
     } catch (err) {
       console.warn('Failed to load user subscription from DB:', err)
       return null
@@ -182,25 +223,30 @@ export const subscriptionsService = {
       updated_at: new Date().toISOString(),
     }
 
+    console.log('Sending UPDATE to user_subscriptions table:', payload)
+
     try {
-      const { data, error } = await supabase
+      const { data, error, status, count } = await supabase
         .from('user_subscriptions')
-        .upsert(payload, { onConflict: 'user_id' })
+        .upsert(payload, { onConflict: 'user_id', count: 'exact' })
         .select('*, plan:subscription_plans(*)')
         .single()
 
-      if (error) throw error
-      return data as UserSubscription
-    } catch (err) {
-      console.warn('Database upsert failed for user subscription:', err)
-      // Return optimistic record
-      return {
-        user_id: userId,
-        plan_id: planId,
-        billing_cycle: billingCycle,
-        status: 'active',
-        current_period_end: periodEnd.toISOString(),
+      console.log('Supabase user_subscriptions UPDATE response:', { data, error, status, count })
+
+      if (error) {
+        console.error('Supabase query failed:', error)
+        throw error
       }
+
+      if (!data) {
+        throw new Error('Supabase responded with empty payload.')
+      }
+
+      return data as unknown as UserSubscription
+    } catch (err) {
+      console.error('Exception during updateUserSubscription:', err)
+      throw err
     }
   },
 

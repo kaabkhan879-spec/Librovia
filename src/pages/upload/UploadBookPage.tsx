@@ -10,6 +10,7 @@ import { notificationsService } from '../../services/notifications'
 import { UploadCloud, FileText, X, Plus, Star, CheckCircle, Lock, Tag } from 'lucide-react'
 import { Button } from '../../components/common/Button'
 import { formatBytes } from '../../utils/helpers'
+import { useSubscription } from '../../context/SubscriptionContext'
 
 interface TagItem {
   id: string
@@ -18,8 +19,10 @@ interface TagItem {
 
 export const UploadBookPage: React.FC = () => {
   const { showSuccess, showError } = useToast()
+  const { canUploadFile, refreshSubscription } = useSubscription()
   const navigate = useNavigate()
   const coverInputRef = useRef<HTMLInputElement>(null)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
   // Form states
   const [file, setFile] = useState<File | null>(null)
@@ -141,9 +144,13 @@ export const UploadBookPage: React.FC = () => {
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Explicit field validations
     if (!file) {
       setGeneralError('Book file is required.')
+      return
+    }
+
+    if (!canUploadFile(file.size)) {
+      setShowUpgradeModal(true)
       return
     }
     if (!title.trim()) {
@@ -210,6 +217,7 @@ export const UploadBookPage: React.FC = () => {
       setUploadProgress(100)
       setStatus('success')
       showSuccess(`"${title.trim()}" uploaded successfully! 📚`)
+      await refreshSubscription().catch((e) => console.error('Failed to update subscription storage:', e))
       notificationsService
         .addNotification(
           'upload',
@@ -772,6 +780,55 @@ export const UploadBookPage: React.FC = () => {
                   </Button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Premium Upgrade Modal */}
+      <AnimatePresence>
+        {showUpgradeModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-bg-card border border-border-base relative max-w-md w-full rounded-2xl p-6 shadow-2xl space-y-6"
+            >
+              <button
+                onClick={() => setShowUpgradeModal(false)}
+                className="absolute right-4 top-4 text-text-muted hover:text-text-main transition-colors"
+              >
+                <X size={20} />
+              </button>
+              <div className="flex flex-col items-center text-center space-y-3">
+                <div className="p-3 bg-accent-amber/10 text-accent-amber rounded-full">
+                  <Lock size={32} />
+                </div>
+                <h3 className="text-xl font-extrabold text-text-main">Storage Limit Reached</h3>
+                <p className="text-sm text-text-muted leading-relaxed">
+                  Uploading this book will exceed your plan's storage limit. Upgrade to a Pro or Family plan to unlock up to 1 TB of cloud library storage!
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => setShowUpgradeModal(false)}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    setShowUpgradeModal(false)
+                    navigate(ROUTES.SUBSCRIPTION)
+                  }}
+                  variant="primary"
+                  className="flex-1"
+                >
+                  View Plans
+                </Button>
+              </div>
             </motion.div>
           </div>
         )}

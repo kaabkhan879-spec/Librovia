@@ -25,6 +25,7 @@ import { booksService, type Book } from '../../services/books'
 import { collectionsService, type Collection } from '../../services/collections'
 import { notesService, type Note } from '../../services/notes'
 import { formatBytes } from '../../utils/helpers'
+import { useSubscription } from '../../context/SubscriptionContext'
 
 interface BookDetails {
   id: string
@@ -133,6 +134,7 @@ const mapBookToDetails = (b: Book, collectionName: string): BookDetails => {
 }
 
 export const BookDetailsPage: React.FC = () => {
+  const { refreshSubscription } = useSubscription()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
@@ -239,6 +241,7 @@ export const BookDetailsPage: React.FC = () => {
       return
     try {
       await booksService.deleteBook(rawBook.id)
+      await refreshSubscription().catch(console.error)
       navigate(ROUTES.LIBRARY)
     } catch (e) {
       console.error(e)

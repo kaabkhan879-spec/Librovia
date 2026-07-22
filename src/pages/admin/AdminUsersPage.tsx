@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { PageWrapper } from '../../components/common/PageWrapper'
 import { useAuth } from '../../context/AuthContext'
@@ -31,10 +31,14 @@ export interface DBUserRecord {
   created_at: string
   updated_at?: string
   name?: string
-  plan?: 'Free' | 'Pro' | 'Family'
+  plan?: string
   storageUsedBytes?: number
   storageLimitBytes?: number
   status?: 'Active' | 'Suspended'
+  current_period_end?: string | null
+  cancel_at_period_end?: boolean
+  plan_id?: string
+  billing_cycle?: 'monthly' | 'yearly'
 }
 
 export const AdminUsersPage: React.FC = () => {
@@ -57,6 +61,13 @@ export const AdminUsersPage: React.FC = () => {
   const [drawerUser, setDrawerUser] = useState<DBUserRecord | null>(null)
   const [drawerTab, setDrawerTab] = useState<'profile' | 'subscription' | 'storage' | 'books' | 'payments' | 'activity' | 'devices'>('profile')
 
+  // Drawer edit states
+  const [editPlanId, setEditPlanId] = useState('free')
+  const [editBillingCycle, setEditBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
+  const [editStatus, setEditStatus] = useState<'active' | 'suspended' | 'canceled'>('active')
+  const [editStorageLimitGB, setEditStorageLimitGB] = useState(5)
+  const [isSaving, setIsSaving] = useState(false)
+
   // Overflow Menu State
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null)
 
@@ -66,54 +77,104 @@ export const AdminUsersPage: React.FC = () => {
   const [newUserName, setNewUserName] = useState('')
   const [newUserRole, setNewUserRole] = useState<'user' | 'super_admin'>('user')
 
-  // Fetch Live Users from Supabase `user_roles`
-  useEffect(() => {
-    async function fetchLiveUsers() {
-      try {
-        setLoading(true)
-        const { data, error } = await supabase.from('user_roles').select('*')
+  // Fetch Live Users from Supabase
+  const fetchLiveUsers = useCallback(async () => {
+    try {
+      setLoading(true)
+      // 1. Fetch user roles
+      const { data: roles, error: rolesErr } = await supabase.from('user_roles').select('*')
+      if (rolesErr) throw rolesErr
 
-        if (error) {
-          console.error('Error fetching user_roles:', error)
-          setUsers([])
-        } else if (data) {
-          const mapped: DBUserRecord[] = data.map((row) => ({
+      // 2. Fetch user subscriptions
+      const { data: subs, error: subsErr } = await supabase
+        .from('user_subscriptions')
+        .select('*, plan:subscription_plans(*)')
+      if (subsErr) console.error('Error fetching user subscriptions:', subsErr)
+
+      // 3. Fetch books to calculate storage
+      const { data: booksData, error: booksErr } = await supabase.from('books').select('user_id, file_size')
+      if (booksErr) console.error('Error fetching books storage:', booksErr)
+
+      // Group storage in memory
+      const storageMap: Record<string, number> = {}
+      if (booksData) {
+        booksData.forEach((b: any) => {
+          if (b.user_id) {
+            storageMap[b.user_id] = (storageMap[b.user_id] || 0) + (b.file_size || 0)
+          }
+        })
+      }
+
+      if (roles) {
+        const mapped: DBUserRecord[] = roles.map((row) => {
+          const sub = subs?.find((s: any) => s.user_id === row.user_id)
+          const storageUsed = storageMap[row.user_id] || 0
+          
+          let storageLimit = 5368709120 // 5 GB default fallback
+          if (sub) {
+            if (sub.custom_storage_limit_bytes !== null && sub.custom_storage_limit_bytes !== undefined) {
+              storageLimit = Number(sub.custom_storage_limit_bytes)
+            } else if (sub.plan) {
+              storageLimit = sub.plan.storage_limit_bytes
+            }
+          }
+
+          return {
             user_id: row.user_id,
             email: row.email || 'N/A',
             role: (row.role as any) || 'user',
             created_at: row.created_at || new Date().toISOString(),
             name: row.email ? row.email.split('@')[0] : 'Registered User',
-            plan: row.role === 'super_admin' ? 'Family' : 'Free',
-            storageUsedBytes: row.role === 'super_admin' ? 1450000 : 500000,
-            storageLimitBytes: row.role === 'super_admin' ? 1000000000000 : 5000000000,
-            status: 'Active',
-          }))
-
-          if (currentUser?.id && !mapped.some((u) => u.user_id === currentUser.id)) {
-            mapped.unshift({
-              user_id: currentUser.id,
-              email: currentUser.email || 'N/A',
-              role: currentUser.role || 'user',
-              created_at: new Date().toISOString(),
-              name: currentUser.displayName || currentUser.email.split('@')[0],
-              plan: currentUser.role === 'super_admin' ? 'Family' : 'Free',
-              storageUsedBytes: currentUser.role === 'super_admin' ? 1450000 : 500000,
-              storageLimitBytes: currentUser.role === 'super_admin' ? 1000000000000 : 5000000000,
-              status: 'Active',
-            })
+            plan: sub?.plan?.plan_name || 'FREE',
+            storageUsedBytes: storageUsed,
+            storageLimitBytes: storageLimit,
+            status: sub?.status === 'suspended' ? 'Suspended' : 'Active',
+            current_period_end: sub?.current_period_end || null,
+            cancel_at_period_end: sub?.cancel_at_period_end || false,
+            plan_id: sub?.plan_id || 'free',
+            billing_cycle: sub?.billing_cycle || 'monthly'
           }
+        })
 
-          setUsers(mapped)
+        // Ensure current user is present
+        if (currentUser?.id && !mapped.some((u) => u.user_id === currentUser.id)) {
+          const currentStorage = storageMap[currentUser.id] || 0
+          mapped.unshift({
+            user_id: currentUser.id,
+            email: currentUser.email || 'N/A',
+            role: currentUser.role || 'user',
+            created_at: new Date().toISOString(),
+            name: currentUser.displayName || currentUser.email.split('@')[0],
+            plan: currentUser.role === 'super_admin' ? 'FAMILY' : 'FREE',
+            storageUsedBytes: currentStorage,
+            storageLimitBytes: currentUser.role === 'super_admin' ? 1099511627776 : 5368709120,
+            status: 'Active',
+            plan_id: currentUser.role === 'super_admin' ? 'family' : 'free',
+            billing_cycle: 'monthly'
+          })
         }
-        setLoading(false)
-      } catch (err) {
-        console.error('Failed to load users:', err)
-        setLoading(false)
-      }
-    }
 
-    fetchLiveUsers()
+        setUsers(mapped)
+      }
+      setLoading(false)
+    } catch (err) {
+      console.error('Failed to load users:', err)
+      setLoading(false)
+    }
   }, [currentUser])
+
+  useEffect(() => {
+    fetchLiveUsers()
+  }, [fetchLiveUsers])
+
+  useEffect(() => {
+    if (drawerUser) {
+      setEditPlanId(drawerUser.plan_id || 'free')
+      setEditBillingCycle(drawerUser.billing_cycle || 'monthly')
+      setEditStatus(drawerUser.status === 'Suspended' ? 'suspended' : 'active')
+      setEditStorageLimitGB(Math.round((drawerUser.storageLimitBytes || 5368709120) / (1024 * 1024 * 1024)))
+    }
+  }, [drawerUser])
 
   // Calculations
   const totalUsers = users.length
@@ -132,9 +193,9 @@ export const AdminUsersPage: React.FC = () => {
         (u.role && u.role.toLowerCase().includes(q))
 
       let matchesFilter = true
-      if (filterType === 'Free') matchesFilter = u.plan === 'Free'
-      if (filterType === 'Pro') matchesFilter = u.plan === 'Pro'
-      if (filterType === 'Family') matchesFilter = u.plan === 'Family'
+      if (filterType === 'Free') matchesFilter = u.plan?.toUpperCase() === 'FREE'
+      if (filterType === 'Pro') matchesFilter = u.plan?.toUpperCase() === 'PRO'
+      if (filterType === 'Family') matchesFilter = u.plan?.toUpperCase() === 'FAMILY'
       if (filterType === 'Admins') matchesFilter = u.role === 'super_admin'
       if (filterType === 'Suspended') matchesFilter = u.status === 'Suspended'
 
@@ -194,17 +255,46 @@ export const AdminUsersPage: React.FC = () => {
     setIsAddUserOpen(false)
   }
 
-  const handleToggleSuspend = (userId: string) => {
-    setUsers((prev) =>
-      prev.map((u) => (u.user_id === userId ? { ...u, status: u.status === 'Active' ? 'Suspended' : 'Active' } : u))
-    )
-    showSuccess('Updated account suspension status.')
+  const handleToggleSuspend = async (userId: string) => {
+    try {
+      const target = users.find((u) => u.user_id === userId)
+      if (!target) return
+      const newStatus = target.status === 'Active' ? 'suspended' : 'active'
+      
+      const { error } = await supabase
+        .from('user_subscriptions')
+        .upsert({
+          user_id: userId,
+          plan_id: target.plan_id || 'free',
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' })
+
+      if (error) throw error
+
+      setUsers((prev) =>
+        prev.map((u) => (u.user_id === userId ? { ...u, status: newStatus === 'suspended' ? 'Suspended' : 'Active' } : u))
+      )
+      showSuccess(`Subscription status updated to ${newStatus}.`)
+    } catch (err: any) {
+      console.error(err)
+      showError(err.message || 'Failed to update suspension status.')
+    }
     setActiveMenuId(null)
   }
 
-  const handleDeleteUser = (userId: string, email: string) => {
-    setUsers((prev) => prev.filter((u) => u.user_id !== userId))
-    showSuccess(`Deleted account ${email}.`)
+  const handleDeleteUser = async (userId: string, email: string) => {
+    if (!confirm(`Are you sure you want to delete user ${email}?`)) return
+    try {
+      const { error } = await supabase.from('user_roles').delete().eq('user_id', userId)
+      if (error) throw error
+      
+      setUsers((prev) => prev.filter((u) => u.user_id !== userId))
+      showSuccess(`Deleted account ${email}.`)
+    } catch (err: any) {
+      console.error(err)
+      showError(err.message || 'Failed to delete user.')
+    }
     setActiveMenuId(null)
   }
 
@@ -482,7 +572,8 @@ export const AdminUsersPage: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => {
-                                showSuccess(`Edit mode enabled for ${u.email}`)
+                                setDrawerUser(u)
+                                setDrawerTab('profile')
                                 setActiveMenuId(null)
                               }}
                               className="w-full flex items-center gap-2 rounded-xl px-3 py-2 text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
@@ -492,7 +583,8 @@ export const AdminUsersPage: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => {
-                                showSuccess(`Upgrade modal for ${u.email}`)
+                                setDrawerUser(u)
+                                setDrawerTab('subscription')
                                 setActiveMenuId(null)
                               }}
                               className="w-full flex items-center gap-2 rounded-xl px-3 py-2 text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
@@ -657,19 +749,169 @@ export const AdminUsersPage: React.FC = () => {
                     )}
 
                     {drawerTab === 'subscription' && (
-                      <div className="space-y-2 rounded-2xl bg-slate-50 p-4 dark:bg-slate-800/50">
-                        <span className="text-[10px] uppercase text-slate-400 block font-bold">Active Tier</span>
-                        <h4 className="text-xl font-black text-purple-600 dark:text-purple-400">{drawerUser.plan || 'Free'} Plan</h4>
-                        <p className="text-slate-500">Auto-renews monthly via Supabase subscriptions.</p>
+                      <div className="space-y-4 rounded-2xl bg-slate-50 p-4 dark:bg-slate-800/50 text-left">
+                        <div>
+                          <label className="block text-[10px] font-extrabold uppercase text-slate-400 mb-1">Select Subscription Plan</label>
+                          <select
+                            value={editPlanId}
+                            onChange={(e) => setEditPlanId(e.target.value)}
+                            className="w-full rounded-xl border border-slate-200 bg-white p-2 text-xs font-semibold text-slate-900 focus:border-purple-600 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+                          >
+                            <option value="free">FREE Plan</option>
+                            <option value="pro">PRO Plan</option>
+                            <option value="family">FAMILY Plan</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-extrabold uppercase text-slate-400 mb-1">Billing Cycle</label>
+                          <select
+                            value={editBillingCycle}
+                            onChange={(e) => setEditBillingCycle(e.target.value as any)}
+                            className="w-full rounded-xl border border-slate-200 bg-white p-2 text-xs font-semibold text-slate-900 focus:border-purple-600 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+                          >
+                            <option value="monthly">Monthly billing</option>
+                            <option value="yearly">Yearly billing</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-extrabold uppercase text-slate-400 mb-1">Subscription Status</label>
+                          <select
+                            value={editStatus}
+                            onChange={(e) => setEditStatus(e.target.value as any)}
+                            className="w-full rounded-xl border border-slate-200 bg-white p-2 text-xs font-semibold text-slate-900 focus:border-purple-600 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+                          >
+                            <option value="active">Active (Auto-renewing)</option>
+                            <option value="suspended">Suspended</option>
+                            <option value="canceled">Canceled</option>
+                          </select>
+                        </div>
+
+                        {drawerUser.current_period_end && (
+                          <div>
+                            <span className="block text-[10px] font-extrabold uppercase text-slate-400">Current Period End / Renewal</span>
+                            <span className="font-bold text-slate-900 dark:text-white font-mono">
+                              {new Date(drawerUser.current_period_end).toLocaleDateString()}
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="pt-2">
+                          <button
+                            type="button"
+                            disabled={isSaving}
+                            onClick={async () => {
+                              try {
+                                setIsSaving(true)
+                                const periodEnd = new Date()
+                                if (editBillingCycle === 'yearly') {
+                                  periodEnd.setFullYear(periodEnd.getFullYear() + 1)
+                                } else {
+                                  periodEnd.setMonth(periodEnd.getMonth() + 1)
+                                }
+
+                                const { error } = await supabase
+                                  .from('user_subscriptions')
+                                  .upsert({
+                                    user_id: drawerUser.user_id,
+                                    plan_id: editPlanId,
+                                    billing_cycle: editBillingCycle,
+                                    status: editStatus,
+                                    current_period_end: periodEnd.toISOString(),
+                                    updated_at: new Date().toISOString()
+                                  }, { onConflict: 'user_id' })
+
+                                if (error) throw error
+
+                                showSuccess('User subscription updated successfully!')
+                                fetchLiveUsers()
+                                setDrawerUser(null)
+                              } catch (err: any) {
+                                console.error(err)
+                                showError(err.message || 'Failed to update subscription.')
+                              } finally {
+                                setIsSaving(false)
+                              }
+                            }}
+                            className="w-full rounded-xl bg-purple-600 py-2.5 text-xs font-black text-white hover:bg-purple-700 shadow-md"
+                          >
+                            {isSaving ? 'Saving Changes...' : 'Save Subscription Settings'}
+                          </button>
+                        </div>
                       </div>
                     )}
 
                     {drawerTab === 'storage' && (
-                      <div className="space-y-2 rounded-2xl bg-slate-50 p-4 dark:bg-slate-800/50">
-                        <span className="text-[10px] uppercase text-slate-400 block font-bold">Storage Quota</span>
-                        <h4 className="text-lg font-black text-slate-900 dark:text-white">{formatStorageMB(drawerUser.storageUsedBytes)} Used</h4>
-                        <div className="h-2 w-full rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden mt-2">
-                          <div className="h-full bg-purple-600" style={{ width: '15%' }} />
+                      <div className="space-y-4 rounded-2xl bg-slate-50 p-4 dark:bg-slate-800/50 text-left">
+                        <div>
+                          <span className="text-[10px] uppercase text-slate-400 block font-bold">Storage Quota</span>
+                          <h4 className="text-sm font-black text-slate-900 dark:text-white mt-1">
+                            {formatStorageMB(drawerUser.storageUsedBytes)} Used of{' '}
+                            {(drawerUser.storageLimitBytes || 5368709120) >= 1099511627776
+                              ? `${((drawerUser.storageLimitBytes || 5368709120) / 1099511627776).toFixed(0)} TB`
+                              : `${((drawerUser.storageLimitBytes || 5368709120) / 1024 / 1024 / 1024).toFixed(0)} GB`}
+                          </h4>
+                          <div className="h-2 w-full rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden mt-2">
+                            <div
+                              className="h-full bg-purple-600"
+                              style={{
+                                width: `${Math.min(
+                                  100,
+                                  Math.round(((drawerUser.storageUsedBytes || 0) / (drawerUser.storageLimitBytes || 5368709120)) * 100)
+                                )}%`
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="border-t border-slate-200 dark:border-slate-700 pt-3">
+                          <label className="block text-[10px] font-extrabold uppercase text-slate-400 mb-1">Custom Storage Override (GB)</label>
+                          <input
+                            type="number"
+                            value={editStorageLimitGB}
+                            onChange={(e) => setEditStorageLimitGB(Math.max(1, Number(e.target.value)))}
+                            className="w-full rounded-xl border border-slate-200 bg-white p-2 text-xs font-semibold text-slate-900 focus:border-purple-600 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+                            placeholder="e.g. 5, 50, 300"
+                          />
+                          <p className="text-[10px] text-slate-400 mt-1">Specify custom storage limit. Changing this overrides the subscription plan's default storage limit.</p>
+                        </div>
+
+                        <div className="pt-2">
+                          <button
+                            type="button"
+                            disabled={isSaving}
+                            onClick={async () => {
+                              try {
+                                setIsSaving(true)
+                                const limitBytes = editStorageLimitGB * 1024 * 1024 * 1024
+
+                                const { error } = await supabase
+                                  .from('user_subscriptions')
+                                  .upsert({
+                                    user_id: drawerUser.user_id,
+                                    plan_id: drawerUser.plan_id || 'free',
+                                    custom_storage_limit_bytes: limitBytes,
+                                    custom_limit_bytes: limitBytes,
+                                    updated_at: new Date().toISOString()
+                                  }, { onConflict: 'user_id' })
+
+                                if (error) throw error
+
+                                showSuccess('Custom storage limit override saved!')
+                                fetchLiveUsers()
+                                setDrawerUser(null)
+                              } catch (err: any) {
+                                console.error(err)
+                                showError(err.message || 'Failed to save storage override.')
+                              } finally {
+                                setIsSaving(false)
+                              }
+                            }}
+                            className="w-full rounded-xl bg-purple-600 py-2.5 text-xs font-black text-white hover:bg-purple-700 shadow-md"
+                          >
+                            {isSaving ? 'Updating Limit...' : 'Save Storage Override'}
+                          </button>
                         </div>
                       </div>
                     )}

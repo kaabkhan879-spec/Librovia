@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { PageWrapper } from '../../components/common/PageWrapper'
 import { useToast } from '../../context/ToastContext'
@@ -24,16 +24,18 @@ export interface DBUserStorageRecord {
   name: string
   email: string
   role: 'user' | 'super_admin' | 'moderator'
-  plan: 'Free' | 'Pro' | 'Family'
+  plan: string
   storageUsedBytes: number
   storageLimitBytes: number
   status: 'Active' | 'Suspended'
   created_at: string
+  plan_id?: string
+  billing_cycle?: 'monthly' | 'yearly'
 }
 
 export const AdminStoragePage: React.FC = () => {
   const { user: currentUser } = useAuth()
-  const { showSuccess } = useToast()
+  const { showSuccess, showError } = useToast()
 
   const [loading, setLoading] = useState(true)
   const [errorState, setErrorState] = useState<string | null>(null)
@@ -51,44 +53,74 @@ export const AdminStoragePage: React.FC = () => {
   // Right-side Drawer State
   const [drawerUser, setDrawerUser] = useState<DBUserStorageRecord | null>(null)
 
-  // Fetch Real Users from Supabase `user_roles`
-  const fetchLiveStorageUsers = async () => {
+  // Fetch Real Users from Supabase
+  const fetchLiveStorageUsers = useCallback(async () => {
     try {
       setLoading(true)
       setErrorState(null)
-      const { data, error } = await supabase.from('user_roles').select('*')
+      const { data: roles, error: rolesErr } = await supabase.from('user_roles').select('*')
+      if (rolesErr) throw rolesErr
 
-      if (error) {
-        console.error('Error fetching user_roles for storage:', error)
-        setErrorState('Unable to load storage information.')
-        setUsers([])
-      } else if (data) {
-        const mapped: DBUserStorageRecord[] = data.map((row) => {
-          const isSuperAdmin = row.role === 'super_admin'
+      const { data: subs, error: subsErr } = await supabase
+        .from('user_subscriptions')
+        .select('*, plan:subscription_plans(*)')
+      if (subsErr) console.error('Error fetching subs for storage page:', subsErr)
+
+      const { data: booksData, error: booksErr } = await supabase.from('books').select('user_id, file_size')
+      if (booksErr) console.error('Error calculating storage size:', booksErr)
+
+      const storageMap: Record<string, number> = {}
+      if (booksData) {
+        booksData.forEach((b: any) => {
+          if (b.user_id) {
+            storageMap[b.user_id] = (storageMap[b.user_id] || 0) + (b.file_size || 0)
+          }
+        })
+      }
+
+      if (roles) {
+        const mapped: DBUserStorageRecord[] = roles.map((row) => {
+          const sub = subs?.find((s: any) => s.user_id === row.user_id)
+          const storageUsed = storageMap[row.user_id] || 0
+          
+          let storageLimit = 5368709120 // 5 GB default fallback
+          if (sub) {
+            if (sub.custom_storage_limit_bytes !== null && sub.custom_storage_limit_bytes !== undefined) {
+              storageLimit = Number(sub.custom_storage_limit_bytes)
+            } else if (sub.plan) {
+              storageLimit = sub.plan.storage_limit_bytes
+            }
+          }
+
           return {
             user_id: row.user_id,
             email: row.email || 'N/A',
             name: row.email ? row.email.split('@')[0] : 'Registered User',
             role: (row.role as any) || 'user',
-            plan: isSuperAdmin ? 'Family' : 'Free',
-            storageUsedBytes: isSuperAdmin ? 1450000 : 500000,
-            storageLimitBytes: isSuperAdmin ? 1000000000000 : 5000000000,
-            status: 'Active',
+            plan: sub?.plan?.plan_name || 'FREE',
+            storageUsedBytes: storageUsed,
+            storageLimitBytes: storageLimit,
+            status: sub?.status === 'suspended' ? 'Suspended' : 'Active',
             created_at: row.created_at || new Date().toISOString(),
+            plan_id: sub?.plan_id || 'free',
+            billing_cycle: sub?.billing_cycle || 'monthly'
           }
         })
 
         if (currentUser?.id && !mapped.some((u) => u.user_id === currentUser.id)) {
+          const currentStorage = storageMap[currentUser.id] || 0
           mapped.unshift({
             user_id: currentUser.id,
             email: currentUser.email || 'N/A',
             name: currentUser.displayName || currentUser.email.split('@')[0],
             role: currentUser.role || 'user',
-            plan: currentUser.role === 'super_admin' ? 'Family' : 'Free',
-            storageUsedBytes: currentUser.role === 'super_admin' ? 1450000 : 500000,
-            storageLimitBytes: currentUser.role === 'super_admin' ? 1000000000000 : 5000000000,
+            plan: currentUser.role === 'super_admin' ? 'FAMILY' : 'FREE',
+            storageUsedBytes: currentStorage,
+            storageLimitBytes: currentUser.role === 'super_admin' ? 1099511627776 : 5368709120,
             status: 'Active',
             created_at: new Date().toISOString(),
+            plan_id: currentUser.role === 'super_admin' ? 'family' : 'free',
+            billing_cycle: 'monthly'
           })
         }
 
@@ -100,11 +132,11 @@ export const AdminStoragePage: React.FC = () => {
       setErrorState('Unable to load storage information.')
       setLoading(false)
     }
-  }
+  }, [currentUser])
 
   useEffect(() => {
     fetchLiveStorageUsers()
-  }, [currentUser])
+  }, [fetchLiveStorageUsers])
 
   // Filter & Sort Pipeline
   const filteredUsers = useMemo(() => {
@@ -119,9 +151,9 @@ export const AdminStoragePage: React.FC = () => {
         const pct = (u.storageUsedBytes / u.storageLimitBytes) * 100
         let matchesFilter = true
 
-        if (filterType === 'Free') matchesFilter = u.plan === 'Free'
-        if (filterType === 'Pro') matchesFilter = u.plan === 'Pro'
-        if (filterType === 'Family') matchesFilter = u.plan === 'Family'
+        if (filterType === 'Free') matchesFilter = u.plan?.toUpperCase() === 'FREE'
+        if (filterType === 'Pro') matchesFilter = u.plan?.toUpperCase() === 'PRO'
+        if (filterType === 'Family') matchesFilter = u.plan?.toUpperCase() === 'FAMILY'
         if (filterType === 'Near Limit') matchesFilter = pct >= 90
         if (filterType === 'Suspended') matchesFilter = u.status === 'Suspended'
 
@@ -155,29 +187,142 @@ export const AdminStoragePage: React.FC = () => {
     return { bar: 'bg-rose-500', text: 'text-rose-600 dark:text-rose-400', badge: 'bg-rose-50 text-rose-700 font-black' }
   }
 
+  // Drawer edit states
+  const [editPlanId, setEditPlanId] = useState('free')
+
+  useEffect(() => {
+    if (drawerUser) {
+      setEditPlanId(drawerUser.plan_id || 'free')
+    }
+  }, [drawerUser])
+
   // Drawer Storage Handlers
-  const handleIncreaseQuota = () => {
+  const handleIncreaseQuota = async () => {
     if (!drawerUser) return
-    const newLimit = drawerUser.storageLimitBytes + 10000000000 // +10GB
-    setDrawerUser({ ...drawerUser, storageLimitBytes: newLimit })
-    setUsers((prev) => prev.map((u) => (u.user_id === drawerUser.user_id ? { ...u, storageLimitBytes: newLimit } : u)))
-    showSuccess(`Increased storage quota for ${drawerUser.email} by +10 GB.`)
+    try {
+      const newLimit = drawerUser.storageLimitBytes + 10000000000 // +10GB
+      
+      const { error } = await supabase
+        .from('user_subscriptions')
+        .upsert({
+          user_id: drawerUser.user_id,
+          plan_id: drawerUser.plan_id || 'free',
+          custom_storage_limit_bytes: newLimit,
+          custom_limit_bytes: newLimit,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' })
+
+      if (error) throw error
+
+      setDrawerUser({ ...drawerUser, storageLimitBytes: newLimit })
+      setUsers((prev) => prev.map((u) => (u.user_id === drawerUser.user_id ? { ...u, storageLimitBytes: newLimit } : u)))
+      showSuccess(`Increased storage quota for ${drawerUser.email} by +10 GB.`)
+    } catch (err: any) {
+      console.error(err)
+      showError(err.message || 'Failed to update storage limit.')
+    }
   }
 
-  const handleReduceQuota = () => {
+  const handleReduceQuota = async () => {
     if (!drawerUser) return
-    const newLimit = Math.max(drawerUser.storageUsedBytes, drawerUser.storageLimitBytes - 5000000000) // -5GB
-    setDrawerUser({ ...drawerUser, storageLimitBytes: newLimit })
-    setUsers((prev) => prev.map((u) => (u.user_id === drawerUser.user_id ? { ...u, storageLimitBytes: newLimit } : u)))
-    showSuccess(`Reduced storage quota for ${drawerUser.email}.`)
+    try {
+      const newLimit = Math.max(drawerUser.storageUsedBytes, drawerUser.storageLimitBytes - 5000000000) // -5GB
+      
+      const { error } = await supabase
+        .from('user_subscriptions')
+        .upsert({
+          user_id: drawerUser.user_id,
+          plan_id: drawerUser.plan_id || 'free',
+          custom_storage_limit_bytes: newLimit,
+          custom_limit_bytes: newLimit,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' })
+
+      if (error) throw error
+
+      setDrawerUser({ ...drawerUser, storageLimitBytes: newLimit })
+      setUsers((prev) => prev.map((u) => (u.user_id === drawerUser.user_id ? { ...u, storageLimitBytes: newLimit } : u)))
+      showSuccess(`Reduced storage quota for ${drawerUser.email} by -5 GB.`)
+    } catch (err: any) {
+      console.error(err)
+      showError(err.message || 'Failed to reduce storage limit.')
+    }
   }
 
-  const handleToggleSuspendUploads = () => {
+  const handleToggleSuspendUploads = async () => {
     if (!drawerUser) return
-    const newStatus = drawerUser.status === 'Active' ? 'Suspended' : 'Active'
-    setDrawerUser({ ...drawerUser, status: newStatus })
-    setUsers((prev) => prev.map((u) => (u.user_id === drawerUser.user_id ? { ...u, status: newStatus } : u)))
-    showSuccess(`Updated upload status for ${drawerUser.email}.`)
+    try {
+      const newStatus = drawerUser.status === 'Active' ? 'suspended' : 'active'
+      
+      const { error } = await supabase
+        .from('user_subscriptions')
+        .upsert({
+          user_id: drawerUser.user_id,
+          plan_id: drawerUser.plan_id || 'free',
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' })
+
+      if (error) throw error
+
+      const updatedStatus = newStatus === 'suspended' ? 'Suspended' : 'Active'
+      setDrawerUser({ ...drawerUser, status: updatedStatus })
+      setUsers((prev) => prev.map((u) => (u.user_id === drawerUser.user_id ? { ...u, status: updatedStatus } : u)))
+      showSuccess(`Updated upload status for ${drawerUser.email} to ${updatedStatus}.`)
+    } catch (err: any) {
+      console.error(err)
+      showError(err.message || 'Failed to suspend uploads.')
+    }
+  }
+
+  const handlePlanChange = async (newPlanId: string) => {
+    if (!drawerUser) return
+    try {
+      const periodEnd = new Date()
+      periodEnd.setMonth(periodEnd.getMonth() + 1)
+
+      const payload = {
+        user_id: drawerUser.user_id,
+        plan_id: newPlanId,
+        billing_cycle: drawerUser.billing_cycle || 'monthly',
+        status: drawerUser.status === 'Suspended' ? 'suspended' : 'active',
+        current_period_end: periodEnd.toISOString(),
+        updated_at: new Date().toISOString()
+      }
+
+      console.log('Sending UPDATE payload to Supabase for user_subscriptions:', payload)
+
+      const { data, error, status, count } = await supabase
+        .from('user_subscriptions')
+        .upsert(payload, { onConflict: 'user_id', count: 'exact' })
+        .select('*, plan:subscription_plans(*)')
+        .single()
+
+      console.log('Supabase UPDATE response:', { data, error, status, count })
+
+      if (error) {
+        console.error('Supabase update failed with error:', error)
+        showError(`Failed to update plan: ${error.message}`)
+        return
+      }
+
+      if (!data) {
+        console.warn('Supabase update succeeded but no data returned.')
+        showError('Plan update was not confirmed by the database.')
+        return
+      }
+
+      showSuccess(`Subscription plan successfully changed to ${newPlanId.toUpperCase()} for ${drawerUser.email}`)
+      fetchLiveStorageUsers()
+      setDrawerUser({
+        ...drawerUser,
+        plan_id: newPlanId,
+        plan: data.plan?.plan_name || newPlanId.toUpperCase()
+      })
+    } catch (err: any) {
+      console.error('Exception in handlePlanChange:', err)
+      showError(err.message || 'An unexpected error occurred.')
+    }
   }
 
   return (
@@ -514,18 +659,22 @@ export const AdminStoragePage: React.FC = () => {
                       <span className="text-[11px] font-bold text-slate-400">Shrink Limit</span>
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        showSuccess(`Plan upgrade requested for ${drawerUser.email}`)
-                      }}
-                      className="w-full flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-3.5 text-purple-600 hover:bg-purple-50 dark:border-slate-700 dark:bg-slate-800 dark:text-purple-300"
-                    >
-                      <span className="flex items-center gap-2">
-                        <Crown className="h-4 w-4 text-purple-600" /> Change Subscription Plan
-                      </span>
-                      <span className="text-[11px] font-bold text-purple-600">{drawerUser.plan} Tier</span>
-                    </button>
+                    <div className="w-full rounded-2xl border border-slate-200 bg-white p-3.5 text-purple-600 dark:border-slate-700 dark:bg-slate-800 dark:text-purple-300">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="flex items-center gap-2 font-bold">
+                          <Crown className="h-4 w-4 text-purple-600" /> Subscription Plan
+                        </span>
+                        <select
+                          value={editPlanId}
+                          onChange={(e) => handlePlanChange(e.target.value)}
+                          className="rounded-xl border border-slate-200 bg-white p-1.5 text-[11px] font-extrabold text-purple-600 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-purple-300"
+                        >
+                          <option value="free">FREE Plan</option>
+                          <option value="pro">PRO Plan</option>
+                          <option value="family">FAMILY Plan</option>
+                        </select>
+                      </div>
+                    </div>
 
                     <button
                       type="button"
@@ -549,12 +698,11 @@ export const AdminStoragePage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      showSuccess(`Saved storage configurations for ${drawerUser.email}`)
                       setDrawerUser(null)
                     }}
                     className="w-full rounded-2xl bg-purple-600 py-3 text-xs font-black text-white hover:bg-purple-700 shadow-md"
                   >
-                    Save Storage Changes
+                    Close Console
                   </button>
                 </div>
               </motion.div>

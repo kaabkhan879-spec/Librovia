@@ -25,12 +25,14 @@ import {
   FilterX,
 } from 'lucide-react'
 import { Button } from '../../components/common/Button'
+import { useSubscription } from '../../context/SubscriptionContext'
 
 export type SortType = 'recently-opened' | 'newest' | 'a-z' | 'z-a' | 'progress' | 'size'
 export type FormatFilter = 'all' | 'pdf' | 'epub'
 export type StatusTab = 'all' | 'reading' | 'completed' | 'favorites'
 
 export const LibraryPage: React.FC = () => {
+  const { refreshSubscription } = useSubscription()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const tabParam = searchParams.get('tab')
@@ -159,6 +161,7 @@ export const LibraryPage: React.FC = () => {
     try {
       await booksService.deleteBook(id)
       fetchBooksAndCollections()
+      await refreshSubscription().catch(console.error)
       setActiveMenuBookId(null)
       notificationsService
         .addNotification(

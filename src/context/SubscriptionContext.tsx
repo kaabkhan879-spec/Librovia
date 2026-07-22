@@ -3,8 +3,11 @@ import {
   subscriptionsService,
   type SubscriptionPlan,
   DEFAULT_PLANS,
+  type UserSubscription,
 } from '../services/subscriptions'
 import { useAuth } from './AuthContext'
+import { booksService } from '../services/books'
+import { supabase } from '../services/supabase'
 
 export type BillingCycle = 'monthly' | 'yearly'
 
@@ -32,56 +35,26 @@ interface SubscriptionContextType {
   currentPlan: SubscriptionPlan
   currentPlanId: string
   billingCycle: BillingCycle
-  subscriptionStatus: 'Active' | 'Auto-renewing' | 'Canceled'
+  subscriptionStatus: 'Active' | 'Auto-renewing' | 'Canceled' | 'Expired'
   renewalDate: string
+  daysRemaining: number
+  isExpired: boolean
   storageUsedBytes: number
   storageLimitBytes: number
   invoices: Invoice[]
   paymentMethods: PaymentMethod[]
-  setPlan: (planId: string) => void
-  setBillingCycle: (cycle: BillingCycle) => void
-  cancelSubscription: () => void
-  reactivateSubscription: () => void
+  setPlan: (planId: string) => Promise<void>
+  setBillingCycle: (cycle: BillingCycle) => Promise<void>
+  cancelSubscription: () => Promise<void>
+  reactivateSubscription: () => Promise<void>
   canUploadFile: (fileSizeBytes: number) => boolean
   hasReachedAILimit: (dailyRequestsUsed: number) => boolean
+  refreshSubscription: () => Promise<void>
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined)
 
-const DEFAULT_INVOICES: Invoice[] = [
-  {
-    id: 'INV-2026-003',
-    date: 'Jul 15, 2026',
-    amount: 'PKR 500',
-    planName: 'Pro Plan (Monthly)',
-    status: 'Paid',
-  },
-  {
-    id: 'INV-2026-002',
-    date: 'Jun 15, 2026',
-    amount: 'PKR 500',
-    planName: 'Pro Plan (Monthly)',
-    status: 'Paid',
-  },
-  {
-    id: 'INV-2026-001',
-    date: 'May 15, 2026',
-    amount: 'PKR 500',
-    planName: 'Pro Plan (Monthly)',
-    status: 'Paid',
-  },
-]
 
-const DEFAULT_PAYMENT_METHODS: PaymentMethod[] = [
-  {
-    id: 'pm_1',
-    type: 'visa',
-    last4: '4242',
-    accountName: 'Kaab Khan',
-    expiry: '08/28',
-    isDefault: true,
-  },
-]
 
 export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth()
@@ -99,11 +72,10 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return (localStorage.getItem('librovia_billing_cycle') as BillingCycle) || 'monthly'
   })
 
-  const [subscriptionStatus, setSubscriptionStatus] = useState<'Active' | 'Auto-renewing' | 'Canceled'>(
-    'Auto-renewing'
-  )
-
-  const [storageUsedBytes] = useState(1.2 * 1024 * 1024 * 1024) // 1.2 GB mock usage
+  const [userSub, setUserSub] = useState<UserSubscription | null>(null)
+  const [storageUsedBytes, setStorageUsedBytes] = useState<number>(0)
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [paymentMethods] = useState<PaymentMethod[]>([])
 
   // Load plans from DB on mount
   useEffect(() => {
@@ -119,15 +91,56 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, [])
 
-  // Sync user subscription from DB if logged in
+  // Refresh function to pull all fresh stats from Supabase
+  const refreshSubscription = async () => {
+    if (!user?.id) return
+    try {
+      const storageUsed = await booksService.getUserStorageUsed(user.id)
+      setStorageUsedBytes(storageUsed)
+
+      const sub = await subscriptionsService.getUserSubscription(user.id)
+      if (sub) {
+        setUserSub(sub)
+        setCurrentPlanId(sub.plan_id)
+        if (sub.billing_cycle) setBillingCycleState(sub.billing_cycle as BillingCycle)
+      }
+
+      // Fetch dynamic payment invoices from DB based on user email
+      if (user.email) {
+        const { data: payData, error: payError } = await supabase
+          .from('payments')
+          .select('*')
+          .eq('customer_email', user.email)
+          .order('created_at', { ascending: false })
+
+        if (!payError && payData) {
+          const mapped = payData.map((p: any) => ({
+            id: p.transaction_id,
+            date: new Date(p.created_at).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            }),
+            amount: `PKR ${p.amount_pkr}`,
+            planName: p.plan_name,
+            status: p.status === 'Completed' ? 'Paid' : p.status === 'Pending' ? 'Pending' : 'Failed',
+          }))
+          setInvoices(mapped as Invoice[])
+        }
+      }
+    } catch (err) {
+      console.error('Error refreshing subscription status:', err)
+    }
+  }
+
+  // Load initial subscription and storage on user login
   useEffect(() => {
     if (user?.id) {
-      subscriptionsService.getUserSubscription(user.id).then((sub) => {
-        if (sub && sub.plan_id) {
-          setCurrentPlanId(sub.plan_id)
-          if (sub.billing_cycle) setBillingCycleState(sub.billing_cycle as BillingCycle)
-        }
-      })
+      refreshSubscription()
+    } else {
+      setUserSub(null)
+      setStorageUsedBytes(0)
+      setCurrentPlanId('free')
     }
   }, [user?.id])
 
@@ -145,43 +158,137 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return found || plans[0] || DEFAULT_PLANS[0]
   }, [plans, currentPlanId])
 
-  const setPlan = (newPlanId: string) => {
-    setCurrentPlanId(newPlanId)
-    if (newPlanId !== 'free') {
-      setSubscriptionStatus('Auto-renewing')
+  // Expiry / Period Calculations
+  const { renewalDate, daysRemaining, isExpired, subscriptionStatus } = useMemo(() => {
+    if (!userSub || !userSub.current_period_end) {
+      return {
+        renewalDate: 'N/A',
+        daysRemaining: 365,
+        isExpired: false,
+        subscriptionStatus: 'Active' as const,
+      }
     }
-    if (user?.id) {
-      subscriptionsService.updateUserSubscription(user.id, newPlanId, billingCycle)
+
+    const end = new Date(userSub.current_period_end)
+    const now = new Date()
+    const diffTime = end.getTime() - now.getTime()
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+    const isExp = diffDays <= 0
+    let status: 'Active' | 'Auto-renewing' | 'Canceled' | 'Expired' = 'Active'
+
+    if (isExp) {
+      status = 'Expired'
+    } else if (userSub.status === 'canceled' || userSub.cancel_at_period_end) {
+      status = 'Canceled'
+    } else if (userSub.status === 'active') {
+      status = 'Auto-renewing'
+    }
+
+    const formattedDate = end.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    })
+
+    return {
+      renewalDate: formattedDate,
+      daysRemaining: diffDays,
+      isExpired: isExp,
+      subscriptionStatus: status,
+    }
+  }, [userSub])
+
+  const setPlan = async (newPlanId: string) => {
+    if (!user?.id) return
+    const prevPlanId = currentPlanId
+    try {
+      const updated = await subscriptionsService.updateUserSubscription(user.id, newPlanId, billingCycle)
+      if (updated) {
+        setUserSub(updated)
+        setCurrentPlanId(newPlanId)
+      }
+    } catch (err) {
+      console.error('Failed to change subscription plan:', err)
+      if (prevPlanId) {
+        setCurrentPlanId(prevPlanId)
+      }
+      throw err
     }
   }
 
-  const setBillingCycle = (cycle: BillingCycle) => {
-    setBillingCycleState(cycle)
-    if (user?.id && currentPlanId) {
-      subscriptionsService.updateUserSubscription(user.id, currentPlanId, cycle)
+  const setBillingCycle = async (cycle: BillingCycle) => {
+    if (!user?.id || !currentPlanId) return
+    const prevCycle = billingCycle
+    try {
+      const updated = await subscriptionsService.updateUserSubscription(user.id, currentPlanId, cycle)
+      if (updated) {
+        setUserSub(updated)
+        setBillingCycleState(cycle)
+      }
+    } catch (err) {
+      console.error('Failed to change billing cycle:', err)
+      setBillingCycleState(prevCycle)
+      throw err
     }
   }
 
-  const cancelSubscription = () => {
-    setSubscriptionStatus('Canceled')
+  const cancelSubscription = async () => {
+    if (!user?.id || !userSub?.id) return
+    try {
+      const { data, error } = await supabase
+        .from('user_subscriptions')
+        .update({ cancel_at_period_end: true, status: 'canceled' })
+        .eq('user_id', user.id)
+        .select('*, plan:subscription_plans(*)')
+        .single()
+
+      if (!error && data) {
+        setUserSub(data as unknown as UserSubscription)
+      }
+    } catch (err) {
+      console.error('Failed to cancel subscription:', err)
+    }
   }
 
-  const reactivateSubscription = () => {
-    setSubscriptionStatus('Auto-renewing')
+  const reactivateSubscription = async () => {
+    if (!user?.id || !userSub?.id) return
+    try {
+      const { data, error } = await supabase
+        .from('user_subscriptions')
+        .update({ cancel_at_period_end: false, status: 'active' })
+        .eq('user_id', user.id)
+        .select('*, plan:subscription_plans(*)')
+        .single()
+
+      if (!error && data) {
+        setUserSub(data as unknown as UserSubscription)
+      }
+    } catch (err) {
+      console.error('Failed to reactivate subscription:', err)
+    }
   }
+
+  const storageLimitBytes = useMemo(() => {
+    if (userSub?.custom_limit_bytes !== undefined && userSub?.custom_limit_bytes !== null) {
+      return Number(userSub.custom_limit_bytes)
+    }
+    if (userSub?.custom_storage_limit_bytes !== undefined && userSub?.custom_storage_limit_bytes !== null) {
+      return Number(userSub.custom_storage_limit_bytes)
+    }
+    return currentPlan.storage_limit_bytes
+  }, [userSub, currentPlan])
 
   // Quota validation methods based dynamically on current database plan
   const canUploadFile = (fileSizeBytes: number): boolean => {
     const totalAfterUpload = storageUsedBytes + fileSizeBytes
-    return totalAfterUpload <= currentPlan.storage_limit_bytes
+    return totalAfterUpload <= storageLimitBytes
   }
 
   const hasReachedAILimit = (dailyRequestsUsed: number): boolean => {
     if (currentPlan.ai_daily_limit === -1) return false // Unlimited
     return dailyRequestsUsed >= currentPlan.ai_daily_limit
   }
-
-  const renewalDate = 'August 20, 2026'
 
   return (
     <SubscriptionContext.Provider
@@ -193,16 +300,19 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         billingCycle,
         subscriptionStatus,
         renewalDate,
+        daysRemaining,
+        isExpired,
         storageUsedBytes,
-        storageLimitBytes: currentPlan.storage_limit_bytes,
-        invoices: DEFAULT_INVOICES,
-        paymentMethods: DEFAULT_PAYMENT_METHODS,
+        storageLimitBytes,
+        invoices,
+        paymentMethods,
         setPlan,
         setBillingCycle,
         cancelSubscription,
         reactivateSubscription,
         canUploadFile,
         hasReachedAILimit,
+        refreshSubscription,
       }}
     >
       {children}

@@ -6,6 +6,7 @@ import { booksService, type Book } from '../../services/books'
 import { collectionsService, type Collection } from '../../services/collections'
 import { notesService, type Note } from '../../services/notes'
 import { useAuth } from '../../context/AuthContext'
+import { useSubscription } from '../../context/SubscriptionContext'
 import {
   BookOpen,
   Play,
@@ -15,12 +16,21 @@ import {
   BarChart3,
   Calendar,
   FileText,
+  HardDrive,
+  Award,
 } from 'lucide-react'
 import { Button } from '../../components/common/Button'
 import { PageWrapper } from '../../components/common/PageWrapper'
 
 export const DashboardPage: React.FC = () => {
   const { user } = useAuth()
+  const {
+    currentPlan,
+    subscriptionStatus,
+    renewalDate,
+    storageUsedBytes,
+    storageLimitBytes,
+  } = useSubscription()
   const navigate = useNavigate()
 
   const [books, setBooks] = useState<Book[]>([])
@@ -489,8 +499,88 @@ export const DashboardPage: React.FC = () => {
                 </motion.div>
               </div>
 
-              {/* RIGHT COLUMN (1 COL): RECENT NOTES */}
+              {/* RIGHT COLUMN (1 COL): RECENT NOTES & SUBSCRIPTION */}
               <div className="space-y-8">
+                {/* ==================================================
+                    SECTION 4.5: SUBSCRIPTION & STORAGE
+                    ================================================== */}
+                <motion.div variants={itemVariants} className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-extrabold tracking-widest text-slate-400 uppercase">
+                      My Subscription
+                    </h3>
+                    <Link
+                      to={ROUTES.SUBSCRIPTION}
+                      className="text-xs font-extrabold text-purple-600 transition-colors hover:text-purple-700"
+                    >
+                      Manage Plan
+                    </Link>
+                  </div>
+
+                  <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-4 text-left">
+                    {/* Header */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-400">
+                          <Award className="h-4.5 w-4.5" />
+                        </div>
+                        <div>
+                          <h4 className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Plan</h4>
+                          <span className="font-sans text-xs font-black text-slate-900 dark:text-white capitalize">
+                            {currentPlan.plan_name}
+                          </span>
+                        </div>
+                      </div>
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[8.5px] font-bold uppercase tracking-wider ${
+                        subscriptionStatus === 'Expired'
+                          ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400'
+                          : subscriptionStatus === 'Canceled'
+                            ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
+                            : 'bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400'
+                      }`}>
+                        {subscriptionStatus}
+                      </span>
+                    </div>
+
+                    {/* Storage progress */}
+                    <div className="space-y-1.5 border-t border-slate-100 dark:border-slate-800 pt-3">
+                      <div className="flex items-center justify-between text-[10px] font-bold text-slate-500">
+                        <div className="flex items-center gap-1">
+                          <HardDrive className="h-3.5 w-3.5 text-slate-400" />
+                          <span>Storage Quota</span>
+                        </div>
+                        <span>
+                          {((storageUsedBytes) / (1024 * 1024 * 1024)).toFixed(2)} GB of {storageLimitBytes >= 1099511627776 ? `${(storageLimitBytes / 1099511627776).toFixed(0)} TB` : `${(storageLimitBytes / 1024 / 1024 / 1024).toFixed(0)} GB`}
+                        </span>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                        <div
+                          className="h-full rounded-full bg-purple-600 transition-all duration-300"
+                          style={{ width: `${Math.min(100, Math.round((storageUsedBytes / storageLimitBytes) * 100))}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-[9px] text-slate-400 font-semibold">
+                        <span>{Math.min(100, Math.round((storageUsedBytes / storageLimitBytes) * 100))}% Used</span>
+                        <span>{Math.max(0, (storageLimitBytes - storageUsedBytes) / 1024 / 1024 / 1024).toFixed(2)} GB Remaining</span>
+                      </div>
+                    </div>
+
+                    {/* Renewal / Expiry */}
+                    <div className="grid grid-cols-2 gap-4 border-t border-slate-100 dark:border-slate-800 pt-3 text-[10.5px]">
+                      <div>
+                        <span className="block text-[9px] font-extrabold text-slate-400 uppercase">Renewal Date</span>
+                        <span className="font-bold text-slate-800 dark:text-slate-200">{renewalDate || 'N/A'}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[9px] font-extrabold text-slate-400 uppercase">Daily AI Requests</span>
+                        <span className="font-bold text-slate-800 dark:text-slate-200">
+                          {currentPlan.ai_daily_limit === -1 ? 'Unlimited' : `${currentPlan.ai_daily_limit} / Day`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+
                 {/* ==================================================
                     SECTION 5: RECENT NOTES FEED
                     ================================================== */}
