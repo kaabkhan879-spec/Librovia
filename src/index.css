@@ -41,6 +41,15 @@
   --color-text-sub: var(--text-sub);
   --color-text-muted: var(--text-muted);
 
+  --color-admin-bg: var(--admin-bg);
+  --color-admin-sidebar: var(--admin-sidebar);
+  --color-admin-card: var(--admin-card);
+  --color-admin-border: var(--admin-border);
+  --color-admin-hover: var(--admin-hover);
+  --color-admin-text-main: var(--admin-text-main);
+  --color-admin-text-sub: var(--admin-text-sub);
+  --color-admin-text-muted: var(--admin-text-muted);
+
   /* Border Radius */
   --radius-xs: 2px;
   --radius-sm: 6px;
@@ -92,6 +101,15 @@
   --text-main: #0f172a;
   --text-sub: #64748b;
   --text-muted: #94a3b8;
+
+  --admin-bg: #f8fafc;
+  --admin-sidebar: #ffffff;
+  --admin-card: #ffffff;
+  --admin-border: #e2e8f0;
+  --admin-hover: #f1f5f9;
+  --admin-text-main: #0f172a;
+  --admin-text-sub: #475569;
+  --admin-text-muted: #94a3b8;
 }
 
 /* Dark Theme Tokens */
@@ -127,6 +145,15 @@
   --text-main: #f4f4f5;
   --text-sub: #a1a1aa;
   --text-muted: #52525b;
+
+  --admin-bg: #0f172a;
+  --admin-sidebar: #111827;
+  --admin-card: #1e293b;
+  --admin-border: #334155;
+  --admin-hover: #273549;
+  --admin-text-main: #ffffff;
+  --admin-text-sub: #cbd5e1;
+  --admin-text-muted: #94a3b8;
 }
 
 @layer base {

@@ -6,6 +6,7 @@ import { useToast } from '../../context/ToastContext'
 import { useAuth } from '../../context/AuthContext'
 import { useSubscription } from '../../context/SubscriptionContext'
 import { useLocalStorage } from '../../hooks/useLocalStorage'
+import { useTheme } from '../../context/ThemeContext'
 import { booksService, type Book } from '../../services/books'
 import { collectionsService, type Collection } from '../../services/collections'
 import { supabase } from '../../services/supabase'
@@ -148,10 +149,7 @@ export const SettingsPage: React.FC = () => {
   // ----------------------------------------------------
   // SECTION 3 — APPEARANCE & STUDY PREFERENCES
   // ----------------------------------------------------
-  const [themeMode, setThemeMode] = useLocalStorage<'light' | 'dark' | 'system'>(
-    'librovia_theme_mode',
-    'system'
-  )
+  const { themeMode, setThemeMode } = useTheme()
 
   const [readerPrefs, setReaderPrefs] = useLocalStorage<ReaderPreferences>(
     'librovia_reader_preferences',
@@ -164,26 +162,6 @@ export const SettingsPage: React.FC = () => {
 
   const [isSavingAppearance, setIsSavingAppearance] = useState(false)
   const [isAppearanceSaved, setIsAppearanceSaved] = useState(false)
-
-  // Theme effect
-  useEffect(() => {
-    const root = document.documentElement
-    if (themeMode === 'dark') {
-      root.classList.add('dark')
-      localStorage.setItem('librovia-theme', 'dark')
-    } else if (themeMode === 'light') {
-      root.classList.remove('dark')
-      localStorage.setItem('librovia-theme', 'light')
-    } else {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-      if (prefersDark) {
-        root.classList.add('dark')
-      } else {
-        root.classList.remove('dark')
-      }
-      localStorage.removeItem('librovia-theme')
-    }
-  }, [themeMode])
 
   // ----------------------------------------------------
   // SECTION 4 — NOTIFICATIONS STATES

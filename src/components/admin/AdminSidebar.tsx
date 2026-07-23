@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { NavLink, Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { useTheme } from '../../context/ThemeContext'
 import { ROUTES } from '../../constants/routes'
 import { supabase } from '../../services/supabase'
 import {
@@ -18,6 +19,7 @@ import {
   LogOut,
   Sun,
   Moon,
+  Monitor,
 } from 'lucide-react'
 
 interface AdminSidebarProps {
@@ -34,11 +36,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   onToggleCollapse,
 }) => {
   const { user, logout } = useAuth()
+  const { themeMode, setThemeMode } = useTheme()
   const navigate = useNavigate()
-
-  const [isDark, setIsDark] = useState(() => {
-    return window.document.documentElement.classList.contains('dark')
-  })
 
   const [pendingCount, setPendingCount] = useState<number>(0)
 
@@ -83,17 +82,6 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
     }
   }, [])
 
-  const toggleTheme = () => {
-    const root = window.document.documentElement
-    if (isDark) {
-      root.classList.remove('dark')
-      setIsDark(false)
-    } else {
-      root.classList.add('dark')
-      setIsDark(true)
-    }
-  }
-
   const handleLogout = async () => {
     await logout()
     navigate(ROUTES.LANDING)
@@ -113,7 +101,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   ]
 
   const sidebarClasses = `
-    fixed inset-y-0 left-0 z-50 flex flex-col border-r border-[#334155] bg-[#111827] transition-all duration-300 ease-in-out
+    fixed inset-y-0 left-0 z-50 flex flex-col border-r border-admin-border bg-admin-sidebar transition-all duration-300 ease-in-out
     ${isOpen ? 'translate-x-0' : '-translate-x-full'}
     ${isCollapsed ? 'w-20' : 'w-64'}
     md:static md:translate-x-0
@@ -124,24 +112,24 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
       {/* Mobile background overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-[#0F172A]/70 backdrop-blur-xs md:hidden"
+          className="bg-admin-bg/70 fixed inset-0 z-40 backdrop-blur-xs md:hidden"
           onClick={onClose}
         />
       )}
 
       <aside className={sidebarClasses}>
         {/* Brand Header */}
-        <div className="flex h-16 items-center justify-between border-b border-[#334155] px-4">
+        <div className="border-admin-border flex h-16 items-center justify-between border-b px-4">
           <Link to={ROUTES.ADMIN} className="flex w-full items-center gap-2.5 overflow-hidden">
-            <div className="to-indigo-650 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-purple-600 text-white shadow-md shadow-purple-600/30">
+            <div className="from-purple-650 to-indigo-650 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-md shadow-purple-600/30">
               <ShieldCheck className="h-5 w-5" />
             </div>
             {!isCollapsed && (
               <div className="truncate text-left">
-                <span className="block font-sans text-sm font-black tracking-tight text-[#FFFFFF]">
+                <span className="text-admin-text-main block font-sans text-sm font-black tracking-tight">
                   Librovia Admin
                 </span>
-                <span className="block text-[10px] font-extrabold tracking-widest text-purple-400 uppercase">
+                <span className="block text-[10px] font-extrabold tracking-widest text-purple-600 uppercase dark:text-purple-400">
                   Super Admin SaaS
                 </span>
               </div>
@@ -150,7 +138,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           {!isCollapsed && (
             <button
               onClick={onToggleCollapse}
-              className="hidden h-6 w-6 items-center justify-center rounded-md border border-[#334155] bg-[#1E293B] text-[#94A3B8] hover:text-[#FFFFFF] md:flex"
+              className="border-admin-border bg-admin-card text-admin-text-muted hover:text-admin-text-main hidden h-6 w-6 cursor-pointer items-center justify-center rounded-md border md:flex"
             >
               ←
             </button>
@@ -159,7 +147,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
 
         {/* 10 Super Admin Modules Navigation */}
         <div className="flex-1 space-y-1.5 overflow-y-auto px-3 py-4">
-          <div className="px-3 pb-2 text-[10px] font-black tracking-widest text-[#94A3B8] uppercase">
+          <div className="text-admin-text-muted px-3 pb-2 text-[10px] font-black tracking-widest uppercase">
             {!isCollapsed && 'Platform Management'}
           </div>
 
@@ -174,8 +162,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                 className={({ isActive }) =>
                   `group relative flex items-center gap-3 rounded-2xl border border-transparent px-3.5 py-2.5 text-xs font-extrabold transition-all duration-200 select-none ${
                     isActive
-                      ? 'to-indigo-650 border border-purple-500/20 bg-gradient-to-r from-purple-600 text-[#FFFFFF] shadow-lg shadow-purple-600/30'
-                      : 'text-[#94A3B8] hover:bg-[#273549] hover:text-[#FFFFFF]'
+                      ? 'from-purple-650 to-indigo-650 shadow-purple-650/30 border border-purple-500/20 bg-gradient-to-r text-[#FFFFFF] shadow-lg'
+                      : 'text-admin-text-sub hover:bg-admin-hover hover:text-admin-text-main'
                   } `
                 }
               >
@@ -187,7 +175,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                   <>
                     {isCollapsed ? (
                       <span
-                        className="absolute top-2 right-2 flex h-2.5 w-2.5 animate-pulse rounded-full bg-rose-500 ring-2 ring-[#111827]"
+                        className="ring-admin-sidebar absolute top-2 right-2 flex h-2.5 w-2.5 animate-pulse rounded-full bg-rose-500 ring-2"
                         title={`${pendingCount} pending payment request(s)`}
                       />
                     ) : (
@@ -203,19 +191,21 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
         </div>
 
         {/* Footer Actions & Mode Switcher */}
-        <div className="space-y-2.5 border-t border-[#334155] p-3">
-          {/* Mode Switcher Button */}
+        <div className="border-admin-border space-y-2.5 border-t p-3">
+          {/* Version Info & Badges */}
           {!isCollapsed && (
-            <div className="space-y-1 rounded-xl border border-[#334155] bg-[#1E293B]/40 p-2 text-center text-[10px]">
-              <div className="flex items-center justify-between font-bold text-[#94A3B8]">
+            <div className="border-admin-border bg-admin-card/40 space-y-1 rounded-xl border p-2 text-center text-[10px]">
+              <div className="text-admin-text-sub flex items-center justify-between font-bold">
                 <span>Platform Version:</span>
-                <span className="font-mono font-extrabold text-purple-400">v2.4.0</span>
+                <span className="font-mono font-extrabold text-purple-600 dark:text-purple-400">
+                  v2.4.0
+                </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="inline-flex items-center gap-1 rounded border border-purple-500/20 bg-purple-900/30 px-1.5 py-0.5 text-[9px] font-black text-purple-300">
+                <span className="inline-flex items-center gap-1 rounded border border-purple-500/20 bg-purple-900/10 px-1.5 py-0.5 text-[9px] font-black text-purple-600 dark:bg-purple-900/30 dark:text-purple-300">
                   PROD
                 </span>
-                <span className="text-[9.5px] font-semibold text-[#94A3B8]/80">
+                <span className="text-admin-text-muted text-[9.5px] font-semibold">
                   Supabase • Edge
                 </span>
               </div>
@@ -224,28 +214,41 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
 
           {/* Theme Toggle & User Logout */}
           <div className="flex items-center justify-between pt-1">
+            {/* Quick switcher cycle button */}
             <button
               type="button"
-              onClick={toggleTheme}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#334155] bg-[#1E293B] text-[#CBD5E1] transition-colors hover:bg-[#273549]"
-              title="Toggle Theme"
+              onClick={() => {
+                if (themeMode === 'light') setThemeMode('dark')
+                else if (themeMode === 'dark') setThemeMode('system')
+                else setThemeMode('light')
+              }}
+              className="border-admin-border bg-admin-card text-admin-text-sub hover:bg-admin-hover flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border transition-colors"
+              title={`Theme: ${themeMode.toUpperCase()} (Click to toggle)`}
             >
-              {isDark ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4" />}
+              {themeMode === 'light' ? (
+                <Sun className="h-4 w-4 text-amber-500" />
+              ) : themeMode === 'dark' ? (
+                <Moon className="h-4 w-4 text-indigo-400" />
+              ) : (
+                <Monitor className="h-4 w-4 text-purple-400" />
+              )}
             </button>
 
             {!isCollapsed && (
-              <div className="max-w-[80px] truncate text-left text-[11px] font-semibold text-[#94A3B8]">
-                <span className="block truncate font-bold text-[#FFFFFF]">
+              <div className="text-admin-text-sub max-w-[80px] truncate text-left text-[11px] font-semibold">
+                <span className="text-admin-text-main block truncate font-bold">
                   {user?.displayName || user?.email?.split('@')[0]}
                 </span>
-                <span className="block text-[10px] text-purple-400">Super Admin</span>
+                <span className="block text-[10px] text-purple-600 dark:text-purple-400">
+                  Super Admin
+                </span>
               </div>
             )}
 
             <button
               type="button"
               onClick={handleLogout}
-              className="hover:text-rose-450 flex h-9 w-9 items-center justify-center rounded-xl border border-[#334155] bg-[#1E293B] text-[#CBD5E1] transition-colors hover:bg-rose-950/40"
+              className="border-admin-border bg-admin-card text-admin-text-sub dark:hover:text-rose-450 flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border transition-colors hover:bg-rose-900/10 hover:text-rose-600 dark:hover:bg-rose-950/40"
               title="Logout"
             >
               <LogOut className="h-4 w-4" />
@@ -256,3 +259,4 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
     </>
   )
 }
+export default AdminSidebar
