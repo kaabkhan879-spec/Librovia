@@ -3,9 +3,10 @@
 -- Run this in your Supabase SQL Editor to support the Shared Library search.
 -- ====================================================================
 
--- 1. Add email and subscription_plan columns to public.profiles
+-- 1. Add email, subscription_plan, and updated_at columns to public.profiles
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS subscription_plan TEXT DEFAULT 'free';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 
 -- 2. Backfill existing profiles data from user_roles and user_subscriptions
