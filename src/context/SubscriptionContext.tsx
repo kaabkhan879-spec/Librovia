@@ -112,18 +112,25 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
           .order('created_at', { ascending: false })
 
         if (!payError && payData) {
-          const mapped = payData.map((p: any) => ({
-            id: p.transaction_id,
-            date: new Date(p.created_at).toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-            }),
-            amount: `PKR ${p.amount_pkr}`,
-            planName: p.plan_name,
-            status:
-              p.status === 'Completed' ? 'Paid' : p.status === 'Pending' ? 'Pending' : 'Failed',
-          }))
+          const mapped = payData.map((p) => {
+            const raw = p as Record<string, unknown>
+            return {
+              id: String(raw.transaction_id || ''),
+              date: new Date(String(raw.created_at || '')).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+              }),
+              amount: `PKR ${Number(raw.amount_pkr || 0)}`,
+              planName: String(raw.plan_name || ''),
+              status:
+                raw.status === 'Completed'
+                  ? ('Paid' as const)
+                  : raw.status === 'Pending'
+                    ? ('Pending' as const)
+                    : ('Failed' as const),
+            }
+          })
           setInvoices(mapped as Invoice[])
         }
       }
@@ -135,11 +142,17 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   // Load initial subscription and storage on user login
   useEffect(() => {
     if (user?.id) {
-      refreshSubscription()
+      const timer = setTimeout(() => {
+        refreshSubscription()
+      }, 0)
+      return () => clearTimeout(timer)
     } else {
-      setUserSub(null)
-      setStorageUsedBytes(0)
-      setCurrentPlanId('free')
+      const timer = setTimeout(() => {
+        setUserSub(null)
+        setStorageUsedBytes(0)
+        setCurrentPlanId('free')
+      }, 0)
+      return () => clearTimeout(timer)
     }
   }, [user?.id])
 
@@ -333,7 +346,9 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 export const useSubscription = () => {
   const context = useContext(SubscriptionContext)
   if (!context) {
-    console.warn('[PWA] useSubscription called outside of SubscriptionProvider. Returning safe fallback values.')
+    console.warn(
+      '[PWA] useSubscription called outside of SubscriptionProvider. Returning safe fallback values.'
+    )
     return {
       plans: DEFAULT_PLANS,
       loadingPlans: false,

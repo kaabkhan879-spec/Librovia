@@ -122,8 +122,8 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ text }) => {
 
         // 4. Bullet List
         if (trimmed.startsWith('* ') || trimmed.startsWith('- ') || trimmed.startsWith('• ')) {
-          const items = trimmed.split(/\n(?:[\*\-•]\s+)/).map((item) => {
-            return item.replace(/^[\*\-•]\s+/, '')
+          const items = trimmed.split(/\n(?:[*-•]\s+)/).map((item) => {
+            return item.replace(/^[*-•]\s+/, '')
           })
           return (
             <ul
@@ -177,8 +177,8 @@ function parseInline(text: string): React.ReactNode[] {
   let index = 0
 
   while (currentText.length > 0) {
-    const boldMatch = currentText.match(/^([^\*]*)\*\*([^\*]+)\*\*(.*)$/)
-    const italicMatch = currentText.match(/^([^\*]*)\*([^\*]+)\*(.*)$/)
+    const boldMatch = currentText.match(/^([^*]*)\*\*([^*]+)\*\*(.*)$/)
+    const italicMatch = currentText.match(/^([^*]*)\*([^*]+)\*(.*)$/)
     const codeMatch = currentText.match(/^([^`]*)`([^`]+)`(.*)$/)
 
     const matches = [
@@ -188,7 +188,7 @@ function parseInline(text: string): React.ReactNode[] {
     ].filter(Boolean) as Array<{ type: string; index: number; match: RegExpMatchArray }>
 
     if (matches.length === 0) {
-      parts.push(<span key={index++}>{currentText}</span>)
+      parts.push(<span key={index}>{currentText}</span>)
       break
     }
 

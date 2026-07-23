@@ -35,7 +35,10 @@ export const DownloadsManagerModal: React.FC<DownloadsManagerModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      loadStorageData()
+      const timer = setTimeout(() => {
+        loadStorageData()
+      }, 0)
+      return () => clearTimeout(timer)
     }
   }, [isOpen, loadStorageData])
 

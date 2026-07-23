@@ -43,19 +43,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
     switch (currentPlanId) {
       case 'family':
         return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[9px] font-black text-amber-600 dark:text-amber-500 border border-amber-500/20 uppercase tracking-wider">
+          <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[9px] font-black tracking-wider text-amber-600 uppercase dark:text-amber-500">
             👑 Family
           </span>
         )
       case 'pro':
         return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-purple-500/10 px-2 py-0.5 text-[9px] font-black text-purple-600 dark:text-purple-400 border border-purple-500/20 uppercase tracking-wider">
+          <span className="inline-flex items-center gap-1 rounded-full border border-purple-500/20 bg-purple-500/10 px-2 py-0.5 text-[9px] font-black tracking-wider text-purple-600 uppercase dark:text-purple-400">
             ⭐ Pro
           </span>
         )
       default:
         return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-slate-500/10 px-2 py-0.5 text-[9px] font-black text-slate-500 dark:text-slate-400 border border-slate-500/20 uppercase tracking-wider">
+          <span className="inline-flex items-center gap-1 rounded-full border border-slate-500/20 bg-slate-500/10 px-2 py-0.5 text-[9px] font-black tracking-wider text-slate-500 uppercase dark:text-slate-400">
             📘 Free
           </span>
         )
@@ -154,8 +154,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     isCollapsed ? 'mx-2 justify-center' : 'mx-3 gap-3 px-3.5'
                   } ${
                     isActive
-                      ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
-                      : 'text-slate-400 hover:bg-primary-600/10 hover:text-primary-300'
+                      ? 'bg-primary-600 shadow-primary-600/20 text-white shadow-lg'
+                      : 'hover:bg-primary-600/10 hover:text-primary-300 text-slate-400'
                   }`
                 }
               >
@@ -163,7 +163,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <>
                     <item.icon
                       className={`h-5 w-5 shrink-0 transition-all duration-[200ms] group-hover:scale-110 ${
-                        isActive ? 'text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.7)]' : 'text-slate-500'
+                        isActive
+                          ? 'text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.7)]'
+                          : 'text-slate-500'
                       }`}
                     />
 
@@ -216,16 +218,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       src={user.avatarUrl}
                       name={user.displayName}
                       email={user.email}
-                      className="!h-[52px] !w-[52px] shadow-md shrink-0"
+                      className="!h-[52px] !w-[52px] shrink-0 shadow-md"
                     />
                     <div className="pointer-events-none absolute top-1/2 left-16 z-50 -translate-y-1/2 rounded-xl border border-slate-700/30 bg-slate-900 px-3.5 py-2 text-[10px] font-bold whitespace-nowrap text-white opacity-0 shadow-xl transition-opacity duration-200 group-hover:opacity-100 dark:bg-slate-800">
                       <p>{user.displayName || 'Kaab Khan'}</p>
-                      <p className="text-[8px] font-normal text-slate-400 mt-0.5 capitalize">{currentPlanId} Plan</p>
+                      <p className="mt-0.5 text-[8px] font-normal text-slate-400 capitalize">
+                        {currentPlanId} Plan
+                      </p>
                     </div>
                   </div>
                   <button
                     onClick={handleLogout}
-                    className="text-red-400 flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10 shadow-xs transition-all hover:bg-red-500/25 active:scale-[0.95]"
+                    className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 shadow-xs transition-all hover:bg-red-500/25 active:scale-[0.95]"
                     title="Logout"
                   >
                     <LogOut className="h-4 w-4" />
@@ -233,29 +237,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
               ) : (
                 /* Expanded Profile Card & Logout button */
-                <div className="bg-slate-50 border border-slate-200 dark:bg-white/[0.02] dark:border-white/[0.08] backdrop-blur-md flex flex-col gap-3 rounded-[20px] p-4 text-left shadow-sm hover:shadow-md dark:shadow-[0_8px_32px_rgba(0,0,0,0.2)] dark:hover:bg-white/[0.04] transition-all duration-300">
+                <div className="flex flex-col gap-3 rounded-[20px] border border-slate-200 bg-slate-50 p-4 text-left shadow-sm backdrop-blur-md transition-all duration-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.02] dark:shadow-[0_8px_32px_rgba(0,0,0,0.2)] dark:hover:bg-white/[0.04]">
                   <div className="flex items-center gap-3">
                     <Avatar
                       src={user.avatarUrl}
                       name={user.displayName}
                       email={user.email}
-                      className="!h-[52px] !w-[52px] shadow-md shrink-0"
+                      className="!h-[52px] !w-[52px] shrink-0 shadow-md"
                     />
                     <div className="min-w-0 flex-1 space-y-1">
-                      <p className="text-slate-900 dark:text-white truncate text-xs font-black">
+                      <p className="truncate text-xs font-black text-slate-900 dark:text-white">
                         {user.displayName || 'Kaab Khan'}
                       </p>
-                      <p className="text-slate-550 dark:text-slate-400 truncate text-[10px] font-bold">
+                      <p className="text-slate-550 truncate text-[10px] font-bold dark:text-slate-400">
                         {user.email}
                       </p>
-                      <div className="pt-0.5">
-                        {planBadge()}
-                      </div>
+                      <div className="pt-0.5">{planBadge()}</div>
                     </div>
                   </div>
                   <button
                     onClick={handleLogout}
-                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 py-2.5 text-xs font-bold uppercase text-red-500 dark:text-red-400 transition-all hover:bg-red-500/20 active:scale-[0.98]"
+                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 py-2.5 text-xs font-bold text-red-500 uppercase transition-all hover:bg-red-500/20 active:scale-[0.98] dark:text-red-400"
                   >
                     <LogOut className="h-4 w-4" />
                     <span>Logout</span>

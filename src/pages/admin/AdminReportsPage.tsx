@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { PageWrapper } from '../../components/common/PageWrapper'
 import { useToast } from '../../context/ToastContext'
 import { supabase } from '../../services/supabase'
@@ -22,11 +22,20 @@ export interface ReportKPIs {
   storageAllocatedGB: number
 }
 
+interface TopBook {
+  id: string
+  title: string
+  author: string
+  category: string
+  downloads: number
+  rating: number
+}
+
 export const AdminReportsPage: React.FC = () => {
   const { showSuccess } = useToast()
 
-  const [loading, setLoading] = useState(true)
   const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | 'ytd'>('30d')
+  const [loading, setLoading] = useState(true)
 
   // Real Database Calculated KPIs
   const [kpis, setKpis] = useState<ReportKPIs>({
@@ -38,10 +47,10 @@ export const AdminReportsPage: React.FC = () => {
     storageAllocatedGB: 0,
   })
 
-  const [topBooks, setTopBooks] = useState<any[]>([])
+  const [topBooks, setTopBooks] = useState<TopBook[]>([])
 
   // Fetch Real Analytics Data from Supabase
-  const fetchAnalyticsData = async () => {
+  const fetchAnalyticsData = useCallback(async () => {
     try {
       setLoading(true)
 
@@ -91,11 +100,14 @@ export const AdminReportsPage: React.FC = () => {
       console.error('Failed to load analytics:', err)
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
-    fetchAnalyticsData()
-  }, [dateRange])
+    const timer = setTimeout(() => {
+      fetchAnalyticsData()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [dateRange, fetchAnalyticsData])
 
   // Exports
   const handleExportReport = (format: 'CSV' | 'Excel' | 'PDF') => {

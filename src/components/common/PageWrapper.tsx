@@ -13,6 +13,7 @@ export const pageVariants = {
     y: 0,
     transition: {
       duration: 0.24,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ease: [0.16, 1, 0.3, 1] as any, // Stripe/Linear standard easeOut curve
     },
   },
@@ -21,6 +22,7 @@ export const pageVariants = {
     y: -15,
     transition: {
       duration: 0.15,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ease: 'easeIn' as any,
     },
   },

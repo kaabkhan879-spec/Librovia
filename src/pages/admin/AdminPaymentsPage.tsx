@@ -80,7 +80,7 @@ export const AdminPaymentsPage: React.FC = () => {
   const [actionProcessing, setActionProcessing] = useState(false)
 
   // Fetch Auto Invoices
-  const fetchLivePayments = async () => {
+  const fetchLivePayments = useCallback(async () => {
     try {
       setLoadingAuto(true)
       const { data, error } = await supabase.from('payments').select('*')
@@ -111,7 +111,7 @@ export const AdminPaymentsPage: React.FC = () => {
     } finally {
       setLoadingAuto(false)
     }
-  }
+  }, [])
 
   // Fetch Manual Requests
   const fetchManualRequests = useCallback(async () => {
@@ -134,9 +134,12 @@ export const AdminPaymentsPage: React.FC = () => {
   }
 
   useEffect(() => {
-    fetchLivePayments()
-    fetchManualRequests()
-  }, [fetchManualRequests])
+    const timer = setTimeout(() => {
+      fetchLivePayments()
+      fetchManualRequests()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [fetchLivePayments, fetchManualRequests])
 
   // Get Signed URL on Request selection
   useEffect(() => {
@@ -149,7 +152,10 @@ export const AdminPaymentsPage: React.FC = () => {
           setSignedScreenshotUrl(null)
         })
     } else {
-      setSignedScreenshotUrl(null)
+      const timer = setTimeout(() => {
+        setSignedScreenshotUrl(null)
+      }, 0)
+      return () => clearTimeout(timer)
     }
   }, [selectedRequest])
 
@@ -166,9 +172,10 @@ export const AdminPaymentsPage: React.FC = () => {
         showSuccess('Payment request has been approved and subscription activated!')
         fetchManualRequests()
         setSelectedRequest(null)
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(err)
-        showError(err.message || 'Failed to approve payment request')
+        const msg = err instanceof Error ? err.message : 'Failed to approve payment request'
+        showError(msg)
       } finally {
         setActionProcessing(false)
       }
@@ -193,9 +200,10 @@ export const AdminPaymentsPage: React.FC = () => {
       setSelectedRequest(null)
       setShowRejectModal(false)
       setRejectionReasonInput('')
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err)
-      showError(err.message || 'Failed to reject payment request')
+      const msg = err instanceof Error ? err.message : 'Failed to reject payment request'
+      showError(msg)
     } finally {
       setActionProcessing(false)
     }
@@ -271,52 +279,56 @@ export const AdminPaymentsPage: React.FC = () => {
       return
     }
 
-    let csvContent = ''
-    if (activeTab === 'manual') {
-      const headers = [
-        'Request ID',
-        'User Email',
-        'Plan',
-        'Payment Method',
-        'Transaction ID',
-        'Amount (PKR)',
-        'Status',
-        'Submitted At',
-      ]
-      const rows = manualRequests.map((r) => [
-        r.id,
-        r.user?.email || 'N/A',
-        r.plan_id,
-        r.payment_method,
-        r.transaction_id,
-        r.amount,
-        r.status,
-        r.created_at,
-      ])
-      csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
-    } else {
-      const headers = [
-        'Transaction ID',
-        'Customer Name',
-        'Email',
-        'Plan',
-        'Gateway',
-        'Amount (PKR)',
-        'Status',
-        'Date',
-      ]
-      const rows = payments.map((p) => [
-        p.transaction_id,
-        p.customer_name,
-        p.customer_email,
-        p.plan_name,
-        p.gateway,
-        p.amount_pkr,
-        p.status,
-        p.created_at,
-      ])
-      csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
-    }
+    const csvContent =
+      activeTab === 'manual'
+        ? [
+            [
+              'Request ID',
+              'User Email',
+              'Plan',
+              'Payment Method',
+              'Transaction ID',
+              'Amount (PKR)',
+              'Status',
+              'Submitted At',
+            ].join(','),
+            ...manualRequests.map((r) =>
+              [
+                r.id,
+                r.user?.email || 'N/A',
+                r.plan_id,
+                r.payment_method,
+                r.transaction_id,
+                r.amount,
+                r.status,
+                r.created_at,
+              ].join(',')
+            ),
+          ].join('\n')
+        : [
+            [
+              'Transaction ID',
+              'Customer Name',
+              'Email',
+              'Plan',
+              'Gateway',
+              'Amount (PKR)',
+              'Status',
+              'Date',
+            ].join(','),
+            ...payments.map((p) =>
+              [
+                p.transaction_id,
+                p.customer_name,
+                p.customer_email,
+                p.plan_name,
+                p.gateway,
+                p.amount_pkr,
+                p.status,
+                p.created_at,
+              ].join(',')
+            ),
+          ].join('\n')
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)

@@ -55,6 +55,13 @@ export const NotesPage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
 
+  const handleSelectNote = (note: Note) => {
+    setSelectedNote(note)
+    setNoteTitleInput(note.noteTitle || '')
+    setNoteTextInput(note.noteText || '')
+    setSaveSuccess(false)
+  }
+
   const fetchData = useCallback(() => {
     Promise.all([notesService.getAllNotes(), booksService.getBooks()]).then(
       ([notesData, booksData]) => {
@@ -75,7 +82,7 @@ export const NotesPage: React.FC = () => {
 
   useEffect(() => {
     fetchData()
-  }, [])
+  }, [fetchData])
 
   const getBookTitle = useCallback(
     (bookId: string) => {
@@ -92,13 +99,6 @@ export const NotesPage: React.FC = () => {
     },
     [books]
   )
-
-  const handleSelectNote = (note: Note) => {
-    setSelectedNote(note)
-    setNoteTitleInput(note.noteTitle || '')
-    setNoteTextInput(note.noteText || '')
-    setSaveSuccess(false)
-  }
 
   const handleSaveNote = async (e: React.FormEvent) => {
     e.preventDefault()

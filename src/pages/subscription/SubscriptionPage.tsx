@@ -5,7 +5,11 @@ import { useSubscription } from '../../context/SubscriptionContext'
 import { useToast } from '../../context/ToastContext'
 import { supabase } from '../../services/supabase'
 import { storageService } from '../../services/storage'
-import { subscriptionsService, type SubscriptionPlan } from '../../services/subscriptions'
+import {
+  subscriptionsService,
+  type SubscriptionPlan,
+  type PaymentRequest,
+} from '../../services/subscriptions'
 import {
   Crown,
   Sparkles,
@@ -28,6 +32,20 @@ import {
   AlertCircle,
 } from 'lucide-react'
 
+interface SystemSettings {
+  id: number
+  easypaisa_number?: string
+  easypaisa_name?: string
+  jazzcash_number?: string
+  jazzcash_name?: string
+  bank_name?: string
+  bank_account_number?: string
+  bank_account_name?: string
+  support_email?: string
+  payment_instructions?: string
+  whatsapp_number?: string
+}
+
 // FAQ items
 const FAQS = [
   {
@@ -48,7 +66,7 @@ const FAQS = [
   {
     question: 'How does Family plan sharing work?',
     answer:
-      'With the Family plan, the primary owner can invite up to 4 family members (5 total accounts). Each member gets their own private reading workspace plus access to shared collections.',
+      'A Family plan subscription allows you to invite up to 4 other users. Once they accept, they get access to premium features and family shared library collections.',
   },
   {
     question: 'Are there any hidden payment processing fees?',
@@ -97,7 +115,7 @@ export const SubscriptionPage: React.FC = () => {
   // Selected plan for Upgrade Modal
   const [selectedUpgradePlan, setSelectedUpgradePlan] = useState<SubscriptionPlan | null>(null)
   const [upgradeStep, setUpgradeStep] = useState<'summary' | 'payment' | 'success'>('summary')
-  const [paymentRequests, setPaymentRequests] = useState<any[]>([])
+  const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([])
 
   // Form fields
   const [paymentMethod, setPaymentMethod] = useState<'EasyPaisa' | 'JazzCash' | 'Bank Transfer'>(
@@ -108,7 +126,7 @@ export const SubscriptionPage: React.FC = () => {
   const [screenshotFile, setScreenshotFile] = useState<File | null>(null)
   const [screenshotPreviewUrl, setScreenshotPreviewUrl] = useState<string | null>(null)
   const [userNote, setUserNote] = useState('')
-  const [systemSettings, setSystemSettings] = useState<any>(null)
+  const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null)
   const [submittingRequest, setSubmittingRequest] = useState(false)
 
   // FAQ accordion collapse state
@@ -123,24 +141,32 @@ export const SubscriptionPage: React.FC = () => {
     }
   }, [])
 
-  const fetchSystemSettings = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('system_settings')
-        .select('*')
-        .eq('id', 1)
-        .maybeSingle()
-      if (error) throw error
-      setSystemSettings(data)
-    } catch (err) {
-      console.error('Failed to fetch system settings:', err)
+  useEffect(() => {
+    let isMounted = true
+    const initData = async () => {
+      try {
+        const reqs = await subscriptionsService.getPaymentRequests()
+        if (isMounted) setPaymentRequests(reqs)
+      } catch (err) {
+        console.error(err)
+      }
+      try {
+        const { data, error } = await supabase
+          .from('system_settings')
+          .select('*')
+          .eq('id', 1)
+          .maybeSingle()
+        if (error) throw error
+        if (isMounted) setSystemSettings(data as SystemSettings)
+      } catch (err) {
+        console.error(err)
+      }
+    }
+    initData()
+    return () => {
+      isMounted = false
     }
   }, [])
-
-  useEffect(() => {
-    fetchUserRequests()
-    fetchSystemSettings()
-  }, [fetchUserRequests, fetchSystemSettings])
 
   // Storage metric calculations driven by DB limit
   const storageUsedGB = (storageUsedBytes / (1024 * 1024 * 1024)).toFixed(1)
@@ -226,9 +252,10 @@ export const SubscriptionPage: React.FC = () => {
       showSuccess('Your payment has been submitted successfully!')
       fetchUserRequests()
       setUpgradeStep('success')
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err)
-      showError(err.message || 'Failed to submit payment request')
+      const msg = err instanceof Error ? err.message : 'Failed to submit payment request'
+      showError(msg)
     } finally {
       setSubmittingRequest(false)
     }
@@ -1284,7 +1311,11 @@ export const SubscriptionPage: React.FC = () => {
                       </label>
                       <select
                         value={paymentMethod}
-                        onChange={(e: any) => setPaymentMethod(e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                          setPaymentMethod(
+                            e.target.value as 'EasyPaisa' | 'JazzCash' | 'Bank Transfer'
+                          )
+                        }
                         className="focus:border-purple-650 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-bold text-slate-900 focus:outline-none dark:border-slate-800 dark:bg-slate-800 dark:text-white"
                       >
                         <option value="EasyPaisa">EasyPaisa</option>
