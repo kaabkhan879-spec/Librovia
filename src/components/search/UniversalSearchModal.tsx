@@ -47,7 +47,15 @@ export const UniversalSearchModal: React.FC<UniversalSearchModalProps> = ({ isOp
   const inputRef = useRef<HTMLInputElement>(null)
 
   const [query, setQuery] = useState('')
-  const debouncedQuery = query.trimStart()
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedQuery(query.trimStart())
+    }, 150)
+    return () => clearTimeout(handler)
+  }, [query])
+
   const [activeFilter, setActiveFilter] = useState<SearchFilterCategory>('all')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [prevFilterKey, setPrevFilterKey] = useState('')
@@ -82,6 +90,7 @@ export const UniversalSearchModal: React.FC<UniversalSearchModalProps> = ({ isOp
   if (!isOpen && prevIsOpen) {
     setPrevIsOpen(false)
     setQuery('')
+    setDebouncedQuery('')
     setActiveFilter('all')
     setSelectedIndex(0)
   } else if (isOpen && !prevIsOpen) {

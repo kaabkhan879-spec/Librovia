@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import { PageWrapper } from '../../components/common/PageWrapper'
 
-const AnimatedNumber: React.FC<{ value: number }> = ({ value }) => {
+const AnimatedNumber = React.memo<{ value: number }>(({ value }) => {
   const [displayValue, setDisplayValue] = useState(0)
 
   useEffect(() => {
@@ -45,7 +45,7 @@ const AnimatedNumber: React.FC<{ value: number }> = ({ value }) => {
   }, [value])
 
   return <>{displayValue}</>
-}
+})
 
 const STATIC_PARTICLES = Array.from({ length: 18 }).map(() => ({
   width: Math.random() * 5 + 3,
