@@ -43,19 +43,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
     switch (currentPlanId) {
       case 'family':
         return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[9px] font-black text-amber-500 border border-amber-500/20 uppercase tracking-wider">
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[9px] font-black text-amber-600 dark:text-amber-500 border border-amber-500/20 uppercase tracking-wider">
             👑 Family
           </span>
         )
       case 'pro':
         return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-purple-500/10 px-2 py-0.5 text-[9px] font-black text-purple-400 border border-purple-500/20 uppercase tracking-wider">
+          <span className="inline-flex items-center gap-1 rounded-full bg-purple-500/10 px-2 py-0.5 text-[9px] font-black text-purple-600 dark:text-purple-400 border border-purple-500/20 uppercase tracking-wider">
             ⭐ Pro
           </span>
         )
       default:
         return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-slate-500/10 px-2 py-0.5 text-[9px] font-black text-slate-400 border border-slate-500/20 uppercase tracking-wider">
+          <span className="inline-flex items-center gap-1 rounded-full bg-slate-500/10 px-2 py-0.5 text-[9px] font-black text-slate-500 dark:text-slate-400 border border-slate-500/20 uppercase tracking-wider">
             📘 Free
           </span>
         )
@@ -233,7 +233,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
               ) : (
                 /* Expanded Profile Card & Logout button */
-                <div className="bg-white/[0.02] border border-white/[0.08] backdrop-blur-md flex flex-col gap-3 rounded-[20px] p-4 text-left shadow-[0_8px_32px_rgba(0,0,0,0.2)] hover:bg-white/[0.04] hover:shadow-[0_12px_40px_rgba(0,0,0,0.3)] transition-all duration-300">
+                <div className="bg-slate-50 border border-slate-200 dark:bg-white/[0.02] dark:border-white/[0.08] backdrop-blur-md flex flex-col gap-3 rounded-[20px] p-4 text-left shadow-sm hover:shadow-md dark:shadow-[0_8px_32px_rgba(0,0,0,0.2)] dark:hover:bg-white/[0.04] transition-all duration-300">
                   <div className="flex items-center gap-3">
                     <Avatar
                       src={user.avatarUrl}
@@ -242,10 +242,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       className="!h-[52px] !w-[52px] shadow-md shrink-0"
                     />
                     <div className="min-w-0 flex-1 space-y-1">
-                      <p className="text-white truncate text-xs font-black">
+                      <p className="text-slate-900 dark:text-white truncate text-xs font-black">
                         {user.displayName || 'Kaab Khan'}
                       </p>
-                      <p className="text-slate-400 truncate text-[10px] font-bold">
+                      <p className="text-slate-550 dark:text-slate-400 truncate text-[10px] font-bold">
                         {user.email}
                       </p>
                       <div className="pt-0.5">
@@ -255,7 +255,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                   <button
                     onClick={handleLogout}
-                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 py-2.5 text-xs font-bold uppercase text-red-450 transition-all hover:bg-red-500/20 active:scale-[0.98]"
+                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 py-2.5 text-xs font-bold uppercase text-red-500 dark:text-red-400 transition-all hover:bg-red-500/20 active:scale-[0.98]"
                   >
                     <LogOut className="h-4 w-4" />
                     <span>Logout</span>
