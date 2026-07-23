@@ -27,7 +27,7 @@ export const AdminLayout: React.FC = () => {
   }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
+    <div className="flex h-screen w-screen overflow-hidden bg-[#0F172A] text-[#FFFFFF]">
       {/* Super Admin Dedicated Sidebar */}
       <AdminSidebar
         isOpen={sidebarOpen}
@@ -43,7 +43,7 @@ export const AdminLayout: React.FC = () => {
           pageTitle={getAdminPageTitle(location.pathname)}
         />
 
-        <main className="flex-1 overflow-y-auto px-4 py-8 sm:px-6 lg:px-8">
+        <main className="flex-1 overflow-y-auto bg-[#0F172A] px-4 py-8 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-7xl">
             <Outlet />
           </div>
@@ -52,3 +52,4 @@ export const AdminLayout: React.FC = () => {
     </div>
   )
 }
+export default AdminLayout

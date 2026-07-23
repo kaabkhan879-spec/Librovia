@@ -455,7 +455,30 @@ export const AdminDashboardPage: React.FC = () => {
       loadDashboardData()
     }, 0)
 
-    return () => clearTimeout(timer)
+    // Realtime channel subscriptions to reload data on changes
+    const channel = supabase
+      .channel('admin-dashboard-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_roles' }, () => {
+        loadDashboardData()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'books' }, () => {
+        loadDashboardData()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payment_requests' }, () => {
+        loadDashboardData()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_logs' }, () => {
+        loadDashboardData()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => {
+        loadDashboardData()
+      })
+      .subscribe()
+
+    return () => {
+      clearTimeout(timer)
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   // Render SVG Sparkline
@@ -512,7 +535,7 @@ export const AdminDashboardPage: React.FC = () => {
               y1={gridY}
               x2={width - margin}
               y2={gridY}
-              className="stroke-slate-100 dark:stroke-slate-800/80"
+              className="stroke-[#334155]/60"
               strokeDasharray="4 4"
               strokeWidth="1"
             />
@@ -538,7 +561,7 @@ export const AdminDashboardPage: React.FC = () => {
             cx={c.x}
             cy={c.y}
             r="4.5"
-            className={`${strokeColor.replace('stroke-', 'fill-')} stroke-white dark:stroke-slate-900`}
+            className={`${strokeColor.replace('stroke-', 'fill-')} stroke-[#1E293B]`}
             strokeWidth="2.5"
           />
         ))}
@@ -616,8 +639,8 @@ export const AdminDashboardPage: React.FC = () => {
       statusText: servicesHealth.db === 'connected' ? '✓ Connected' : '✗ Offline',
       badgeColor:
         servicesHealth.db === 'connected'
-          ? 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/30'
-          : 'bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900/30',
+          ? 'bg-emerald-950/40 text-emerald-450 border border-emerald-900/30'
+          : 'bg-rose-950/40 text-rose-450 border border-rose-900/30',
       statusType: servicesHealth.db,
       icon: Database,
     },
@@ -627,8 +650,8 @@ export const AdminDashboardPage: React.FC = () => {
       statusText: servicesHealth.auth === 'connected' ? '✓ Connected' : '✗ Offline',
       badgeColor:
         servicesHealth.auth === 'connected'
-          ? 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/30'
-          : 'bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900/30',
+          ? 'bg-emerald-950/40 text-emerald-450 border border-emerald-900/30'
+          : 'bg-rose-950/40 text-rose-450 border border-rose-900/30',
       statusType: servicesHealth.auth,
       icon: ShieldCheck,
     },
@@ -638,8 +661,8 @@ export const AdminDashboardPage: React.FC = () => {
       statusText: servicesHealth.storage === 'connected' ? '✓ Connected' : '✗ Offline',
       badgeColor:
         servicesHealth.storage === 'connected'
-          ? 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/30'
-          : 'bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900/30',
+          ? 'bg-emerald-950/40 text-emerald-450 border border-emerald-900/30'
+          : 'bg-rose-950/40 text-rose-450 border border-rose-900/30',
       statusType: servicesHealth.storage,
       icon: HardDrive,
     },
@@ -649,8 +672,8 @@ export const AdminDashboardPage: React.FC = () => {
       statusText: servicesHealth.smtp === 'connected' ? '✓ Connected' : 'Not Configured',
       badgeColor:
         servicesHealth.smtp === 'connected'
-          ? 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/30'
-          : 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900/30',
+          ? 'bg-emerald-950/40 text-emerald-450 border border-emerald-900/30'
+          : 'bg-amber-950/40 text-amber-450 border border-amber-900/30',
       statusType: servicesHealth.smtp,
       icon: Mail,
     },
@@ -658,8 +681,7 @@ export const AdminDashboardPage: React.FC = () => {
       id: 'domain',
       name: 'Domain Resolution',
       statusText: '✓ Healthy',
-      badgeColor:
-        'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/30',
+      badgeColor: 'bg-emerald-950/40 text-emerald-450 border border-emerald-900/30',
       statusType: 'healthy',
       icon: Globe,
     },
@@ -667,8 +689,7 @@ export const AdminDashboardPage: React.FC = () => {
       id: 'cron',
       name: 'Database Cron Jobs',
       statusText: '✓ Running',
-      badgeColor:
-        'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/30',
+      badgeColor: 'bg-emerald-950/40 text-emerald-450 border border-emerald-900/30',
       statusType: 'running',
       icon: Clock,
     },
@@ -676,8 +697,7 @@ export const AdminDashboardPage: React.FC = () => {
       id: 'realtime',
       name: 'Supabase Realtime',
       statusText: '✓ Connected',
-      badgeColor:
-        'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/30',
+      badgeColor: 'bg-emerald-950/40 text-emerald-450 border border-emerald-900/30',
       statusType: 'connected',
       icon: Activity,
     },
@@ -689,47 +709,44 @@ export const AdminDashboardPage: React.FC = () => {
   // Loading skeleton layout
   if (loading) {
     return (
-      <PageWrapper className="min-h-screen space-y-6 pb-20 select-none">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-4 dark:border-slate-800">
+      <PageWrapper className="min-h-screen space-y-6 bg-[#0F172A] pb-20 text-[#FFFFFF] select-none">
+        <div className="flex items-center justify-between border-b border-[#334155] pb-4">
           <div className="space-y-2">
-            <div className="h-6 w-32 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
-            <div className="h-4 w-64 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+            <div className="h-6 w-32 animate-pulse rounded bg-[#1E293B]" />
+            <div className="h-4 w-64 animate-pulse rounded bg-[#1E293B]" />
           </div>
-          <div className="h-10 w-24 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" />
+          <div className="h-10 w-24 animate-pulse rounded-full bg-[#1E293B]" />
         </div>
 
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-28 animate-pulse rounded-3xl bg-slate-200 dark:bg-slate-800"
-            />
+            <div key={i} className="h-28 animate-pulse rounded-3xl bg-[#1E293B]" />
           ))}
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <div className="h-64 animate-pulse rounded-3xl bg-slate-200 dark:bg-slate-800" />
-          <div className="h-64 animate-pulse rounded-3xl bg-slate-200 dark:bg-slate-800" />
+          <div className="h-64 animate-pulse rounded-3xl bg-[#1E293B]" />
+          <div className="h-64 animate-pulse rounded-3xl bg-[#1E293B]" />
         </div>
       </PageWrapper>
     )
   }
 
   return (
-    <PageWrapper className="min-h-screen space-y-8 bg-slate-50/50 pb-20 text-left select-none dark:bg-slate-950/30">
+    <PageWrapper className="min-h-screen space-y-8 bg-[#0F172A] pb-20 text-left text-[#FFFFFF] select-none">
       {/* HEADER SECTION */}
-      <div className="flex flex-col gap-4 border-b border-slate-200/60 pb-6 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800/80">
+      <div className="flex flex-col gap-4 border-b border-[#334155] pb-6 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1 rounded-full bg-purple-600 px-3 py-0.5 text-[10px] font-black tracking-wider text-white uppercase">
+            <span className="bg-purple-650 inline-flex items-center gap-1 rounded-full px-3 py-0.5 text-[10px] font-black tracking-wider text-white uppercase">
               <Crown className="h-3 w-3" />
               SaaS Admin
             </span>
-            <span className="font-mono text-[11px] font-bold tracking-widest text-slate-400 uppercase">
+            <span className="font-mono text-[11px] font-bold tracking-widest text-[#94A3B8] uppercase">
               • Librovia Console
             </span>
           </div>
-          <h1 className="font-sans text-2xl font-black tracking-tight text-slate-900 sm:text-3xl dark:text-white">
+          <h1 className="font-sans text-2xl font-black tracking-tight text-[#FFFFFF] sm:text-3xl">
             Welcome back, {user?.displayName || user?.email?.split('@')[0] || 'Super Admin'} 👋
           </h1>
         </div>
@@ -738,7 +755,7 @@ export const AdminDashboardPage: React.FC = () => {
           <button
             type="button"
             onClick={() => navigate(ROUTES.DASHBOARD)}
-            className="hover:bg-slate-55 inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 transition-all active:scale-98 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+            className="inline-flex items-center gap-2 rounded-2xl border border-[#334155] bg-[#1E293B] px-4 py-2.5 text-xs font-bold text-[#CBD5E1] transition-all hover:bg-[#273549] hover:text-[#FFFFFF] active:scale-98"
           >
             <span>Reader Mode</span>
             <ArrowUpRight className="h-4 w-4" />
@@ -749,88 +766,82 @@ export const AdminDashboardPage: React.FC = () => {
       {/* SECTION 1: TOP KPI CARDS */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         {/* Card 1: Total Users */}
-        <div className="group relative space-y-3 overflow-hidden rounded-3xl border border-slate-200/85 bg-white p-5 shadow-sm transition-all hover:shadow-md dark:border-slate-800/85 dark:bg-slate-900">
+        <div className="group relative space-y-3 overflow-hidden rounded-3xl border border-[#334155] bg-[#1E293B] p-5 transition-all duration-250 hover:scale-102 hover:bg-[#273549] hover:shadow-lg hover:shadow-purple-900/10">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-extrabold tracking-widest text-slate-400 uppercase">
+            <span className="text-[10px] font-extrabold tracking-widest text-[#94A3B8] uppercase">
               Total Users
             </span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-300">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-900/30 text-purple-300">
               <Users className="h-4 w-4" />
             </div>
           </div>
           <div>
-            <h3 className="text-slate-955 font-mono text-2xl font-black dark:text-white">
-              {totalUsers}
-            </h3>
-            <span className="mt-1 flex items-center gap-0.5 text-[10.5px] font-bold text-emerald-600">
+            <h3 className="font-mono text-2xl font-black text-[#FFFFFF]">{totalUsers}</h3>
+            <span className="mt-1 flex items-center gap-0.5 text-[10.5px] font-bold text-emerald-400">
               <TrendingUp className="h-3 w-3" />+{weeklyUsersGrowth} this week
             </span>
           </div>
         </div>
 
         {/* Card 2: Total Books */}
-        <div className="group relative space-y-3 overflow-hidden rounded-3xl border border-slate-200/85 bg-white p-5 shadow-sm transition-all hover:shadow-md dark:border-slate-800/85 dark:bg-slate-900">
+        <div className="group relative space-y-3 overflow-hidden rounded-3xl border border-[#334155] bg-[#1E293B] p-5 transition-all duration-250 hover:scale-102 hover:bg-[#273549] hover:shadow-lg hover:shadow-purple-900/10">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-extrabold tracking-widest text-slate-400 uppercase">
+            <span className="text-[10px] font-extrabold tracking-widest text-[#94A3B8] uppercase">
               Total Books
             </span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-300">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-900/30 text-purple-300">
               <BookOpen className="h-4 w-4" />
             </div>
           </div>
           <div>
-            <h3 className="text-slate-955 font-mono text-2xl font-black dark:text-white">
-              {totalBooks}
-            </h3>
-            <span className="mt-1 flex items-center gap-0.5 text-[10.5px] font-bold text-emerald-600">
+            <h3 className="font-mono text-2xl font-black text-[#FFFFFF]">{totalBooks}</h3>
+            <span className="mt-1 flex items-center gap-0.5 text-[10.5px] font-bold text-emerald-400">
               <TrendingUp className="h-3 w-3" />+{weeklyBooksGrowth} this week
             </span>
           </div>
         </div>
 
         {/* Card 3: Pending Payments */}
-        <div className="group relative space-y-3 overflow-hidden rounded-3xl border border-slate-200/85 bg-white p-5 shadow-sm transition-all hover:shadow-md dark:border-slate-800/85 dark:bg-slate-900">
+        <div className="group relative space-y-3 overflow-hidden rounded-3xl border border-[#334155] bg-[#1E293B] p-5 transition-all duration-250 hover:scale-102 hover:bg-[#273549] hover:shadow-lg hover:shadow-purple-900/10">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-extrabold tracking-widest text-slate-400 uppercase">
+            <span className="text-[10px] font-extrabold tracking-widest text-[#94A3B8] uppercase">
               Pending Pay
             </span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-300">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-900/30 text-purple-300">
               <CreditCard className="h-4 w-4" />
             </div>
           </div>
           <div>
-            <h3 className="text-slate-955 font-mono text-2xl font-black dark:text-white">
-              {pendingPaymentsCount}
-            </h3>
+            <h3 className="font-mono text-2xl font-black text-[#FFFFFF]">{pendingPaymentsCount}</h3>
             <div className="mt-1 flex items-center gap-1.5">
               {pendingPaymentsCount > 0 ? (
-                <span className="inline-flex animate-pulse items-center gap-1 rounded bg-rose-50 px-1.5 py-0.5 text-[9px] font-black text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+                <span className="inline-flex animate-pulse items-center gap-1 rounded border border-rose-900/30 bg-rose-950/50 px-1.5 py-0.5 text-[9px] font-black text-rose-400">
                   Verification Required
                 </span>
               ) : (
-                <span className="text-[10px] font-semibold text-slate-400">All settled</span>
+                <span className="text-[10px] font-semibold text-[#94A3B8]">All settled</span>
               )}
             </div>
           </div>
         </div>
 
         {/* Card 4: Storage Used */}
-        <div className="group relative space-y-3 overflow-hidden rounded-3xl border border-slate-200/85 bg-white p-5 shadow-sm transition-all hover:shadow-md dark:border-slate-800/85 dark:bg-slate-900">
+        <div className="group relative space-y-3 overflow-hidden rounded-3xl border border-[#334155] bg-[#1E293B] p-5 transition-all duration-250 hover:scale-102 hover:bg-[#273549] hover:shadow-lg hover:shadow-purple-900/10">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-extrabold tracking-widest text-slate-400 uppercase">
+            <span className="text-[10px] font-extrabold tracking-widest text-[#94A3B8] uppercase">
               Storage Used
             </span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-300">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-900/30 text-purple-300">
               <HardDrive className="h-4 w-4" />
             </div>
           </div>
           <div className="space-y-1.5">
-            <h3 className="text-slate-955 truncate font-mono text-sm font-black dark:text-white">
+            <h3 className="truncate font-mono text-sm font-black text-[#FFFFFF]">
               {formatBytes(totalStorageUsed)} / {formatBytes(totalStorageLimit)}
             </h3>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+            <div className="h-1.5 w-full overflow-hidden rounded-full border border-[#334155]/20 bg-[#111827]">
               <div
-                className="h-full rounded-full bg-purple-600"
+                className="h-full rounded-full bg-purple-500"
                 style={{ width: `${storagePercentage}%` }}
               />
             </div>
@@ -838,22 +849,20 @@ export const AdminDashboardPage: React.FC = () => {
         </div>
 
         {/* Card 5: Active Users Today */}
-        <div className="group relative space-y-3 overflow-hidden rounded-3xl border border-slate-200/85 bg-white p-5 shadow-sm transition-all hover:shadow-md dark:border-slate-800/85 dark:bg-slate-900">
+        <div className="group relative space-y-3 overflow-hidden rounded-3xl border border-[#334155] bg-[#1E293B] p-5 transition-all duration-250 hover:scale-102 hover:bg-[#273549] hover:shadow-lg hover:shadow-purple-900/10">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-extrabold tracking-widest text-slate-400 uppercase">
+            <span className="text-[10px] font-extrabold tracking-widest text-[#94A3B8] uppercase">
               Active Today
             </span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-300">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-900/30 text-purple-300">
               <Activity className="h-4 w-4" />
             </div>
           </div>
           <div>
-            <h3 className="text-slate-955 font-mono text-2xl font-black dark:text-white">
-              {activeUsersToday}
-            </h3>
+            <h3 className="font-mono text-2xl font-black text-[#FFFFFF]">{activeUsersToday}</h3>
             <span
               className={`mt-1 flex items-center gap-0.5 text-[10.5px] font-bold ${
-                activeUsersPctChange >= 0 ? 'text-emerald-600' : 'text-rose-600'
+                activeUsersPctChange >= 0 ? 'text-emerald-400' : 'text-rose-450'
               }`}
             >
               {activeUsersPctChange >= 0 ? '+' : ''}
@@ -863,12 +872,12 @@ export const AdminDashboardPage: React.FC = () => {
         </div>
 
         {/* Card 6: System Status */}
-        <div className="group relative space-y-3 overflow-hidden rounded-3xl border border-slate-200/85 bg-white p-5 shadow-sm transition-all hover:shadow-md dark:border-slate-800/85 dark:bg-slate-900">
+        <div className="group relative space-y-3 overflow-hidden rounded-3xl border border-[#334155] bg-[#1E293B] p-5 transition-all duration-250 hover:scale-102 hover:bg-[#273549] hover:shadow-lg hover:shadow-purple-900/10">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-extrabold tracking-widest text-slate-400 uppercase">
+            <span className="text-[10px] font-extrabold tracking-widest text-[#94A3B8] uppercase">
               System Status
             </span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-300">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-900/30 text-purple-300">
               <Server className="h-4 w-4" />
             </div>
           </div>
@@ -887,12 +896,12 @@ export const AdminDashboardPage: React.FC = () => {
                 ></span>
               </div>
               <span
-                className={`text-[11px] font-black tracking-wide ${isAllServicesHealthy ? 'text-emerald-600' : 'text-amber-600'}`}
+                className={`text-[11px] font-black tracking-wide ${isAllServicesHealthy ? 'text-emerald-450' : 'text-amber-450'}`}
               >
                 {isAllServicesHealthy ? 'All Systems Connected' : 'Degraded Performance'}
               </span>
             </div>
-            <span className="mt-1 block text-[9.5px] font-bold tracking-wider text-slate-400 uppercase">
+            <span className="mt-1 block text-[9.5px] font-bold tracking-wider text-[#94A3B8] uppercase">
               {isAllServicesHealthy
                 ? 'Healthy Uptime 99.9%'
                 : `${failingServicesList.length} systems offline`}
@@ -903,8 +912,8 @@ export const AdminDashboardPage: React.FC = () => {
 
       {/* DYNAMIC TOP BANNER FOR SERVICE OUTAGES */}
       {!isAllServicesHealthy && (
-        <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-xs font-semibold text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
-          <AlertTriangle className="h-4.5 w-4.5 shrink-0 text-amber-600" />
+        <div className="bg-amber-955/20 flex items-center gap-3 rounded-2xl border border-amber-900/40 p-4 text-xs font-semibold text-amber-300">
+          <AlertTriangle className="h-4.5 w-4.5 shrink-0 text-amber-500" />
           <span>
             ⚠️ Infrastructure Warning: The following core service integrations are currently
             unresponsive or unconfigured: <strong>{failingServicesList.join(', ')}</strong>. Please
@@ -916,24 +925,24 @@ export const AdminDashboardPage: React.FC = () => {
       {/* SECTION 2: ANALYTICS CHARTS */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Chart 1: Users Growth */}
-        <div className="space-y-4 rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800/85 dark:bg-slate-900">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
+        <div className="space-y-4 rounded-3xl border border-[#334155] bg-[#1E293B] p-6 shadow-md">
+          <div className="flex items-center justify-between border-b border-[#334155] pb-3">
             <div>
-              <h3 className="text-slate-955 font-sans text-sm font-black tracking-wider uppercase dark:text-white">
+              <h3 className="font-sans text-sm font-black tracking-wider text-[#FFFFFF] uppercase">
                 User Base Expansion
               </h3>
-              <p className="mt-0.5 text-[10px] font-bold tracking-widest text-slate-400 uppercase">
+              <p className="mt-0.5 text-[10px] font-bold tracking-widest text-[#94A3B8] uppercase">
                 Cumulative Registered Accounts (Last 7 Days)
               </p>
             </div>
-            <span className="inline-flex items-center gap-1 rounded bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:bg-purple-950 dark:text-purple-300">
+            <span className="inline-flex items-center gap-1 rounded border border-purple-500/20 bg-purple-900/30 px-2 py-0.5 text-[10px] font-bold text-purple-300">
               Users: {totalUsers}
             </span>
           </div>
           <div className="h-44 w-full pt-2">
             {renderSvgChart(usersChartData.points, 'stroke-purple-500', 'purpleGradient', true)}
           </div>
-          <div className="flex justify-between px-2 text-[9px] font-bold tracking-wider text-slate-400 uppercase">
+          <div className="flex justify-between px-2 text-[9px] font-bold tracking-wider text-[#94A3B8] uppercase">
             {usersChartData.labels.map((lbl, idx) => (
               <span key={idx}>{lbl}</span>
             ))}
@@ -941,24 +950,24 @@ export const AdminDashboardPage: React.FC = () => {
         </div>
 
         {/* Chart 2: Revenue Growth */}
-        <div className="space-y-4 rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800/85 dark:bg-slate-900">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
+        <div className="space-y-4 rounded-3xl border border-[#334155] bg-[#1E293B] p-6 shadow-md">
+          <div className="flex items-center justify-between border-b border-[#334155] pb-3">
             <div>
-              <h3 className="text-slate-955 font-sans text-sm font-black tracking-wider uppercase dark:text-white">
+              <h3 className="font-sans text-sm font-black tracking-wider text-[#FFFFFF] uppercase">
                 Revenue Ingress Trend
               </h3>
-              <p className="mt-0.5 text-[10px] font-bold tracking-widest text-slate-400 uppercase">
+              <p className="mt-0.5 text-[10px] font-bold tracking-widest text-[#94A3B8] uppercase">
                 Approved Payment Transactions (Last 7 Days)
               </p>
             </div>
-            <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+            <span className="inline-flex items-center gap-1 rounded border border-emerald-900/30 bg-emerald-950/40 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
               Approved Txns
             </span>
           </div>
           <div className="h-44 w-full pt-2">
             {renderSvgChart(revenueChartData.points, 'stroke-emerald-500', 'emeraldGradient', true)}
           </div>
-          <div className="flex justify-between px-2 text-[9px] font-bold tracking-wider text-slate-400 uppercase">
+          <div className="flex justify-between px-2 text-[9px] font-bold tracking-wider text-[#94A3B8] uppercase">
             {revenueChartData.labels.map((lbl, idx) => (
               <span key={idx}>{lbl}</span>
             ))}
@@ -971,14 +980,14 @@ export const AdminDashboardPage: React.FC = () => {
         {/* LEFT COLUMN: 2/3 Width components */}
         <div className="space-y-6 lg:col-span-2">
           {/* SECTION 4: RECENT PENDING PAYMENTS */}
-          <div className="space-y-4 rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800/85 dark:bg-slate-900">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
-              <h3 className="text-slate-955 font-sans text-sm font-black tracking-wider uppercase dark:text-white">
+          <div className="space-y-4 rounded-3xl border border-[#334155] bg-[#1E293B] p-6 shadow-md">
+            <div className="flex items-center justify-between border-b border-[#334155] pb-3">
+              <h3 className="font-sans text-sm font-black tracking-wider text-[#FFFFFF] uppercase">
                 Recent Pending Payments
               </h3>
               <Link
                 to={ROUTES.ADMIN_PAYMENTS}
-                className="inline-flex items-center gap-1 rounded-xl bg-purple-50 px-3 py-1.5 text-[11.5px] font-black text-purple-700 transition-all hover:bg-purple-100 dark:bg-purple-950/40 dark:text-purple-300"
+                className="inline-flex items-center gap-1 rounded-xl border border-purple-500/25 bg-purple-900/30 px-3 py-1.5 text-[11.5px] font-black text-purple-300 transition-all hover:bg-purple-900/50"
               >
                 <span>View All Requests</span>
                 <ArrowUpRight className="h-3.5 w-3.5" />
@@ -987,8 +996,8 @@ export const AdminDashboardPage: React.FC = () => {
 
             <div className="overflow-x-auto pt-1">
               {recentPendingPayments.length > 0 ? (
-                <table className="w-full border-collapse text-left text-xs font-semibold text-slate-500 dark:text-slate-400">
-                  <thead className="border-b border-slate-100 bg-slate-50/50 text-[9.5px] font-bold tracking-widest text-slate-400 uppercase dark:border-slate-800 dark:bg-slate-800/20">
+                <table className="w-full border-collapse text-left text-xs font-semibold text-[#CBD5E1]">
+                  <thead className="border-b border-[#334155] bg-[#111827]/40 text-[9.5px] font-bold tracking-widest text-[#94A3B8] uppercase">
                     <tr>
                       <th className="px-4 py-3">User</th>
                       <th className="px-4 py-3">Plan</th>
@@ -997,33 +1006,33 @@ export const AdminDashboardPage: React.FC = () => {
                       <th className="px-4 py-3 text-right">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/55">
+                  <tbody className="divide-y divide-[#334155]">
                     {recentPendingPayments.map((req) => (
                       <tr
                         key={req.id}
-                        className="hover:bg-slate-55/40 transition-colors dark:hover:bg-slate-800/10"
+                        className="border-b border-[#334155]/20 transition-colors hover:bg-[#273549]/40"
                       >
                         <td className="px-4 py-3">
                           <div>
-                            <span className="block font-bold text-slate-950 dark:text-white">
+                            <span className="block font-bold text-[#FFFFFF]">
                               {req.user?.display_name}
                             </span>
-                            <span className="font-mono text-[10px] text-slate-400">
+                            <span className="font-mono text-[10px] text-[#94A3B8]">
                               {req.user?.email}
                             </span>
                           </div>
                         </td>
-                        <td className="px-4 py-3 font-bold text-purple-600 uppercase dark:text-purple-400">
+                        <td className="px-4 py-3 font-bold text-purple-400 uppercase">
                           {req.plan_id}
                         </td>
-                        <td className="px-4 py-3 font-mono font-bold text-slate-900 dark:text-white">
+                        <td className="px-4 py-3 font-mono font-bold text-[#FFFFFF]">
                           PKR {req.amount.toLocaleString()}
                         </td>
-                        <td className="px-4 py-3 text-slate-400">
+                        <td className="px-4 py-3 text-[#94A3B8]">
                           {new Date(req.created_at).toLocaleDateString()}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-100 bg-amber-50 px-2.5 py-0.5 text-[10px] font-extrabold text-amber-700 dark:border-amber-900/30 dark:bg-amber-950/40 dark:text-amber-300">
+                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-900/30 bg-amber-950/40 px-2.5 py-0.5 text-[10px] font-extrabold text-amber-400">
                             Verification Required
                           </span>
                         </td>
@@ -1033,13 +1042,13 @@ export const AdminDashboardPage: React.FC = () => {
                 </table>
               ) : (
                 <div className="flex flex-col items-center justify-center space-y-2 py-10 text-center">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-purple-900/30 text-purple-300">
                     <CheckCircle2 className="h-5 w-5" />
                   </div>
-                  <h4 className="text-xs font-black text-slate-900 dark:text-white">
+                  <h4 className="text-xs font-black text-[#FFFFFF]">
                     No pending verification requests
                   </h4>
-                  <p className="text-[11px] font-semibold text-slate-400">
+                  <p className="text-[11px] font-semibold text-[#94A3B8]">
                     All subscriber invoices have been verified.
                   </p>
                 </div>
@@ -1048,12 +1057,12 @@ export const AdminDashboardPage: React.FC = () => {
           </div>
 
           {/* SECTION 3: RECENT ACTIVITY */}
-          <div className="space-y-4 rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800/85 dark:bg-slate-900">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
-              <h3 className="text-slate-955 font-sans text-sm font-black tracking-wider uppercase dark:text-white">
+          <div className="space-y-4 rounded-3xl border border-[#334155] bg-[#1E293B] p-6 shadow-md">
+            <div className="flex items-center justify-between border-b border-[#334155] pb-3">
+              <h3 className="font-sans text-sm font-black tracking-wider text-[#FFFFFF] uppercase">
                 System Activity Log Stream
               </h3>
-              <span className="font-mono text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+              <span className="font-mono text-[10px] font-bold tracking-wider text-[#94A3B8] uppercase">
                 Live Audit Logs
               </span>
             </div>
@@ -1069,26 +1078,24 @@ export const AdminDashboardPage: React.FC = () => {
                     return (
                       <div
                         key={act.id}
-                        className="flex items-start justify-between border-b border-slate-100 pb-3 last:border-b-0 dark:border-slate-800"
+                        className="flex items-start justify-between border-b border-[#334155]/30 pb-3 last:border-b-0"
                       >
                         <div className="space-y-1">
-                          <span className="block text-xs font-bold text-slate-900 dark:text-white">
+                          <span className="block text-xs font-bold text-[#FFFFFF]">
                             {act.event}
                           </span>
-                          <div className="flex items-center gap-2 text-[10.5px] font-semibold text-slate-400">
-                            <span className="font-mono text-slate-500">{act.actor_email}</span>
+                          <div className="flex items-center gap-2 text-[10.5px] font-semibold text-[#94A3B8]">
+                            <span className="font-mono text-[#CBD5E1]">{act.actor_email}</span>
                             <span>•</span>
-                            <span className="py-0.2 inline-flex items-center rounded bg-slate-100 px-1 text-[9px] font-black text-slate-600 uppercase dark:bg-slate-800 dark:text-slate-300">
+                            <span className="py-0.2 inline-flex items-center rounded border border-[#334155]/20 bg-[#111827]/60 px-1 text-[9px] font-black text-[#CBD5E1] uppercase">
                               {act.actor_role}
                             </span>
                             <span>•</span>
-                            <span className="text-purple-600 dark:text-purple-400">
-                              {act.category}
-                            </span>
+                            <span className="text-purple-400">{act.category}</span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-1.5 font-mono text-xs font-semibold text-slate-400">
-                          <Clock className="h-3.5 w-3.5 text-slate-300" />
+                        <div className="flex items-center gap-1.5 font-mono text-xs font-semibold text-[#94A3B8]">
+                          <Clock className="h-3.5 w-3.5 text-[#94A3B8]" />
                           <span>{activityTime}</span>
                         </div>
                       </div>
@@ -1097,13 +1104,13 @@ export const AdminDashboardPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center space-y-2 py-10 text-center">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-purple-900/30 text-purple-300">
                     <Inbox className="h-5 w-5" />
                   </div>
-                  <h4 className="text-xs font-black text-slate-900 dark:text-white">
+                  <h4 className="text-xs font-black text-[#FFFFFF]">
                     No recent audit log activities
                   </h4>
-                  <p className="text-[11px] font-semibold text-slate-400">
+                  <p className="text-[11px] font-semibold text-[#94A3B8]">
                     Log activity stream is clean.
                   </p>
                 </div>
@@ -1115,8 +1122,8 @@ export const AdminDashboardPage: React.FC = () => {
         {/* RIGHT COLUMN: 1/3 Width components */}
         <div className="space-y-6">
           {/* SECTION 6: QUICK ACTIONS */}
-          <div className="space-y-4 rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800/85 dark:bg-slate-900">
-            <h3 className="border-b border-slate-100 pb-3 font-sans text-sm font-black tracking-wider text-slate-950 uppercase dark:border-slate-800 dark:text-white">
+          <div className="space-y-4 rounded-3xl border border-[#334155] bg-[#1E293B] p-6 shadow-md">
+            <h3 className="border-b border-[#334155] pb-3 font-sans text-sm font-black tracking-wider text-[#FFFFFF] uppercase">
               Administrative Quick Tools
             </h3>
 
@@ -1124,71 +1131,71 @@ export const AdminDashboardPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => navigate(ROUTES.ADMIN_ANNOUNCEMENTS)}
-                className="bg-slate-55/50 flex w-full items-center gap-3 rounded-2xl border border-slate-100 p-3.5 text-left text-xs font-extrabold text-slate-700 transition-all select-none hover:border-purple-200 hover:bg-purple-50 hover:text-purple-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-purple-950/20"
+                className="flex w-full items-center gap-3 rounded-2xl border border-[#334155] bg-[#111827]/40 p-3.5 text-left text-xs font-extrabold text-[#CBD5E1] transition-all select-none hover:border-purple-500/30 hover:bg-[#273549] hover:text-[#FFFFFF]"
               >
-                <Megaphone className="h-4.5 w-4.5 text-purple-600" />
+                <Megaphone className="h-4.5 w-4.5 text-purple-400" />
                 <span>Create Announcement</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => navigate(ROUTES.ADMIN_PAYMENTS)}
-                className="bg-slate-55/50 flex w-full items-center gap-3 rounded-2xl border border-slate-100 p-3.5 text-left text-xs font-extrabold text-slate-700 transition-all select-none hover:border-purple-200 hover:bg-purple-50 hover:text-purple-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-purple-950/20"
+                className="flex w-full items-center gap-3 rounded-2xl border border-[#334155] bg-[#111827]/40 p-3.5 text-left text-xs font-extrabold text-[#CBD5E1] transition-all select-none hover:border-purple-500/30 hover:bg-[#273549] hover:text-[#FFFFFF]"
               >
-                <CreditCard className="h-4.5 w-4.5 text-purple-600" />
+                <CreditCard className="h-4.5 w-4.5 text-purple-400" />
                 <span>Verify Payments</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => navigate(ROUTES.ADMIN_STORAGE)}
-                className="bg-slate-55/50 flex w-full items-center gap-3 rounded-2xl border border-slate-100 p-3.5 text-left text-xs font-extrabold text-slate-700 transition-all select-none hover:border-purple-200 hover:bg-purple-50 hover:text-purple-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-purple-950/20"
+                className="flex w-full items-center gap-3 rounded-2xl border border-[#334155] bg-[#111827]/40 p-3.5 text-left text-xs font-extrabold text-[#CBD5E1] transition-all select-none hover:border-purple-500/30 hover:bg-[#273549] hover:text-[#FFFFFF]"
               >
-                <HardDrive className="h-4.5 w-4.5 text-purple-600" />
+                <HardDrive className="h-4.5 w-4.5 text-purple-400" />
                 <span>Manage Storage Limits</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => navigate(ROUTES.ADMIN_SUBSCRIPTIONS)}
-                className="bg-slate-55/50 flex w-full items-center gap-3 rounded-2xl border border-slate-100 p-3.5 text-left text-xs font-extrabold text-slate-700 transition-all select-none hover:border-purple-200 hover:bg-purple-50 hover:text-purple-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-purple-950/20"
+                className="flex w-full items-center gap-3 rounded-2xl border border-[#334155] bg-[#111827]/40 p-3.5 text-left text-xs font-extrabold text-[#CBD5E1] transition-all select-none hover:border-purple-500/30 hover:bg-[#273549] hover:text-[#FFFFFF]"
               >
-                <Crown className="h-4.5 w-4.5 text-purple-600" />
+                <Crown className="h-4.5 w-4.5 text-purple-400" />
                 <span>Subscription Plans Editor</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => navigate(ROUTES.ADMIN_AUDIT_LOGS)}
-                className="bg-slate-55/50 flex w-full items-center gap-3 rounded-2xl border border-slate-100 p-3.5 text-left text-xs font-extrabold text-slate-700 transition-all select-none hover:border-purple-200 hover:bg-purple-50 hover:text-purple-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-purple-950/20"
+                className="flex w-full items-center gap-3 rounded-2xl border border-[#334155] bg-[#111827]/40 p-3.5 text-left text-xs font-extrabold text-[#CBD5E1] transition-all select-none hover:border-purple-500/30 hover:bg-[#273549] hover:text-[#FFFFFF]"
               >
-                <ClipboardList className="h-4.5 w-4.5 text-purple-600" />
+                <ClipboardList className="h-4.5 w-4.5 text-purple-400" />
                 <span>View System Audit Logs</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => navigate(ROUTES.ADMIN_SETTINGS)}
-                className="bg-slate-55/50 flex w-full items-center gap-3 rounded-2xl border border-slate-100 p-3.5 text-left text-xs font-extrabold text-slate-700 transition-all select-none hover:border-purple-200 hover:bg-purple-50 hover:text-purple-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-purple-950/20"
+                className="flex w-full items-center gap-3 rounded-2xl border border-[#334155] bg-[#111827]/40 p-3.5 text-left text-xs font-extrabold text-[#CBD5E1] transition-all select-none hover:border-purple-500/30 hover:bg-[#273549] hover:text-[#FFFFFF]"
               >
-                <Settings className="h-4.5 w-4.5 text-purple-600" />
+                <Settings className="h-4.5 w-4.5 text-purple-400" />
                 <span>Infrastructure Settings</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setIsAddUserOpen(true)}
-                className="bg-slate-55/50 flex w-full items-center gap-3 rounded-2xl border border-slate-100 p-3.5 text-left text-xs font-extrabold text-slate-700 transition-all select-none hover:border-purple-200 hover:bg-purple-50 hover:text-purple-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-purple-950/20"
+                className="flex w-full items-center gap-3 rounded-2xl border border-[#334155] bg-[#111827]/40 p-3.5 text-left text-xs font-extrabold text-[#CBD5E1] transition-all select-none hover:border-purple-500/30 hover:bg-[#273549] hover:text-[#FFFFFF]"
               >
-                <UserPlus className="h-4.5 w-4.5 text-purple-600" />
+                <UserPlus className="h-4.5 w-4.5 text-purple-400" />
                 <span>Invite / Add New User</span>
               </button>
             </div>
           </div>
 
           {/* SECTION 7: SUBSCRIPTION DISTRIBUTION */}
-          <div className="space-y-4 rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800/85 dark:bg-slate-900">
-            <h3 className="text-slate-955 border-b border-slate-100 pb-3 font-sans text-sm font-black tracking-wider uppercase dark:border-slate-800 dark:text-white">
+          <div className="space-y-4 rounded-3xl border border-[#334155] bg-[#1E293B] p-6 shadow-md">
+            <h3 className="border-b border-[#334155] pb-3 font-sans text-sm font-black tracking-wider text-[#FFFFFF] uppercase">
               Subscription Tier Shares
             </h3>
 
@@ -1196,15 +1203,7 @@ export const AdminDashboardPage: React.FC = () => {
               {/* Custom SVG Doughnut Chart */}
               <div className="relative flex h-32 w-32 items-center justify-center">
                 <svg className="h-full w-full -rotate-90 transform" viewBox="0 0 120 120">
-                  <circle
-                    cx="60"
-                    cy="60"
-                    r="50"
-                    fill="none"
-                    stroke="#f1f5f9"
-                    strokeWidth="12"
-                    className="dark:stroke-slate-800"
-                  />
+                  <circle cx="60" cy="60" r="50" fill="none" stroke="#273549" strokeWidth="12" />
                   {(() => {
                     const total = planStats.total || 1
                     const freePct = (planStats.free / total) * 100
@@ -1264,10 +1263,10 @@ export const AdminDashboardPage: React.FC = () => {
                   })()}
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-slate-905 font-mono text-xl font-black dark:text-white">
+                  <span className="font-mono text-xl font-black text-[#FFFFFF]">
                     {planStats.total}
                   </span>
-                  <span className="text-[9px] font-extrabold tracking-widest text-slate-400 uppercase">
+                  <span className="text-[9px] font-extrabold tracking-widest text-[#94A3B8] uppercase">
                     Accounts
                   </span>
                 </div>
@@ -1278,9 +1277,9 @@ export const AdminDashboardPage: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="h-2.5 w-2.5 rounded-full bg-purple-500" />
-                    <span className="text-slate-500">Free Tier</span>
+                    <span className="text-[#CBD5E1]">Free Tier</span>
                   </div>
-                  <span className="font-bold text-slate-900 dark:text-white">
+                  <span className="font-bold text-[#FFFFFF]">
                     {planStats.free} (
                     {planStats.total ? ((planStats.free / planStats.total) * 100).toFixed(0) : 0}%)
                   </span>
@@ -1289,9 +1288,9 @@ export const AdminDashboardPage: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="h-2.5 w-2.5 rounded-full bg-indigo-500" />
-                    <span className="text-slate-500">Pro Tier</span>
+                    <span className="text-[#CBD5E1]">Pro Tier</span>
                   </div>
-                  <span className="font-bold text-slate-900 dark:text-white">
+                  <span className="font-bold text-[#FFFFFF]">
                     {planStats.pro} (
                     {planStats.total ? ((planStats.pro / planStats.total) * 100).toFixed(0) : 0}%)
                   </span>
@@ -1300,9 +1299,9 @@ export const AdminDashboardPage: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="h-2.5 w-2.5 rounded-full bg-pink-500" />
-                    <span className="text-slate-500">Family Tier</span>
+                    <span className="text-[#CBD5E1]">Family Tier</span>
                   </div>
-                  <span className="font-bold text-slate-900 dark:text-white">
+                  <span className="font-bold text-[#FFFFFF]">
                     {planStats.family} (
                     {planStats.total ? ((planStats.family / planStats.total) * 100).toFixed(0) : 0}
                     %)
@@ -1313,8 +1312,8 @@ export const AdminDashboardPage: React.FC = () => {
           </div>
 
           {/* SECTION 8: TOP READERS */}
-          <div className="space-y-4 rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800/85 dark:bg-slate-900">
-            <h3 className="text-slate-955 border-b border-slate-100 pb-3 font-sans text-sm font-black tracking-wider uppercase dark:border-slate-800 dark:text-white">
+          <div className="space-y-4 rounded-3xl border border-[#334155] bg-[#1E293B] p-6 shadow-md">
+            <h3 className="border-b border-[#334155] pb-3 font-sans text-sm font-black tracking-wider text-[#FFFFFF] uppercase">
               Reader Activity Leaderboard
             </h3>
 
@@ -1323,32 +1322,32 @@ export const AdminDashboardPage: React.FC = () => {
                 topReaders.map((reader, index) => (
                   <div
                     key={reader.user_id}
-                    className="flex items-center justify-between border-b border-slate-100 pb-2.5 last:border-b-0 dark:border-slate-800"
+                    className="flex items-center justify-between border-b border-[#334155]/20 pb-2.5 last:border-b-0"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="flex h-6.5 w-6.5 items-center justify-center rounded-lg bg-purple-50 text-[10px] font-black text-purple-700 dark:bg-purple-950 dark:text-purple-300">
+                      <div className="flex h-6.5 w-6.5 items-center justify-center rounded-lg bg-purple-900/30 text-[10px] font-black text-purple-300">
                         #{index + 1}
                       </div>
                       <div>
-                        <span className="text-slate-955 block text-xs font-bold dark:text-white">
+                        <span className="block text-xs font-bold text-[#FFFFFF]">
                           {reader.displayName}
                         </span>
-                        <span className="font-mono text-[10px] text-slate-400">{reader.email}</span>
+                        <span className="font-mono text-[10px] text-[#94A3B8]">{reader.email}</span>
                       </div>
                     </div>
 
-                    <div className="text-right text-[11px] font-semibold text-slate-500">
-                      <span className="block font-mono font-black text-slate-900 dark:text-white">
+                    <div className="text-right text-[11px] font-semibold text-[#CBD5E1]">
+                      <span className="block font-mono font-black text-[#FFFFFF]">
                         {reader.pagesRead.toLocaleString()} pages
                       </span>
-                      <span className="block text-[9.5px] font-medium text-slate-400">
+                      <span className="block text-[9.5px] font-medium text-[#94A3B8]">
                         {reader.booksCount} books • {reader.readingTimeMinutes} mins
                       </span>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="py-6 text-center text-xs text-slate-400">
+                <div className="py-6 text-center text-xs text-[#94A3B8]">
                   No reading progress activity logged yet.
                 </div>
               )}
@@ -1356,12 +1355,12 @@ export const AdminDashboardPage: React.FC = () => {
           </div>
 
           {/* SECTION 5: PLATFORM HEALTH */}
-          <div className="space-y-4 rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800/85 dark:bg-slate-900">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
-              <h3 className="text-slate-955 font-sans text-sm font-black tracking-wider uppercase dark:text-white">
+          <div className="space-y-4 rounded-3xl border border-[#334155] bg-[#1E293B] p-6 shadow-md">
+            <div className="flex items-center justify-between border-b border-[#334155] pb-3">
+              <h3 className="font-sans text-sm font-black tracking-wider text-[#FFFFFF] uppercase">
                 Infrastructure Integrations
               </h3>
-              <span className="text-[9px] font-black tracking-wider text-slate-400 uppercase">
+              <span className="text-[9px] font-black tracking-wider text-[#94A3B8] uppercase">
                 Verification Matrix
               </span>
             </div>
@@ -1372,15 +1371,13 @@ export const AdminDashboardPage: React.FC = () => {
                 return (
                   <div
                     key={srv.id}
-                    className="flex items-center justify-between border-b border-slate-100 pb-2.5 last:border-b-0 dark:border-slate-800"
+                    className="flex items-center justify-between border-b border-[#334155]/20 pb-2.5 last:border-b-0"
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="dark:text-slate-350 flex h-8 w-8 items-center justify-center rounded-lg bg-slate-50 text-slate-600 dark:bg-slate-300">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#334155]/20 bg-[#111827]/40 text-[#CBD5E1]">
                         <Icon className="h-4 w-4" />
                       </div>
-                      <span className="text-xs font-bold text-slate-900 dark:text-white">
-                        {srv.name}
-                      </span>
+                      <span className="text-xs font-bold text-[#FFFFFF]">{srv.name}</span>
                     </div>
 
                     <span
@@ -1412,33 +1409,33 @@ export const AdminDashboardPage: React.FC = () => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsAddUserOpen(false)}
-              className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs"
+              className="fixed inset-0 bg-[#0F172A]/70 backdrop-blur-xs"
             />
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="relative w-full max-w-md space-y-4 rounded-3xl border border-slate-200 bg-white p-6 text-left shadow-2xl dark:border-slate-800 dark:bg-slate-900"
+              className="relative w-full max-w-md space-y-4 rounded-3xl border border-[#334155] bg-[#1E293B] p-6 text-left text-[#FFFFFF] shadow-2xl"
             >
               <button
                 type="button"
                 onClick={() => setIsAddUserOpen(false)}
-                className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                className="absolute top-4 right-4 text-[#94A3B8] hover:text-[#FFFFFF]"
               >
                 <X className="h-5 w-5" />
               </button>
 
-              <h3 className="flex items-center gap-2 text-lg font-black text-slate-900 dark:text-white">
-                <UserPlus className="h-5 w-5 text-purple-600" />
+              <h3 className="flex items-center gap-2 text-lg font-black text-[#FFFFFF]">
+                <UserPlus className="h-5 w-5 text-purple-400" />
                 Invite or Register User
               </h3>
-              <p className="text-xs font-medium text-slate-500">
+              <p className="text-xs font-medium text-[#CBD5E1]">
                 Register a new user email and define their security role profile.
               </p>
 
               <form onSubmit={handleAddUser} className="space-y-4 pt-2">
                 <div>
-                  <label className="dark:text-slate-350 mb-1 block text-xs font-bold text-slate-700">
+                  <label className="mb-1 block text-xs font-bold text-[#CBD5E1]">
                     User Email Address
                   </label>
                   <input
@@ -1446,13 +1443,13 @@ export const AdminDashboardPage: React.FC = () => {
                     value={newUserEmail}
                     onChange={(e) => setNewUserEmail(e.target.value)}
                     placeholder="e.g. member.team@librovia.com"
-                    className="focus:border-purple-650 w-full rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 focus:outline-none dark:border-slate-800 dark:bg-slate-800 dark:text-white"
+                    className="w-full rounded-2xl border border-[#334155] bg-[#111827] p-2.5 text-xs font-semibold text-[#FFFFFF] placeholder-[#94A3B8] focus:border-purple-500 focus:outline-none"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="dark:text-slate-350 mb-1 block text-xs font-bold text-slate-700">
+                  <label className="mb-1 block text-xs font-bold text-[#CBD5E1]">
                     Authorization Role
                   </label>
                   <select
@@ -1460,17 +1457,23 @@ export const AdminDashboardPage: React.FC = () => {
                     onChange={(e) =>
                       setNewUserRole(e.target.value as 'user' | 'super_admin' | 'moderator')
                     }
-                    className="focus:border-purple-650 w-full rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 focus:outline-none dark:border-slate-800 dark:bg-slate-800 dark:text-white"
+                    className="w-full rounded-2xl border border-[#334155] bg-[#111827] p-2.5 text-xs font-semibold text-[#FFFFFF] focus:border-purple-500 focus:outline-none"
                   >
-                    <option value="user">Reader (Default)</option>
-                    <option value="moderator">Moderator</option>
-                    <option value="super_admin">Super Administrator</option>
+                    <option value="user" className="bg-[#1E293B] text-[#FFFFFF]">
+                      Reader (Default)
+                    </option>
+                    <option value="moderator" className="bg-[#1E293B] text-[#FFFFFF]">
+                      Moderator
+                    </option>
+                    <option value="super_admin" className="bg-[#1E293B] text-[#FFFFFF]">
+                      Super Administrator
+                    </option>
                   </select>
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full rounded-2xl bg-purple-600 py-3 text-xs font-black text-white shadow-md shadow-purple-600/20 hover:bg-purple-700"
+                  className="w-full rounded-2xl bg-purple-600 py-3 text-xs font-black text-white shadow-md shadow-purple-600/20 transition-all hover:bg-purple-700 active:scale-98"
                 >
                   Confirm Registration & Invite
                 </button>
