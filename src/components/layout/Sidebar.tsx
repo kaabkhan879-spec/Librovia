@@ -39,6 +39,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { currentPlanId } = useSubscription()
   const navigate = useNavigate()
 
+  const planBadge = () => {
+    switch (currentPlanId) {
+      case 'family':
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[9px] font-black text-amber-500 border border-amber-500/20 uppercase tracking-wider">
+            👑 Family
+          </span>
+        )
+      case 'pro':
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-purple-500/10 px-2 py-0.5 text-[9px] font-black text-purple-400 border border-purple-500/20 uppercase tracking-wider">
+            ⭐ Pro
+          </span>
+        )
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-slate-500/10 px-2 py-0.5 text-[9px] font-black text-slate-400 border border-slate-500/20 uppercase tracking-wider">
+            📘 Free
+          </span>
+        )
+    }
+  }
+
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768)
 
   useEffect(() => {
@@ -127,20 +150,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 to={item.to}
                 end={item.to === ROUTES.DASHBOARD}
                 className={({ isActive }) =>
-                  `group text-text-sub hover:bg-bg-app hover:text-text-main relative flex cursor-pointer items-center rounded-xl p-2.5 text-xs font-bold tracking-wider uppercase transition-all ${
+                  `group relative flex cursor-pointer items-center rounded-xl p-2.5 text-xs font-bold tracking-wider uppercase transition-all duration-[200ms] ease-in-out ${
                     isCollapsed ? 'mx-2 justify-center' : 'mx-3 gap-3 px-3.5'
                   } ${
                     isActive
-                      ? 'bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400 font-black'
-                      : ''
+                      ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
+                      : 'text-slate-400 hover:bg-primary-600/10 hover:text-primary-300'
                   }`
                 }
               >
                 {({ isActive }) => (
                   <>
                     <item.icon
-                      className={`h-5 w-5 shrink-0 transition-transform duration-200 group-hover:scale-105 ${
-                        isActive ? 'text-primary-600 dark:text-primary-400' : ''
+                      className={`h-5 w-5 shrink-0 transition-all duration-[200ms] group-hover:scale-110 ${
+                        isActive ? 'text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.7)]' : 'text-slate-500'
                       }`}
                     />
 
@@ -170,7 +193,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <motion.div
                         layoutId="active-indicator"
                         transition={{ type: 'spring', stiffness: 350, damping: 28 }}
-                        className="bg-primary-600 absolute top-2.5 bottom-2.5 left-0 w-1 rounded-r-full"
+                        className="bg-primary-650 absolute top-2.5 bottom-2.5 left-0 w-1.5 rounded-r-full shadow-[0_0_8px_rgba(124,58,237,0.8)]"
                       />
                     )}
                   </>
@@ -188,20 +211,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {isCollapsed ? (
                 /* Collapsed Profile & Logout */
                 <div className="flex flex-col items-center gap-3">
-                  <div className="group relative">
+                  <div className="group relative cursor-pointer">
                     <Avatar
                       src={user.avatarUrl}
                       name={user.displayName}
                       email={user.email}
-                      size="sm"
+                      className="!h-[52px] !w-[52px] shadow-md shrink-0"
                     />
-                    <div className="pointer-events-none absolute top-1/2 left-14 z-50 -translate-y-1/2 rounded-xl border border-slate-700/30 bg-slate-900 px-3 py-1.5 text-[10px] font-bold whitespace-nowrap text-white opacity-0 shadow-xl transition-opacity duration-200 group-hover:opacity-100 dark:bg-slate-800">
-                      {user.displayName || 'Kaab Khan'}
+                    <div className="pointer-events-none absolute top-1/2 left-16 z-50 -translate-y-1/2 rounded-xl border border-slate-700/30 bg-slate-900 px-3.5 py-2 text-[10px] font-bold whitespace-nowrap text-white opacity-0 shadow-xl transition-opacity duration-200 group-hover:opacity-100 dark:bg-slate-800">
+                      <p>{user.displayName || 'Kaab Khan'}</p>
+                      <p className="text-[8px] font-normal text-slate-400 mt-0.5 capitalize">{currentPlanId} Plan</p>
                     </div>
                   </div>
                   <button
                     onClick={handleLogout}
-                    className="text-red-650 flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-red-200 bg-red-50 shadow-xs transition-all hover:bg-red-100/50 dark:border-red-950/20 dark:bg-red-950/20 dark:text-red-400 dark:hover:bg-red-900/30"
+                    className="text-red-400 flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10 shadow-xs transition-all hover:bg-red-500/25 active:scale-[0.95]"
                     title="Logout"
                   >
                     <LogOut className="h-4 w-4" />
@@ -209,26 +233,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
               ) : (
                 /* Expanded Profile Card & Logout button */
-                <div className="bg-bg-app border-border-light flex flex-col gap-3 rounded-2xl border p-3.5 text-left shadow-sm">
+                <div className="bg-white/[0.02] border border-white/[0.08] backdrop-blur-md flex flex-col gap-3 rounded-[20px] p-4 text-left shadow-[0_8px_32px_rgba(0,0,0,0.2)] hover:bg-white/[0.04] hover:shadow-[0_12px_40px_rgba(0,0,0,0.3)] transition-all duration-300">
                   <div className="flex items-center gap-3">
                     <Avatar
                       src={user.avatarUrl}
                       name={user.displayName}
                       email={user.email}
-                      size="sm"
+                      className="!h-[52px] !w-[52px] shadow-md shrink-0"
                     />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-text-main truncate text-xs font-black">
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <p className="text-white truncate text-xs font-black">
                         {user.displayName || 'Kaab Khan'}
                       </p>
-                      <p className="text-text-muted mt-0.5 truncate text-[10px] font-bold">
+                      <p className="text-slate-400 truncate text-[10px] font-bold">
                         {user.email}
                       </p>
+                      <div className="pt-0.5">
+                        {planBadge()}
+                      </div>
                     </div>
                   </div>
                   <button
                     onClick={handleLogout}
-                    className="text-red-650 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 py-2.5 text-xs font-bold uppercase shadow-xs transition-all hover:bg-red-100/50 dark:border-red-950/20 dark:bg-red-950/20 dark:text-red-400 dark:hover:bg-red-900/30"
+                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 py-2.5 text-xs font-bold uppercase text-red-450 transition-all hover:bg-red-500/20 active:scale-[0.98]"
                   >
                     <LogOut className="h-4 w-4" />
                     <span>Logout</span>
