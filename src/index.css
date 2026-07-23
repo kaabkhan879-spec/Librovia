@@ -159,6 +159,12 @@
 @layer base {
   body {
     @apply bg-bg-app text-text-main antialiased transition-colors duration-300;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+  }
+
+  .dark body {
+    scrollbar-color: rgba(71, 85, 105, 0.4) transparent;
   }
 
   /* Smooth transition for all design system theme updates */

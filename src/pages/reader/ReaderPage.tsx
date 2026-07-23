@@ -456,8 +456,10 @@ export const ReaderPage: React.FC = () => {
 
     const targetNote = bookNotes.find((n) => n.id === noteIdParam)
     if (targetNote && targetNote.pageNumber !== page) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setPage(targetNote.pageNumber)
+      const timer = setTimeout(() => {
+        setPage(targetNote.pageNumber)
+      }, 0)
+      return () => clearTimeout(timer)
     }
   }, [loading, bookNotes, searchParams, page])
 

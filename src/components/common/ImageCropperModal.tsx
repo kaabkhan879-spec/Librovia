@@ -120,6 +120,29 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
     setIsDragging(false)
   }
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return
+    setIsDragging(true)
+    const touch = e.touches[0]
+    setDragStart({ x: touch.clientX - pan.x, y: touch.clientY - pan.y })
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging || e.touches.length !== 1) return
+    const touch = e.touches[0]
+    const newX = touch.clientX - dragStart.x
+    const newY = touch.clientY - dragStart.y
+    const maxOffset = 140 * zoom
+    setPan({
+      x: Math.max(-maxOffset, Math.min(maxOffset, newX)),
+      y: Math.max(-maxOffset, Math.min(maxOffset, newY)),
+    })
+  }
+
+  const handleTouchEnd = () => {
+    setIsDragging(false)
+  }
+
   const handleSave = async () => {
     const canvas = generateCroppedCanvas()
     if (!canvas) return
@@ -178,6 +201,9 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseUp}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
                 className="relative h-[280px] w-[280px] cursor-grab overflow-hidden rounded-2xl bg-slate-950 select-none active:cursor-grabbing"
               >
                 {loadedImage && (
