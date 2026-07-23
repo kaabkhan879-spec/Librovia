@@ -10,7 +10,7 @@ export const AppLayout: React.FC = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage<boolean>(
     'sidebar-collapsed',
-    false
+    window.innerWidth < 1024 && window.innerWidth >= 768
   )
   const location = useLocation()
 
