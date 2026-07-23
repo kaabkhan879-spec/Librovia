@@ -47,7 +47,7 @@ export const UniversalSearchModal: React.FC<UniversalSearchModalProps> = ({ isOp
   const inputRef = useRef<HTMLInputElement>(null)
 
   const [query, setQuery] = useState('')
-  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const debouncedQuery = query.trimStart()
   const [activeFilter, setActiveFilter] = useState<SearchFilterCategory>('all')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [prevFilterKey, setPrevFilterKey] = useState('')
@@ -77,20 +77,11 @@ export const UniversalSearchModal: React.FC<UniversalSearchModalProps> = ({ isOp
     }
   })
 
-  // Debounce input by 300ms
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedQuery(query.trim())
-    }, 300)
-    return () => clearTimeout(handler)
-  }, [query])
-
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen)
 
   if (!isOpen && prevIsOpen) {
     setPrevIsOpen(false)
     setQuery('')
-    setDebouncedQuery('')
     setActiveFilter('all')
     setSelectedIndex(0)
   } else if (isOpen && !prevIsOpen) {
@@ -173,15 +164,19 @@ export const UniversalSearchModal: React.FC<UniversalSearchModalProps> = ({ isOp
   const searchResults = useMemo(() => {
     if (!debouncedQuery) return []
 
-    const q = debouncedQuery.toLowerCase()
+    const q = debouncedQuery.trimStart().toLowerCase()
+    if (!q) return []
+
     const results: SearchResultItem[] = []
 
-    // 1. Books Search
+    // 1. Books Search (Prefix match)
     books.forEach((book) => {
-      const matchTitle = book.title.toLowerCase().includes(q)
-      const matchAuthor = book.author?.toLowerCase().includes(q)
-      const matchDesc = book.description?.toLowerCase().includes(q)
-      const matchTags = book.tags?.some((t) => t.toLowerCase().includes(q))
+      const matchTitle = book.title.trimStart().toLowerCase().startsWith(q)
+      const matchAuthor = book.author ? book.author.trimStart().toLowerCase().startsWith(q) : false
+      const matchDesc = book.description
+        ? book.description.trimStart().toLowerCase().startsWith(q)
+        : false
+      const matchTags = book.tags?.some((t) => t.trimStart().toLowerCase().startsWith(q))
 
       if (matchTitle || matchAuthor || matchDesc || matchTags) {
         results.push({
@@ -198,10 +193,14 @@ export const UniversalSearchModal: React.FC<UniversalSearchModalProps> = ({ isOp
       }
     })
 
-    // 2. Notes Search
+    // 2. Notes Search (Prefix match)
     notes.forEach((note) => {
-      const matchTitle = note.noteTitle?.toLowerCase().includes(q)
-      const matchText = note.noteText?.toLowerCase().includes(q)
+      const matchTitle = note.noteTitle
+        ? note.noteTitle.trimStart().toLowerCase().startsWith(q)
+        : false
+      const matchText = note.noteText
+        ? note.noteText.trimStart().toLowerCase().startsWith(q)
+        : false
 
       if (matchTitle || matchText) {
         results.push({
@@ -218,9 +217,9 @@ export const UniversalSearchModal: React.FC<UniversalSearchModalProps> = ({ isOp
       }
     })
 
-    // 3. Highlights Search
+    // 3. Highlights Search (Prefix match)
     notes.forEach((note) => {
-      if (note.highlightedText && note.highlightedText.toLowerCase().includes(q)) {
+      if (note.highlightedText && note.highlightedText.trimStart().toLowerCase().startsWith(q)) {
         results.push({
           id: `highlight-${note.id}`,
           type: 'highlight',
@@ -239,9 +238,9 @@ export const UniversalSearchModal: React.FC<UniversalSearchModalProps> = ({ isOp
       }
     })
 
-    // 4. Collections Search
+    // 4. Collections Search (Prefix match)
     collections.forEach((col) => {
-      const matchName = col.name.toLowerCase().includes(q)
+      const matchName = col.name.trimStart().toLowerCase().startsWith(q)
 
       if (matchName) {
         results.push({
@@ -255,12 +254,12 @@ export const UniversalSearchModal: React.FC<UniversalSearchModalProps> = ({ isOp
       }
     })
 
-    // 5. Authors Search
+    // 5. Authors Search (Prefix match)
     const authorsMap = new Map<string, number>()
     books.forEach((book) => {
       if (book.author && book.author.trim()) {
         const author = book.author.trim()
-        if (author.toLowerCase().includes(q)) {
+        if (author.trimStart().toLowerCase().startsWith(q)) {
           authorsMap.set(author, (authorsMap.get(author) || 0) + 1)
         }
       }
@@ -314,21 +313,21 @@ export const UniversalSearchModal: React.FC<UniversalSearchModalProps> = ({ isOp
     return groups.filter((g) => g.items.length > 0)
   }, [filteredResults])
 
-  // Auto-complete suggestions list
+  // Auto-complete suggestions list (Prefix match)
   const autoSuggestions = useMemo(() => {
-    if (!query.trim() || query.length < 2) return []
-    const q = query.toLowerCase()
+    if (!query.trimStart() || query.trimStart().length < 2) return []
+    const q = query.trimStart().toLowerCase()
     const suggestionsSet = new Set<string>()
 
     books.forEach((b) => {
-      if (b.title.toLowerCase().includes(q)) suggestionsSet.add(b.title)
-      if (b.author?.toLowerCase().includes(q)) suggestionsSet.add(b.author)
+      if (b.title.trimStart().toLowerCase().startsWith(q)) suggestionsSet.add(b.title)
+      if (b.author?.trimStart().toLowerCase().startsWith(q)) suggestionsSet.add(b.author)
     })
     notes.forEach((n) => {
-      if (n.noteTitle?.toLowerCase().includes(q)) suggestionsSet.add(n.noteTitle)
+      if (n.noteTitle?.trimStart().toLowerCase().startsWith(q)) suggestionsSet.add(n.noteTitle)
     })
     collections.forEach((c) => {
-      if (c.name.toLowerCase().includes(q)) suggestionsSet.add(c.name)
+      if (c.name.trimStart().toLowerCase().startsWith(q)) suggestionsSet.add(c.name)
     })
 
     return Array.from(suggestionsSet).slice(0, 5)
@@ -527,15 +526,21 @@ export const UniversalSearchModal: React.FC<UniversalSearchModalProps> = ({ isOp
                   <Search className="h-6 w-6" />
                 </div>
                 <h4 className="mt-3 text-base font-bold text-slate-900 dark:text-white">
-                  No results found
+                  No books found
                 </h4>
                 <p className="mt-1 max-w-xs text-xs text-slate-400">
                   Try searching with another keyword or switching filter chips.
                 </p>
               </div>
             ) : (
-              /* CASE 4: Grouped Search Results */
+              /* CASE 4: Grouped Search Results with Count Display */
               <div className="space-y-6">
+                {debouncedQuery && (
+                  <div className="px-2 text-[10px] font-black tracking-widest text-slate-400 uppercase">
+                    Found {filteredResults.length}{' '}
+                    {filteredResults.length === 1 ? 'result' : 'results'} for "{debouncedQuery}"
+                  </div>
+                )}
                 {groupedResults.map((group) => {
                   const Icon = group.icon
                   return (
