@@ -290,46 +290,49 @@ export const BookDetailsPage: React.FC = () => {
     setResolvedRecipient(null)
 
     try {
-      const { data: userRole, error: roleError } = await supabase
-        .from('user_roles')
-        .select('*')
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, display_name, email, subscription_plan, avatar_url, created_at')
         .eq('email', shareEmail.trim().toLowerCase())
         .maybeSingle()
 
-      if (roleError || !userRole) {
+      if (profileError) {
+        if (import.meta.env.DEV) {
+          console.error('[DEV] Supabase profiles search error:', profileError)
+        }
+        setSearchError('An error occurred during search')
+        return
+      }
+
+      if (!profile) {
         setSearchError('User not found')
         return
       }
 
-      if (userRole.user_id === currentUser?.id) {
+      if (profile.id === currentUser?.id) {
         setSearchError('You cannot share a book with yourself')
         return
       }
 
-      const { data: subData } = await supabase
-        .from('user_subscriptions')
-        .select('*, plan:subscription_plans(*)')
-        .eq('user_id', userRole.user_id)
-        .maybeSingle()
-
-      const planName = subData?.plan?.plan_name || 'FREE'
-
       setResolvedRecipient({
-        userId: userRole.user_id,
-        email: userRole.email,
-        name: userRole.email ? userRole.email.split('@')[0] : 'User',
-        plan: planName,
-        joined: userRole.created_at
-          ? new Date(userRole.created_at).toLocaleDateString('en-US', {
+        userId: profile.id,
+        email: profile.email || '',
+        name: profile.display_name || profile.email?.split('@')[0] || 'User',
+        plan: (profile.subscription_plan || 'free').toUpperCase(),
+        joined: profile.created_at
+          ? new Date(profile.created_at).toLocaleDateString('en-US', {
               year: 'numeric',
               month: 'short',
             })
           : 'Jan 2026',
         avatar:
+          profile.avatar_url ||
           'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&h=100&q=80',
       })
     } catch (err) {
-      console.error(err)
+      if (import.meta.env.DEV) {
+        console.error('[DEV] Profiles search caught exception:', err)
+      }
       setSearchError('An error occurred during search')
     } finally {
       setSearchingUser(false)
