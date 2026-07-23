@@ -123,6 +123,66 @@ export const notificationsService = {
     }
   },
 
+  async addNotificationForUser(
+    recipientId: string,
+    type: Notification['type'],
+    title: string,
+    description: string
+  ): Promise<Notification> {
+    const isLive = await this.isSupabaseAvailable()
+    const now = new Date().toISOString()
+    const tempId = Math.random().toString(36).substr(2, 9)
+
+    const newNotif: Notification = {
+      id: tempId,
+      userId: recipientId,
+      type,
+      title,
+      description,
+      isRead: false,
+      createdAt: now,
+    }
+
+    if (isLive) {
+      try {
+        const { data, error } = await supabase
+          .from('notifications')
+          .insert({
+            user_id: recipientId,
+            type,
+            title,
+            description,
+            is_read: false,
+          })
+          .select()
+          .single()
+
+        if (error) {
+          console.error('Failed to save user notification to Supabase:', error)
+          this.saveLocalNotification(newNotif)
+          return newNotif
+        }
+
+        return {
+          id: data.id,
+          userId: data.user_id,
+          type: data.type as Notification['type'],
+          title: data.title,
+          description: data.description,
+          isRead: data.is_read,
+          createdAt: data.created_at,
+        }
+      } catch (err) {
+        console.error('Failed to insert user notification:', err)
+        this.saveLocalNotification(newNotif)
+        return newNotif
+      }
+    } else {
+      this.saveLocalNotification(newNotif)
+      return newNotif
+    }
+  },
+
   async markAsRead(id: string): Promise<void> {
     const isLive = await this.isSupabaseAvailable()
     if (isLive) {

@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 import { ROUTES } from '../../constants/routes'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Avatar } from '../common/Avatar'
+import { useSubscription } from '../../context/SubscriptionContext'
 import {
   BookOpen,
   LayoutDashboard,
@@ -20,6 +21,7 @@ import {
   Moon,
   Crown,
   ShieldCheck,
+  Users,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -36,6 +38,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
 }) => {
   const { user, logout } = useAuth()
+  const { currentPlanId } = useSubscription()
   const navigate = useNavigate()
 
   // Track dark theme state locally to update UI toggle icon
@@ -62,6 +65,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navigation = [
     { name: 'Dashboard', to: ROUTES.DASHBOARD, icon: LayoutDashboard },
     { name: 'My Library', to: ROUTES.LIBRARY, icon: Library },
+    ...((currentPlanId === 'pro' || currentPlanId === 'family')
+      ? [{ name: 'Shared Library', to: ROUTES.SHARED_LIBRARY, icon: Users }]
+      : []),
     { name: 'Collections', to: ROUTES.COLLECTIONS, icon: Folder },
     { name: 'Notes', to: ROUTES.NOTES, icon: MessageSquare },
     { name: 'Analytics', to: ROUTES.ANALYTICS, icon: BarChart3 },

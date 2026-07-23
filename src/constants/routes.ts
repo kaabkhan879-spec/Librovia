@@ -19,6 +19,7 @@ export const ROUTES = {
   FORGOT_PASSWORD: '/forgot-password',
   RESET_PASSWORD: '/reset-password',
   SUBSCRIPTION: '/subscription',
+  SHARED_LIBRARY: '/shared-library',
   ADMIN: '/admin',
   ADMIN_USERS: '/admin/users',
   ADMIN_SUBSCRIPTIONS: '/admin/subscriptions',

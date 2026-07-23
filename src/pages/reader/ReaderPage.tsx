@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { PageWrapper } from '../../components/common/PageWrapper'
 import { ROUTES } from '../../constants/routes'
 import { useToast } from '../../context/ToastContext'
+import { useAuth } from '../../context/AuthContext'
 
 import {
   ArrowLeft,
@@ -49,6 +50,7 @@ export const ReaderPage: React.FC = () => {
   const [searchParams] = useSearchParams()
   const pageParam = searchParams.get('page')
   const { showInfo, showSuccess, showError } = useToast()
+  const { user: currentUser } = useAuth()
 
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -56,6 +58,10 @@ export const ReaderPage: React.FC = () => {
   const [rawBook, setRawBook] = useState<Book | null>(null)
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
+  const isShared = React.useMemo(() => {
+    return !!(rawBook && currentUser && rawBook.user_id !== currentUser.id)
+  }, [rawBook, currentUser])
 
   // Reader states
   const [page, setPage] = useState(1)
@@ -1108,43 +1114,45 @@ export const ReaderPage: React.FC = () => {
           </div>
 
           {/* Offline Download button */}
-          <button
-            onClick={handleToggleDownload}
-            disabled={isDownloading}
-            className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-all ${
-              isDownloading
-                ? 'bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300'
-                : isDownloaded
-                  ? 'border border-emerald-200/60 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300'
-                  : 'bg-slate-100 text-slate-700 hover:bg-purple-50 hover:text-purple-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
-            }`}
-            title={
-              isDownloaded
-                ? 'Available Offline (Click to remove local copy)'
-                : 'Download for Offline Reading'
-            }
-          >
-            {isDownloading ? (
-              <>
-                <div className="h-3 w-3 animate-spin rounded-full border-2 border-purple-600 border-t-transparent" />
-                <span className="font-mono text-[10px]">{downloadProgress}%</span>
-              </>
-            ) : isDownloaded ? (
-              <>
-                <CheckCircle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span className="hidden text-[10px] font-extrabold tracking-wider uppercase sm:inline">
-                  Offline
-                </span>
-              </>
-            ) : (
-              <>
-                <Download className="h-3.5 w-3.5" />
-                <span className="hidden text-[10px] font-extrabold tracking-wider uppercase sm:inline">
-                  Download
-                </span>
-              </>
-            )}
-          </button>
+          {!isShared && (
+            <button
+              onClick={handleToggleDownload}
+              disabled={isDownloading}
+              className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-all ${
+                isDownloading
+                  ? 'bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300'
+                  : isDownloaded
+                    ? 'border border-emerald-200/60 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300'
+                    : 'bg-slate-100 text-slate-700 hover:bg-purple-50 hover:text-purple-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
+              }`}
+              title={
+                isDownloaded
+                  ? 'Available Offline (Click to remove local copy)'
+                  : 'Download for Offline Reading'
+              }
+            >
+              {isDownloading ? (
+                <>
+                  <div className="h-3 w-3 animate-spin rounded-full border-2 border-purple-600 border-t-transparent" />
+                  <span className="font-mono text-[10px]">{downloadProgress}%</span>
+                </>
+              ) : isDownloaded ? (
+                <>
+                  <CheckCircle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span className="hidden text-[10px] font-extrabold tracking-wider uppercase sm:inline">
+                    Offline
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Download className="h-3.5 w-3.5" />
+                  <span className="hidden text-[10px] font-extrabold tracking-wider uppercase sm:inline">
+                    Download
+                  </span>
+                </>
+              )}
+            </button>
+          )}
 
           {/* Custom Journal Note Modal triggers */}
           <button

@@ -21,6 +21,7 @@ export interface Book {
   lastReadAt?: string
   startedAt?: string
   readingTime?: number
+  user_id?: string
 }
 
 export interface ReadingProgress {
@@ -213,6 +214,7 @@ export const booksService = {
         lastReadAt: rp?.lastReadAt || rp?.last_read_at,
         startedAt: rp?.startedAt || rp?.started_at,
         readingTime: rp?.readingTime !== undefined ? rp.readingTime : rp?.reading_time,
+        user_id: row.user_id,
       }
     })
 
@@ -329,6 +331,7 @@ export const booksService = {
       lastReadAt: rp?.lastReadAt || rp?.last_read_at,
       startedAt: rp?.startedAt || rp?.started_at,
       readingTime: rp?.readingTime !== undefined ? rp.readingTime : rp?.reading_time,
+      user_id: data.user_id,
     }
   },
 
@@ -446,6 +449,14 @@ export const booksService = {
     if (error) {
       console.error('Failed to delete book record from database:', error)
       throw error
+    }
+
+    // Cascade book deletion to sharing records
+    try {
+      const { sharesService } = await import('./shares')
+      await sharesService.handleBookDeleted(id, book.title)
+    } catch (shareErr) {
+      console.error('Failed to clean up sharing records cascadingly:', shareErr)
     }
 
     // 2. Delete Supabase Storage files only after DB record deletion succeeded

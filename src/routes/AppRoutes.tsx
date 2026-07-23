@@ -29,6 +29,7 @@ import { SettingsPage } from '../pages/settings/SettingsPage'
 import { StoragePage } from '../pages/storage/StoragePage'
 import { AnalyticsPage } from '../pages/analytics/AnalyticsPage'
 import { SubscriptionPage } from '../pages/subscription/SubscriptionPage'
+import { SharedLibraryPage } from '../pages/shared-library/SharedLibraryPage'
 
 // Super Admin SaaS Pages
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage'
@@ -77,7 +78,8 @@ export const AppRoutes: React.FC = () => {
           <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
           <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />
           <Route path={ROUTES.STORAGE} element={<StoragePage />} />
-          <Route path={ROUTES.SUBSCRIPTION} element={<SubscriptionPage />} />
+           <Route path={ROUTES.SUBSCRIPTION} element={<SubscriptionPage />} />
+          <Route path={ROUTES.SHARED_LIBRARY} element={<SharedLibraryPage />} />
         </Route>
 
         {/* Dedicated Super Admin SaaS Suite wrapped in AdminRoute guard + AdminLayout */}
