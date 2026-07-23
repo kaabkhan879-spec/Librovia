@@ -1,7 +1,8 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { NavLink, Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { ROUTES } from '../../constants/routes'
+import { supabase } from '../../services/supabase'
 import {
   LayoutDashboard,
   Users,
@@ -27,17 +28,56 @@ interface AdminSidebarProps {
   onToggleCollapse: () => void
 }
 
-export const AdminSidebar: React.FC<AdminSidebarProps> = ({
-  isOpen,
-  isCollapsed,
-  onClose,
-}) => {
+export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOpen, isCollapsed, onClose }) => {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
 
-  const [isDark, setIsDark] = React.useState(() => {
+  const [isDark, setIsDark] = useState(() => {
     return window.document.documentElement.classList.contains('dark')
   })
+
+  const [pendingCount, setPendingCount] = useState<number>(0)
+
+  const fetchPendingCount = async () => {
+    try {
+      const { count, error } = await supabase
+        .from('payment_requests')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'Pending Verification')
+
+      if (!error && count !== null) {
+        setPendingCount(count)
+      }
+    } catch (err) {
+      console.error('Error fetching pending payments count:', err)
+    }
+  }
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchPendingCount()
+    }, 0)
+
+    const channel = supabase
+      .channel('admin-pending-payments')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'payment_requests',
+        },
+        () => {
+          fetchPendingCount()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      clearTimeout(timer)
+      supabase.removeChannel(channel)
+    }
+  }, [])
 
   const toggleTheme = () => {
     const root = window.document.documentElement
@@ -106,41 +146,57 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
         </div>
 
         {/* 10 Super Admin Modules Navigation */}
-        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+        <div className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
           <div className="px-3 pb-2 text-[10px] font-black tracking-widest text-slate-400 uppercase">
             {!isCollapsed && 'Platform Management'}
           </div>
 
           {adminNavigation.map((item) => {
             const Icon = item.icon
+            const isPayments = item.name === 'Payments'
             return (
               <NavLink
                 key={item.name}
                 to={item.to}
                 end={item.to === ROUTES.ADMIN}
-                className={({ isActive }) => `
-                  flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-xs font-extrabold transition-all duration-200 select-none
-                  ${
+                className={({ isActive }) =>
+                  `relative flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-xs font-extrabold transition-all duration-200 select-none ${
                     isActive
                       ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
                       : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-white'
-                  }
-                `}
+                  } `
+                }
               >
                 <Icon className="h-4 w-4 shrink-0" />
                 {!isCollapsed && <span className="truncate">{item.name}</span>}
+
+                {/* Real-time Pending Payments Notification Badge */}
+                {isPayments && pendingCount > 0 && (
+                  <>
+                    {isCollapsed ? (
+                      <span
+                        className="absolute top-2 right-2 flex h-2.5 w-2.5 animate-pulse rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-900"
+                        title={`${pendingCount} pending payment request(s)`}
+                      />
+                    ) : (
+                      <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-black text-white">
+                        {pendingCount}
+                      </span>
+                    )}
+                  </>
+                )}
               </NavLink>
             )
           })}
         </div>
 
         {/* Footer Actions & Mode Switcher */}
-        <div className="border-t border-slate-200/80 p-3 space-y-2 dark:border-slate-800">
+        <div className="space-y-2 border-t border-slate-200/80 p-3 dark:border-slate-800">
           {/* Mode Switcher Button */}
           <Link to={ROUTES.DASHBOARD}>
             <button
               type="button"
-              className="w-full flex items-center justify-center gap-2 rounded-2xl border border-purple-200 bg-purple-50/70 py-2.5 text-xs font-black text-purple-700 hover:bg-purple-100 transition-all dark:border-purple-900/50 dark:bg-purple-950/40 dark:text-purple-300"
+              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-purple-200 bg-purple-50/70 py-2.5 text-xs font-black text-purple-700 transition-all hover:bg-purple-100 dark:border-purple-900/50 dark:bg-purple-950/40 dark:text-purple-300"
             >
               <BookMarked className="h-4 w-4" />
               {!isCollapsed && <span>Switch to Reader Mode</span>}
@@ -149,10 +205,12 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
 
           {/* Enterprise System Info & Badges */}
           {!isCollapsed && (
-            <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-2 text-center text-[10px] space-y-1 dark:border-slate-800/60 dark:bg-slate-800/30">
+            <div className="space-y-1 rounded-xl border border-slate-100 bg-slate-50/70 p-2 text-center text-[10px] dark:border-slate-800/60 dark:bg-slate-800/30">
               <div className="flex items-center justify-between font-bold text-slate-500 dark:text-slate-400">
                 <span>Platform Version:</span>
-                <span className="font-mono text-purple-600 dark:text-purple-400 font-extrabold">v2.4.0</span>
+                <span className="font-mono font-extrabold text-purple-600 dark:text-purple-400">
+                  v2.4.0
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="inline-flex items-center gap-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-black text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
@@ -181,14 +239,16 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                 <span className="block truncate font-bold text-slate-800 dark:text-slate-200">
                   {user?.displayName || user?.email?.split('@')[0]}
                 </span>
-                <span className="block text-[10px] text-purple-600 dark:text-purple-400">Super Admin</span>
+                <span className="block text-[10px] text-purple-600 dark:text-purple-400">
+                  Super Admin
+                </span>
               </div>
             )}
 
             <button
               type="button"
               onClick={handleLogout}
-              className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 transition-colors"
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 dark:hover:text-rose-400"
               title="Logout"
             >
               <LogOut className="h-4 w-4" />
