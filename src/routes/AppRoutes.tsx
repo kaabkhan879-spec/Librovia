@@ -13,7 +13,6 @@ import { PublicRoute } from './PublicRoute'
 import { AdminRoute } from './AdminRoute'
 
 // Pages
-import { LandingPage } from '../pages/landing/LandingPage'
 import { LoginPage } from '../pages/auth/LoginPage'
 import { RegisterPage } from '../pages/auth/RegisterPage'
 import { ForgotPasswordPage } from '../pages/auth/ForgotPasswordPage'
@@ -48,7 +47,7 @@ export const AppRoutes: React.FC = () => {
     <Routes>
       {/* Public Pages Layout */}
       <Route element={<PublicLayout />}>
-        <Route path={ROUTES.LANDING} element={<LandingPage />} />
+        <Route path={ROUTES.LANDING} element={<Navigate to={ROUTES.LOGIN} replace />} />
 
         {/* Auth Pages wrapped in PublicRoute guard */}
         <Route element={<PublicRoute />}>

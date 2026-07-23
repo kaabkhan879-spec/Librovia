@@ -65,9 +65,9 @@ export const LoginForm: React.FC = () => {
     <AuthCard>
       <div className="space-y-6 text-left">
         <div>
-          <h2 className="text-text-main text-2xl font-extrabold tracking-tight">Welcome back</h2>
-          <p className="text-text-muted mt-1 text-xs font-semibold">
-            Please enter your login details to access your shelf.
+          <h2 className="text-text-main text-3xl font-extrabold tracking-tight">Welcome Back 👋</h2>
+          <p className="text-text-muted mt-1.5 text-xs font-semibold">
+            Sign in to continue your reading journey.
           </p>
         </div>
 
@@ -120,7 +120,7 @@ export const LoginForm: React.FC = () => {
             disabled={isLoading}
             rightIcon={!isLoading ? <ArrowRight className="h-4 w-4" /> : undefined}
           >
-            {isLoading ? 'Signing In...' : 'Login to Shelf'}
+            {isLoading ? 'Signing In...' : 'Login to Librovia'}
           </Button>
         </form>
 
