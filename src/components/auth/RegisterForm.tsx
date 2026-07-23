@@ -7,8 +7,15 @@ import { PasswordInput } from './PasswordInput'
 import { GoogleButton } from './GoogleButton'
 import { Input } from '../common/Input'
 import { Button } from '../common/Button'
-import { Mail, User, ShieldAlert, ArrowRight } from 'lucide-react'
+import { Mail, User, ShieldAlert, ArrowRight, AlertTriangle } from 'lucide-react'
 import { AuthCard } from './AuthCard'
+
+const isSupabaseConfigured =
+  import.meta.env.VITE_SUPABASE_URL &&
+  import.meta.env.VITE_SUPABASE_URL !== 'https://your-project.supabase.co' &&
+  import.meta.env.VITE_SUPABASE_ANON_KEY &&
+  import.meta.env.VITE_SUPABASE_ANON_KEY !== 'your-anon-public-key'
+
 export const RegisterForm: React.FC = () => {
   const { register } = useAuth()
   const navigate = useNavigate()
@@ -89,6 +96,18 @@ export const RegisterForm: React.FC = () => {
             Get started with 5 GB free cloud library storage today.
           </p>
         </div>
+
+        {!isSupabaseConfigured && (
+          <div className="bg-amber-950/40 border border-amber-500/30 rounded-2xl p-4 text-xs text-amber-200 space-y-1.5 backdrop-blur-sm">
+            <div className="font-bold flex items-center gap-1.5 text-amber-400">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500 animate-pulse" />
+              <span>Configuration Required</span>
+            </div>
+            <p className="leading-relaxed text-amber-200/80">
+              Supabase connection keys are missing from the build environment. If this is deployed on Vercel, please add <code className="bg-black/35 px-1 py-0.5 rounded text-amber-300 font-mono text-[10px]">VITE_SUPABASE_URL</code> and <code className="bg-black/35 px-1 py-0.5 rounded text-amber-300 font-mono text-[10px]">VITE_SUPABASE_ANON_KEY</code> to your Vercel Project Settings, then redeploy the project.
+            </p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-3.5">
           <Input

@@ -18,7 +18,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
       </div>
 
       {/* Right side: Authentication Card centering space (40% Width) */}
-      <div className="relative flex h-screen flex-1 items-center justify-center overflow-y-auto bg-[#0B0F19]/40 p-4 sm:p-8 lg:w-[40%] lg:p-12 xl:w-[40%]">
+      <div className="relative flex min-h-screen flex-1 items-center justify-center overflow-y-auto bg-[#0B0F19]/40 p-4 sm:p-8 lg:w-[40%] lg:p-12 xl:w-[40%]">
         {/* Subtle background glow for authentication canvas */}
         <div className="pointer-events-none absolute top-1/2 left-1/2 h-[400px] w-[400px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-purple-600/5 blur-3xl select-none" />
 
