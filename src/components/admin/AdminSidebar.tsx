@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { NavLink, Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { useTheme } from '../../context/ThemeContext'
 import { ROUTES } from '../../constants/routes'
 import { supabase } from '../../services/supabase'
 import {
@@ -17,9 +16,6 @@ import {
   ClipboardList,
   ShieldCheck,
   LogOut,
-  Sun,
-  Moon,
-  Monitor,
 } from 'lucide-react'
 
 interface AdminSidebarProps {
@@ -36,7 +32,6 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   onToggleCollapse,
 }) => {
   const { user, logout } = useAuth()
-  const { themeMode, setThemeMode } = useTheme()
   const navigate = useNavigate()
 
   const [pendingCount, setPendingCount] = useState<number>(0)
@@ -190,7 +185,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           })}
         </div>
 
-        {/* Footer Actions & Mode Switcher */}
+        {/* Footer Actions */}
         <div className="border-admin-border space-y-2.5 border-t p-3">
           {/* Version Info & Badges */}
           {!isCollapsed && (
@@ -212,47 +207,37 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
             </div>
           )}
 
-          {/* Theme Toggle & User Logout */}
+          {/* User Logout Footer Box */}
           <div className="flex items-center justify-between pt-1">
-            {/* Quick switcher cycle button */}
-            <button
-              type="button"
-              onClick={() => {
-                if (themeMode === 'light') setThemeMode('dark')
-                else if (themeMode === 'dark') setThemeMode('system')
-                else setThemeMode('light')
-              }}
-              className="border-admin-border bg-admin-card text-admin-text-sub hover:bg-admin-hover flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border transition-colors"
-              title={`Theme: ${themeMode.toUpperCase()} (Click to toggle)`}
-            >
-              {themeMode === 'light' ? (
-                <Sun className="h-4 w-4 text-amber-500" />
-              ) : themeMode === 'dark' ? (
-                <Moon className="h-4 w-4 text-indigo-400" />
-              ) : (
-                <Monitor className="h-4 w-4 text-purple-400" />
-              )}
-            </button>
-
-            {!isCollapsed && (
-              <div className="text-admin-text-sub max-w-[80px] truncate text-left text-[11px] font-semibold">
-                <span className="text-admin-text-main block truncate font-bold">
-                  {user?.displayName || user?.email?.split('@')[0]}
-                </span>
-                <span className="block text-[10px] text-purple-600 dark:text-purple-400">
-                  Super Admin
-                </span>
-              </div>
+            {!isCollapsed ? (
+              <>
+                <div className="text-admin-text-sub max-w-[120px] truncate text-left text-[11px] font-semibold">
+                  <span className="text-admin-text-main block truncate font-bold">
+                    {user?.displayName || user?.email?.split('@')[0]}
+                  </span>
+                  <span className="block text-[10px] text-purple-600 dark:text-purple-400">
+                    Super Admin
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="border-admin-border bg-admin-card text-admin-text-sub dark:hover:text-rose-450 flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border transition-colors hover:bg-rose-900/10 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                  title="Logout"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="border-admin-border bg-admin-card text-admin-text-sub dark:hover:text-rose-450 mx-auto flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border transition-colors hover:bg-rose-900/10 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                title="Logout"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
             )}
-
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="border-admin-border bg-admin-card text-admin-text-sub dark:hover:text-rose-450 flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border transition-colors hover:bg-rose-900/10 hover:text-rose-600 dark:hover:bg-rose-950/40"
-              title="Logout"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
           </div>
         </div>
       </aside>
