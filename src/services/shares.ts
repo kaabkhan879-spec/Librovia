@@ -13,6 +13,33 @@ export interface BookShare {
   updated_at: string
 }
 
+export interface SharedByMeBook extends BookShare {
+  book_title: string
+  book_cover?: string
+  book_author?: string
+}
+
+export interface SharedWithMeBook extends BookShare {
+  book_id: string
+  book_title: string
+  book_cover?: string
+  book_author?: string
+  book_file_url: string
+  book_file_size: number
+  owner_email: string
+  user_id: string
+}
+
+export interface BookSharedUser {
+  id: string
+  recipient_id: string
+  name: string
+  email: string
+  plan_id: string
+  status: string
+  joined_date: string
+}
+
 export const sharesService = {
   // Check if book_shares table exists in schema cache
   async isSupabaseAvailable(): Promise<boolean> {
@@ -189,7 +216,7 @@ export const sharesService = {
   },
 
   // Get books shared by me
-  async getSharedByMe(): Promise<any[]> {
+  async getSharedByMe(): Promise<SharedByMeBook[]> {
     const {
       data: { user: currentUser },
     } = await supabase.auth.getUser()
@@ -230,7 +257,7 @@ export const sharesService = {
   },
 
   // Get books shared with me
-  async getSharedWithMe(): Promise<any[]> {
+  async getSharedWithMe(): Promise<SharedWithMeBook[]> {
     const {
       data: { user: currentUser },
     } = await supabase.auth.getUser()
@@ -436,7 +463,7 @@ export const sharesService = {
   },
 
   // Get details of users a book is shared with
-  async getBookSharedUsers(bookId: string): Promise<any[]> {
+  async getBookSharedUsers(bookId: string): Promise<BookSharedUser[]> {
     const isLive = await this.isSupabaseAvailable()
     let sharesList: BookShare[] = []
 

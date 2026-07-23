@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { ROUTES } from '../../constants/routes'
+import { supabase } from '../../services/supabase'
 import { notificationsService, type Notification } from '../../services/notifications'
 import {
   BookOpen,
@@ -136,7 +137,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [onOpenSearch])
 
-  // Fetch notifications from service inside effect to avoid cascading state warnings
+  // Fetch notifications from service inside effect and subscribe to realtime updates
   useEffect(() => {
     let active = true
 
@@ -149,23 +150,36 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
       })
       .catch((err) => console.error('Failed to query notifications:', err))
 
-    // Poll notifications every 8 seconds
-    const interval = setInterval(() => {
-      notificationsService
-        .getNotifications()
-        .then((data) => {
-          if (active) {
-            setNotifications(data)
+    if (!user) return
+
+    const channel = supabase
+      .channel('public:notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        async () => {
+          try {
+            const data = await notificationsService.getNotifications()
+            if (active) {
+              setNotifications(data)
+            }
+          } catch (err) {
+            console.error('Failed to refresh notifications on realtime update:', err)
           }
-        })
-        .catch((err) => console.error(err))
-    }, 8000)
+        }
+      )
+      .subscribe()
 
     return () => {
       active = false
-      clearInterval(interval)
+      supabase.removeChannel(channel)
     }
-  }, [])
+  }, [user])
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -187,6 +201,16 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     } catch (err) {
       console.error(err)
     }
+  }
+
+  const toggleDropdown = () => {
+    setShowDropdown((prev) => {
+      const next = !prev
+      if (next) {
+        handleMarkAllRead()
+      }
+      return next
+    })
   }
 
   const handleClearAll = async () => {
@@ -327,7 +351,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         {/* Notifications Bell with Dropdown Container */}
         <div className="relative" ref={dropdownRef}>
           <button
-            onClick={() => setShowDropdown(!showDropdown)}
+            onClick={toggleDropdown}
             className="border-border-base bg-bg-surface text-text-sub hover:bg-bg-app hover:text-text-main relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border transition-all"
             title="Notifications"
           >

@@ -61,7 +61,7 @@ export const NotesPage: React.FC = () => {
         setNotes(notesData)
         setBooks(booksData)
         setLoading(false)
-        
+
         // Auto select first note if nothing is selected yet
         if (notesData.length > 0 && !selectedNote) {
           const sorted = [...notesData].sort(
@@ -114,7 +114,7 @@ export const NotesPage: React.FC = () => {
         updatedAt: new Date().toISOString(),
       }
       const updated = await notesService.saveNote(payload)
-      
+
       // Update local lists
       setNotes((prev) => prev.map((n) => (n.id === selectedNote.id ? updated : n)))
       setSelectedNote(updated)
@@ -144,7 +144,7 @@ export const NotesPage: React.FC = () => {
       const updatedNotes = notes.filter((n) => n.id !== id)
       setNotes(updatedNotes)
       showInfo('Note Deleted Successfully! 🗑️')
-      
+
       notificationsService
         .addNotification(
           'note',
@@ -204,7 +204,6 @@ export const NotesPage: React.FC = () => {
     })
   }, [notes, searchQuery, selectedBookId, sortBy, getBookTitle])
 
-
   return (
     <PageWrapper className="relative min-h-screen space-y-8 pb-20 text-left select-none">
       {/* Header section */}
@@ -245,7 +244,8 @@ export const NotesPage: React.FC = () => {
             <div className="space-y-2">
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">No Notes Logged</h3>
               <p className="mx-auto max-w-xs text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-                Create annotations, highlight texts, or drop bookmarks inside the Reader to log notes here.
+                Create annotations, highlight texts, or drop bookmarks inside the Reader to log
+                notes here.
               </p>
             </div>
             <Link to={ROUTES.LIBRARY} className="inline-block">
@@ -273,10 +273,10 @@ export const NotesPage: React.FC = () => {
                       placeholder="Search note contents... (Ctrl + K)"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 py-2 pr-12 pl-10 text-xs font-semibold text-slate-900 placeholder-slate-400 outline-hidden transition-all focus:border-purple-650 focus:bg-white focus:shadow-md dark:border-slate-800 dark:bg-slate-800/40 dark:text-white"
+                      className="focus:border-purple-650 w-full rounded-2xl border border-slate-200 bg-slate-50/50 py-2 pr-12 pl-10 text-xs font-semibold text-slate-900 placeholder-slate-400 outline-hidden transition-all focus:bg-white focus:shadow-md dark:border-slate-800 dark:bg-slate-800/40 dark:text-white"
                     />
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <kbd className="inline-flex items-center gap-0.5 rounded border border-slate-100 bg-white/90 px-1.5 font-sans text-[8px] font-bold text-slate-400 shadow-2xs dark:border-slate-850 dark:bg-slate-905">
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                      <kbd className="dark:border-slate-850 dark:bg-slate-905 inline-flex items-center gap-0.5 rounded border border-slate-100 bg-white/90 px-1.5 font-sans text-[8px] font-bold text-slate-400 shadow-2xs">
                         <span className="text-[9px]">⌘</span>K
                       </kbd>
                     </div>
@@ -344,12 +344,12 @@ export const NotesPage: React.FC = () => {
                         </h4>
 
                         {note.highlightedText && (
-                          <p className="mt-1 line-clamp-1 border-l-2 border-purple-300 pl-2 text-[10px] italic text-slate-500">
+                          <p className="mt-1 line-clamp-1 border-l-2 border-purple-300 pl-2 text-[10px] text-slate-500 italic">
                             "{note.highlightedText}"
                           </p>
                         )}
 
-                        <p className="mt-2 line-clamp-2 text-xs font-medium text-slate-650 dark:text-slate-350">
+                        <p className="text-slate-650 dark:text-slate-350 mt-2 line-clamp-2 text-xs font-medium">
                           {note.noteText || <em className="text-slate-400">Bookmark marker</em>}
                         </p>
 
@@ -379,7 +379,7 @@ export const NotesPage: React.FC = () => {
             {/* Right Pane - Note details editor */}
             <div className="lg:col-span-2">
               {selectedNote ? (
-                <div className="space-y-6 rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8">
+                <div className="space-y-6 rounded-3xl border border-slate-100 bg-white p-6 shadow-sm sm:p-8 dark:border-slate-800 dark:bg-slate-900">
                   {/* Note header information */}
                   <div className="flex flex-col gap-4 border-b border-slate-50 pb-5 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
                     <div className="flex items-center gap-4 text-left">
@@ -397,10 +397,10 @@ export const NotesPage: React.FC = () => {
                         )}
                       </div>
                       <div className="min-w-0">
-                        <span className="block text-[8.5px] font-extrabold tracking-wider text-purple-650 uppercase">
+                        <span className="text-purple-650 block text-[8.5px] font-extrabold tracking-wider uppercase">
                           {getBookTitle(selectedNote.bookId)}
                         </span>
-                        <h2 className="text-text-main truncate font-sans text-sm font-black leading-tight">
+                        <h2 className="text-text-main truncate font-sans text-sm leading-tight font-black">
                           Page {selectedNote.pageNumber} Annotation
                         </h2>
                         <span className="text-text-muted mt-0.5 block text-[9.5px] font-semibold">
@@ -430,10 +430,10 @@ export const NotesPage: React.FC = () => {
                   {/* Highlights block if exists */}
                   {selectedNote.highlightedText && (
                     <div className="rounded-2xl border border-purple-100 bg-purple-50/15 p-4 text-left dark:border-purple-950/20 dark:bg-purple-950/5">
-                      <span className="block text-[9px] font-extrabold tracking-widest text-purple-650 uppercase">
+                      <span className="text-purple-650 block text-[9px] font-extrabold tracking-widest uppercase">
                         Highlighted text in reader
                       </span>
-                      <p className="mt-1.5 font-serif text-sm leading-relaxed text-slate-700 italic dark:text-slate-350">
+                      <p className="dark:text-slate-350 mt-1.5 font-serif text-sm leading-relaxed text-slate-700 italic">
                         "{selectedNote.highlightedText}"
                       </p>
                     </div>
@@ -463,7 +463,7 @@ export const NotesPage: React.FC = () => {
                         placeholder="Type your notes, ideas or study reflections here..."
                         value={noteTextInput}
                         onChange={(e) => setNoteTextInput(e.target.value)}
-                        className="border-border-base bg-bg-app text-text-main focus:border-purple-650 focus:ring-purple-650 w-full rounded-2xl border p-4 text-xs font-medium leading-relaxed outline-hidden transition-all focus:bg-white"
+                        className="border-border-base bg-bg-app text-text-main focus:border-purple-650 focus:ring-purple-650 w-full rounded-2xl border p-4 text-xs leading-relaxed font-medium outline-hidden transition-all focus:bg-white"
                         required
                       />
                     </div>

@@ -147,7 +147,10 @@ export const subscriptionsService = {
         .order('sort_order', { ascending: true })
 
       if (error || !data || data.length === 0) {
-        console.warn('Using fallback subscription plans (Supabase query returned empty or error):', error?.message)
+        console.warn(
+          'Using fallback subscription plans (Supabase query returned empty or error):',
+          error?.message
+        )
         return DEFAULT_PLANS
       }
 
@@ -352,14 +355,12 @@ export const subscriptionsService = {
     }
 
     try {
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: user.id,
-          type: 'payment',
-          title: 'Payment Awaiting Verification ⏳',
-          message: `Your payment of PKR ${payload.amount} for the "${payload.plan_id.toUpperCase()}" plan has been submitted and is awaiting admin approval.`,
-        })
+      await supabase.from('notifications').insert({
+        user_id: user.id,
+        type: 'payment',
+        title: 'Payment Awaiting Verification ⏳',
+        message: `Your payment of PKR ${payload.amount} for the "${payload.plan_id.toUpperCase()}" plan has been submitted and is awaiting admin approval.`,
+      })
     } catch (err) {
       console.error('Failed to write notification for payment submit:', err)
     }
@@ -517,14 +518,12 @@ export const subscriptionsService = {
       }
 
       try {
-        await supabase
-          .from('notifications')
-          .insert({
-            user_id: req.user_id,
-            type: 'subscription',
-            title: 'Subscription Activated! 🎉',
-            message: `Your payment was approved! Your account has been upgraded to the ${req.plan_id.toUpperCase()} plan. Thank you for choosing Librovia!`,
-          })
+        await supabase.from('notifications').insert({
+          user_id: req.user_id,
+          type: 'subscription',
+          title: 'Subscription Activated! 🎉',
+          message: `Your payment was approved! Your account has been upgraded to the ${req.plan_id.toUpperCase()} plan. Thank you for choosing Librovia!`,
+        })
       } catch (err) {
         console.error('Failed to write notification for payment approval:', err)
       }
@@ -549,14 +548,12 @@ export const subscriptionsService = {
       }
 
       try {
-        await supabase
-          .from('notifications')
-          .insert({
-            user_id: req.user_id,
-            type: 'alert',
-            title: 'Payment Request Declined ❌',
-            message: `Your payment verification request for the "${req.plan_id.toUpperCase()}" plan was declined. Reason: "${rejectionReason || 'No reason provided'}".`,
-          })
+        await supabase.from('notifications').insert({
+          user_id: req.user_id,
+          type: 'alert',
+          title: 'Payment Request Declined ❌',
+          message: `Your payment verification request for the "${req.plan_id.toUpperCase()}" plan was declined. Reason: "${rejectionReason || 'No reason provided'}".`,
+        })
       } catch (err) {
         console.error('Failed to write notification for payment rejection:', err)
       }

@@ -54,7 +54,16 @@ export const AdminPaymentsPage: React.FC = () => {
 
   // Filters & Controls
   const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'All' | 'Completed' | 'Pending' | 'Failed' | 'Refunded' | 'Approved' | 'Rejected' | 'Pending Verification'>('All')
+  const [statusFilter, setStatusFilter] = useState<
+    | 'All'
+    | 'Completed'
+    | 'Pending'
+    | 'Failed'
+    | 'Refunded'
+    | 'Approved'
+    | 'Rejected'
+    | 'Pending Verification'
+  >('All')
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
@@ -81,8 +90,11 @@ export const AdminPaymentsPage: React.FC = () => {
       } else if (data) {
         const mapped: DBPaymentRecord[] = data.map((row) => ({
           id: row.id || row.transaction_id || `tx-${Date.now()}`,
-          transaction_id: row.transaction_id || `TXN-${Math.floor(100000 + Math.random() * 900000)}`,
-          customer_name: row.customer_name || (row.customer_email ? row.customer_email.split('@')[0] : 'Customer'),
+          transaction_id:
+            row.transaction_id || `TXN-${Math.floor(100000 + Math.random() * 900000)}`,
+          customer_name:
+            row.customer_name ||
+            (row.customer_email ? row.customer_email.split('@')[0] : 'Customer'),
           customer_email: row.customer_email || 'N/A',
           plan_name: row.plan_name || 'Pro Plan (Monthly)',
           amount_pkr: Number(row.amount_pkr) || 500,
@@ -171,7 +183,11 @@ export const AdminPaymentsPage: React.FC = () => {
     }
     setActionProcessing(true)
     try {
-      await subscriptionsService.reviewPaymentRequest(selectedRequest.id, 'Rejected', rejectionReasonInput)
+      await subscriptionsService.reviewPaymentRequest(
+        selectedRequest.id,
+        'Rejected',
+        rejectionReasonInput
+      )
       showSuccess('Payment request has been rejected.')
       fetchManualRequests()
       setSelectedRequest(null)
@@ -194,7 +210,9 @@ export const AdminPaymentsPage: React.FC = () => {
     .filter((r) => r.status === 'Approved')
     .reduce((acc, r) => acc + r.amount, 0)
 
-  const pendingVerificationCount = manualRequests.filter((r) => r.status === 'Pending Verification').length
+  const pendingVerificationCount = manualRequests.filter(
+    (r) => r.status === 'Pending Verification'
+  ).length
   const totalApprovedManualRequests = manualRequests.filter((r) => r.status === 'Approved').length
   const totalRejectedManualRequests = manualRequests.filter((r) => r.status === 'Rejected').length
 
@@ -238,7 +256,10 @@ export const AdminPaymentsPage: React.FC = () => {
   // Pagination Slice
   const currentDataset = activeTab === 'manual' ? filteredManualRequests : filteredAutoPayments
   const totalPages = Math.ceil(currentDataset.length / itemsPerPage) || 1
-  const paginatedDataset = currentDataset.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+  const paginatedDataset = currentDataset.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  )
 
   const todayStr = new Date().toISOString().split('T')[0]
 
@@ -252,7 +273,16 @@ export const AdminPaymentsPage: React.FC = () => {
 
     let csvContent = ''
     if (activeTab === 'manual') {
-      const headers = ['Request ID', 'User Email', 'Plan', 'Payment Method', 'Transaction ID', 'Amount (PKR)', 'Status', 'Submitted At']
+      const headers = [
+        'Request ID',
+        'User Email',
+        'Plan',
+        'Payment Method',
+        'Transaction ID',
+        'Amount (PKR)',
+        'Status',
+        'Submitted At',
+      ]
       const rows = manualRequests.map((r) => [
         r.id,
         r.user?.email || 'N/A',
@@ -265,7 +295,16 @@ export const AdminPaymentsPage: React.FC = () => {
       ])
       csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
     } else {
-      const headers = ['Transaction ID', 'Customer Name', 'Email', 'Plan', 'Gateway', 'Amount (PKR)', 'Status', 'Date']
+      const headers = [
+        'Transaction ID',
+        'Customer Name',
+        'Email',
+        'Plan',
+        'Gateway',
+        'Amount (PKR)',
+        'Status',
+        'Date',
+      ]
       const rows = payments.map((p) => [
         p.transaction_id,
         p.customer_name,
@@ -283,7 +322,10 @@ export const AdminPaymentsPage: React.FC = () => {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.setAttribute('href', url)
-    link.setAttribute('download', `librovia_${activeTab}_payments_${type.toLowerCase()}_${todayStr}.csv`)
+    link.setAttribute(
+      'download',
+      `librovia_${activeTab}_payments_${type.toLowerCase()}_${todayStr}.csv`
+    )
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -344,9 +386,9 @@ export const AdminPaymentsPage: React.FC = () => {
   return (
     <PageWrapper className="min-h-screen space-y-8 pb-20 text-left select-none">
       {/* 1. HEADER & TOOLBAR */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200/80 pb-6 dark:border-slate-800">
+      <div className="flex flex-col gap-4 border-b border-slate-200/80 pb-6 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
         <div className="space-y-1">
-          <h1 className="font-sans text-2xl font-black tracking-tight text-slate-900 sm:text-3xl dark:text-white flex items-center gap-2.5">
+          <h1 className="flex items-center gap-2.5 font-sans text-2xl font-black tracking-tight text-slate-900 sm:text-3xl dark:text-white">
             <CreditCard className="h-7 w-7 text-purple-600" />
             Payment & Billing Center
           </h1>
@@ -360,40 +402,40 @@ export const AdminPaymentsPage: React.FC = () => {
           <button
             type="button"
             onClick={handleRefresh}
-            className="inline-flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-extrabold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 transition-all shadow-xs"
+            className="inline-flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-extrabold text-slate-700 shadow-xs transition-all hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
           >
             <RefreshCw className="h-4 w-4" />
             <span className="hidden sm:inline">Refresh</span>
           </button>
 
           {/* Export Dropdown */}
-          <div className="relative group">
+          <div className="group relative">
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 rounded-2xl bg-purple-600 px-4 py-2.5 text-xs font-black text-white hover:bg-purple-700 shadow-md shadow-purple-600/20 active:scale-98 transition-all"
+              className="inline-flex items-center gap-1.5 rounded-2xl bg-purple-600 px-4 py-2.5 text-xs font-black text-white shadow-md shadow-purple-600/20 transition-all hover:bg-purple-700 active:scale-98"
             >
               <Download className="h-4 w-4" />
               <span>Export Reports</span>
             </button>
-            <div className="absolute right-0 top-12 hidden group-hover:block z-30 w-36 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-slate-800 dark:bg-slate-900 text-left text-xs font-semibold space-y-0.5">
+            <div className="absolute top-12 right-0 z-30 hidden w-36 space-y-0.5 rounded-2xl border border-slate-200 bg-white p-1.5 text-left text-xs font-semibold shadow-xl group-hover:block dark:border-slate-800 dark:bg-slate-900">
               <button
                 type="button"
                 onClick={() => handleExport('CSV')}
-                className="w-full flex items-center gap-2 rounded-xl px-3 py-2 text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 CSV File (.csv)
               </button>
               <button
                 type="button"
                 onClick={() => handleExport('Excel')}
-                className="w-full flex items-center gap-2 rounded-xl px-3 py-2 text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 Excel Sheet (.xlsx)
               </button>
               <button
                 type="button"
                 onClick={() => handleExport('PDF')}
-                className="w-full flex items-center gap-2 rounded-xl px-3 py-2 text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 PDF Document (.pdf)
               </button>
@@ -404,64 +446,78 @@ export const AdminPaymentsPage: React.FC = () => {
 
       {/* 2. REAL DATABASE CALCULATED ANALYTICS CARDS */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-        <div className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-1">
-          <span className="text-[10px] font-extrabold text-slate-400 uppercase block tracking-wider">Total Revenue</span>
-          <h3 className="text-xl font-black text-purple-600 dark:text-purple-400 font-mono">
+        <div className="space-y-1 rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+          <span className="block text-[10px] font-extrabold tracking-wider text-slate-400 uppercase">
+            Total Revenue
+          </span>
+          <h3 className="font-mono text-xl font-black text-purple-600 dark:text-purple-400">
             PKR {(totalRevenue + manualApprovedRevenue).toLocaleString()}
           </h3>
           <span className="text-[10.5px] font-semibold text-slate-500">Auto + Approved Manual</span>
         </div>
 
-        <div className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-1">
-          <span className="text-[10px] font-extrabold text-slate-400 uppercase block tracking-wider">Manual Revenue</span>
-          <h3 className="text-xl font-black text-slate-900 dark:text-white font-mono">
+        <div className="space-y-1 rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+          <span className="block text-[10px] font-extrabold tracking-wider text-slate-400 uppercase">
+            Manual Revenue
+          </span>
+          <h3 className="font-mono text-xl font-black text-slate-900 dark:text-white">
             PKR {manualApprovedRevenue.toLocaleString()}
           </h3>
-          <span className="text-[10.5px] font-semibold text-emerald-600 font-bold">{totalApprovedManualRequests} Approved</span>
+          <span className="text-[10.5px] font-bold font-semibold text-emerald-600">
+            {totalApprovedManualRequests} Approved
+          </span>
         </div>
 
-        <div className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-1">
-          <span className="text-[10px] font-extrabold text-amber-600 uppercase block tracking-wider font-extrabold">Awaiting Verification</span>
-          <h3 className="text-xl font-black text-amber-600 font-mono animate-pulse">
+        <div className="space-y-1 rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+          <span className="block text-[10px] font-extrabold tracking-wider text-amber-600 uppercase">
+            Awaiting Verification
+          </span>
+          <h3 className="animate-pulse font-mono text-xl font-black text-amber-600">
             {pendingVerificationCount} Requests
           </h3>
           <span className="text-[10.5px] font-semibold text-slate-500">Manual review needed</span>
         </div>
 
-        <div className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-1">
-          <span className="text-[10px] font-extrabold text-rose-500 uppercase block tracking-wider font-extrabold">Declined Payments</span>
-          <h3 className="text-xl font-black text-rose-500 font-mono">
+        <div className="space-y-1 rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+          <span className="block text-[10px] font-extrabold tracking-wider text-rose-500 uppercase">
+            Declined Payments
+          </span>
+          <h3 className="font-mono text-xl font-black text-rose-500">
             {totalRejectedManualRequests} Requests
           </h3>
-          <span className="text-[10.5px] font-semibold text-slate-500">Manual payment failures</span>
+          <span className="text-[10.5px] font-semibold text-slate-500">
+            Manual payment failures
+          </span>
         </div>
 
-        <div className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-1">
-          <span className="text-[10px] font-extrabold text-emerald-600 uppercase block tracking-wider">Auto Completed</span>
-          <h3 className="text-xl font-black text-emerald-600 font-mono">
+        <div className="space-y-1 rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+          <span className="block text-[10px] font-extrabold tracking-wider text-emerald-600 uppercase">
+            Auto Completed
+          </span>
+          <h3 className="font-mono text-xl font-black text-emerald-600">
             {payments.filter((p) => p.status === 'Completed').length} Paid
           </h3>
           <span className="text-[10.5px] font-semibold text-slate-500">Automatic gateway logs</span>
         </div>
 
-        <div className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-1">
-          <span className="text-[10px] font-extrabold text-indigo-600 uppercase block tracking-wider">Total Invoices</span>
-          <h3 className="text-xl font-black text-indigo-600 font-mono">
-            {payments.length} Logs
-          </h3>
+        <div className="space-y-1 rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+          <span className="block text-[10px] font-extrabold tracking-wider text-indigo-600 uppercase">
+            Total Invoices
+          </span>
+          <h3 className="font-mono text-xl font-black text-indigo-600">{payments.length} Logs</h3>
           <span className="text-[10.5px] font-semibold text-slate-500">Gateway settlements</span>
         </div>
       </div>
 
       {/* Tabs Selector */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800 pb-1.5 gap-3">
+      <div className="flex gap-3 border-b border-slate-200 pb-1.5 dark:border-slate-800">
         <button
           type="button"
           onClick={() => {
             setActiveTab('manual')
             setCurrentPage(1)
           }}
-          className={`pb-3 text-sm font-black border-b-2 transition-all ${
+          className={`border-b-2 pb-3 text-sm font-black transition-all ${
             activeTab === 'manual'
               ? 'border-purple-600 text-purple-600 dark:text-purple-400'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -476,7 +532,7 @@ export const AdminPaymentsPage: React.FC = () => {
             setActiveTab('automatic')
             setCurrentPage(1)
           }}
-          className={`pb-3 text-sm font-black border-b-2 transition-all ${
+          className={`border-b-2 pb-3 text-sm font-black transition-all ${
             activeTab === 'automatic'
               ? 'border-purple-600 text-purple-600 dark:text-purple-400'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -489,8 +545,8 @@ export const AdminPaymentsPage: React.FC = () => {
       {/* 3. SEARCH & STATUS FILTERS BAR */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         {/* Search */}
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <div className="relative max-w-md flex-1">
+          <Search className="absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             value={searchQuery}
@@ -503,64 +559,68 @@ export const AdminPaymentsPage: React.FC = () => {
                 ? 'Search by User, Email, Transaction ID, or Wallet...'
                 : 'Search by Customer Name, Email, or Transaction ID...'
             }
-            className="w-full rounded-2xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-xs font-semibold text-slate-900 focus:border-purple-650 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+            className="focus:border-purple-650 w-full rounded-2xl border border-slate-200 bg-white py-2.5 pr-4 pl-10 text-xs font-semibold text-slate-900 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white"
           />
         </div>
 
         {/* Filter Pills */}
-        <div className="flex rounded-2xl bg-slate-100 p-1 dark:bg-slate-800 flex-wrap gap-1">
-          {activeTab === 'manual' ? (
-            (['All', 'Pending Verification', 'Approved', 'Rejected'] as const).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => {
-                  setStatusFilter(s)
-                  setCurrentPage(1)
-                }}
-                className={`rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-colors ${
-                  statusFilter === s
-                    ? 'bg-purple-600 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
-                }`}
-              >
-                {s === 'Pending Verification' ? 'Pending' : s}
-              </button>
-            ))
-          ) : (
-            (['All', 'Completed', 'Pending', 'Failed', 'Refunded'] as const).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => {
-                  setStatusFilter(s)
-                  setCurrentPage(1)
-                }}
-                className={`rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-colors ${
-                  statusFilter === s
-                    ? 'bg-purple-600 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
-                }`}
-              >
-                {s}
-              </button>
-            ))
-          )}
+        <div className="flex flex-wrap gap-1 rounded-2xl bg-slate-100 p-1 dark:bg-slate-800">
+          {activeTab === 'manual'
+            ? (['All', 'Pending Verification', 'Approved', 'Rejected'] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter(s)
+                    setCurrentPage(1)
+                  }}
+                  className={`rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-colors ${
+                    statusFilter === s
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                  }`}
+                >
+                  {s === 'Pending Verification' ? 'Pending' : s}
+                </button>
+              ))
+            : (['All', 'Completed', 'Pending', 'Failed', 'Refunded'] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter(s)
+                    setCurrentPage(1)
+                  }}
+                  className={`rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-colors ${
+                    statusFilter === s
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
         </div>
       </div>
 
       {/* 4. TRANSACTIONS / VERIFICATION TABLE */}
       <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
         {loadingAuto && activeTab === 'automatic' ? (
-          <div className="p-6 space-y-4">
+          <div className="space-y-4 p-6">
             {Array.from({ length: 3 }).map((_, idx) => (
-              <div key={idx} className="h-12 w-full animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" />
+              <div
+                key={idx}
+                className="h-12 w-full animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800"
+              />
             ))}
           </div>
         ) : loadingManual && activeTab === 'manual' ? (
-          <div className="p-6 space-y-4">
+          <div className="space-y-4 p-6">
             {Array.from({ length: 3 }).map((_, idx) => (
-              <div key={idx} className="h-12 w-full animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" />
+              <div
+                key={idx}
+                className="h-12 w-full animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800"
+              />
             ))}
           </div>
         ) : paginatedDataset.length > 0 ? (
@@ -580,19 +640,28 @@ export const AdminPaymentsPage: React.FC = () => {
                     <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/40 font-semibold">
+                <tbody className="divide-y divide-slate-100 font-semibold dark:divide-slate-800/40">
                   {(paginatedDataset as PaymentRequest[]).map((r) => (
-                    <tr key={r.id} className="transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                    <tr
+                      key={r.id}
+                      className="transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/30"
+                    >
                       <td className="px-6 py-4 font-mono text-slate-400">
                         {new Date(r.created_at).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4">
                         <div>
-                          <span className="block font-bold text-slate-900 dark:text-white">{r.user?.display_name || 'Bookworm'}</span>
-                          <span className="text-[11px] text-slate-400 font-mono">{r.user?.email || 'N/A'}</span>
+                          <span className="block font-bold text-slate-900 dark:text-white">
+                            {r.user?.display_name || 'Bookworm'}
+                          </span>
+                          <span className="font-mono text-[11px] text-slate-400">
+                            {r.user?.email || 'N/A'}
+                          </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 font-bold text-purple-600 dark:text-purple-400 uppercase">{r.plan_id}</td>
+                      <td className="px-6 py-4 font-bold text-purple-600 uppercase dark:text-purple-400">
+                        {r.plan_id}
+                      </td>
                       <td className="px-6 py-4">
                         {r.payment_method === 'EasyPaisa' && (
                           <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
@@ -610,8 +679,10 @@ export const AdminPaymentsPage: React.FC = () => {
                           </span>
                         )}
                       </td>
-                      <td className="px-6 py-4 font-mono font-bold text-slate-900 dark:text-white">{r.transaction_id}</td>
-                      <td className="px-6 py-4 font-black text-slate-900 dark:text-white font-mono">
+                      <td className="px-6 py-4 font-mono font-bold text-slate-900 dark:text-white">
+                        {r.transaction_id}
+                      </td>
+                      <td className="px-6 py-4 font-mono font-black text-slate-900 dark:text-white">
                         PKR {r.amount.toLocaleString()}
                       </td>
                       <td className="px-6 py-4">{getStatusBadge(r.status)}</td>
@@ -645,19 +716,30 @@ export const AdminPaymentsPage: React.FC = () => {
                     <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/40 font-semibold">
+                <tbody className="divide-y divide-slate-100 font-semibold dark:divide-slate-800/40">
                   {(paginatedDataset as DBPaymentRecord[]).map((p) => (
-                    <tr key={p.id} className="transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-                      <td className="px-6 py-4 font-mono font-bold text-slate-900 dark:text-white">{p.transaction_id}</td>
+                    <tr
+                      key={p.id}
+                      className="transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/30"
+                    >
+                      <td className="px-6 py-4 font-mono font-bold text-slate-900 dark:text-white">
+                        {p.transaction_id}
+                      </td>
                       <td className="px-6 py-4">
                         <div>
-                          <span className="block font-bold text-slate-900 dark:text-white">{p.customer_name}</span>
-                          <span className="text-[11px] text-slate-400 font-mono">{p.customer_email}</span>
+                          <span className="block font-bold text-slate-900 dark:text-white">
+                            {p.customer_name}
+                          </span>
+                          <span className="font-mono text-[11px] text-slate-400">
+                            {p.customer_email}
+                          </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 font-bold text-purple-600 dark:text-purple-400">{p.plan_name}</td>
+                      <td className="px-6 py-4 font-bold text-purple-600 dark:text-purple-400">
+                        {p.plan_name}
+                      </td>
                       <td className="px-6 py-4">{getGatewayBadge(p.gateway)}</td>
-                      <td className="px-6 py-4 font-black text-slate-900 dark:text-white font-mono">
+                      <td className="px-6 py-4 font-mono font-black text-slate-900 dark:text-white">
                         PKR {p.amount_pkr.toLocaleString()}
                       </td>
                       <td className="px-6 py-4">{getStatusBadge(p.status)}</td>
@@ -683,14 +765,14 @@ export const AdminPaymentsPage: React.FC = () => {
           </div>
         ) : (
           // Empty State
-          <div className="p-12 text-center flex flex-col items-center justify-center space-y-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400 shadow-xs">
+          <div className="flex flex-col items-center justify-center space-y-4 p-12 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-purple-50 text-purple-600 shadow-xs dark:bg-purple-950 dark:text-purple-400">
               <CreditCard className="h-8 w-8" />
             </div>
 
-            <div className="space-y-1 max-w-sm">
+            <div className="max-w-sm space-y-1">
               <h3 className="text-lg font-black text-slate-900 dark:text-white">No Payments Yet</h3>
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 leading-relaxed">
+              <p className="text-xs leading-relaxed font-semibold text-slate-500 dark:text-slate-400">
                 {activeTab === 'manual'
                   ? 'No manual payment requests have been submitted that match the status filter.'
                   : 'Subscription invoices will automatically appear here once users purchase plans.'}
@@ -701,7 +783,7 @@ export const AdminPaymentsPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => navigate(ROUTES.ADMIN_SUBSCRIPTIONS)}
-                className="inline-flex items-center gap-2 rounded-2xl bg-purple-600 px-4 py-2.5 text-xs font-black text-white hover:bg-purple-700 shadow-md shadow-purple-600/20"
+                className="inline-flex items-center gap-2 rounded-2xl bg-purple-600 px-4 py-2.5 text-xs font-black text-white shadow-md shadow-purple-600/20 hover:bg-purple-700"
               >
                 <span>View Subscription Plans</span>
                 <ArrowUpRight className="h-4 w-4" />
@@ -720,9 +802,18 @@ export const AdminPaymentsPage: React.FC = () => {
 
         {/* PAGINATION FOOTER */}
         {currentDataset.length > 0 && (
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-t border-slate-100 p-4 text-xs font-semibold text-slate-500 dark:border-slate-800">
+          <div className="flex flex-col gap-3 border-t border-slate-100 p-4 text-xs font-semibold text-slate-500 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
             <div>
-              Showing <strong className="text-slate-900 dark:text-white">{(currentPage - 1) * itemsPerPage + 1}</strong>–<strong className="text-slate-900 dark:text-white">{Math.min(currentPage * itemsPerPage, currentDataset.length)}</strong> of <strong className="text-slate-900 dark:text-white">{currentDataset.length}</strong> records
+              Showing{' '}
+              <strong className="text-slate-900 dark:text-white">
+                {(currentPage - 1) * itemsPerPage + 1}
+              </strong>
+              –
+              <strong className="text-slate-900 dark:text-white">
+                {Math.min(currentPage * itemsPerPage, currentDataset.length)}
+              </strong>{' '}
+              of <strong className="text-slate-900 dark:text-white">{currentDataset.length}</strong>{' '}
+              records
             </div>
 
             <div className="flex items-center gap-2">
@@ -730,7 +821,7 @@ export const AdminPaymentsPage: React.FC = () => {
                 type="button"
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                className="flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-1.5 text-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
+                className="flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-1.5 text-slate-700 hover:bg-slate-50 disabled:opacity-40 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
               >
                 <ChevronLeft className="h-4 w-4" /> Previous
               </button>
@@ -741,7 +832,7 @@ export const AdminPaymentsPage: React.FC = () => {
                 type="button"
                 disabled={currentPage >= totalPages}
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                className="flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-1.5 text-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
+                className="flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-1.5 text-slate-700 hover:bg-slate-50 disabled:opacity-40 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
               >
                 Next <ChevronRight className="h-4 w-4" />
               </button>
@@ -768,14 +859,18 @@ export const AdminPaymentsPage: React.FC = () => {
                 animate={{ x: 0 }}
                 exit={{ x: '100%' }}
                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                className="w-screen max-w-md bg-white p-6 shadow-2xl dark:bg-slate-900 flex flex-col justify-between text-left"
+                className="flex w-screen max-w-md flex-col justify-between bg-white p-6 text-left shadow-2xl dark:bg-slate-900"
               >
                 <div className="space-y-6 overflow-y-auto pr-1">
                   {/* Drawer Header */}
                   <div className="flex items-center justify-between border-b border-slate-100 pb-4 dark:border-slate-800">
                     <div>
-                      <h3 className="font-sans text-lg font-black text-slate-900 dark:text-white">Payment Transaction Details</h3>
-                      <p className="text-xs font-mono text-purple-600 dark:text-purple-400">{selectedPayment.transaction_id}</p>
+                      <h3 className="font-sans text-lg font-black text-slate-900 dark:text-white">
+                        Payment Transaction Details
+                      </h3>
+                      <p className="font-mono text-xs text-purple-600 dark:text-purple-400">
+                        {selectedPayment.transaction_id}
+                      </p>
                     </div>
 
                     <button
@@ -788,42 +883,54 @@ export const AdminPaymentsPage: React.FC = () => {
                   </div>
 
                   {/* Summary Box */}
-                  <div className="rounded-3xl bg-purple-50/60 p-5 dark:bg-purple-950/30 text-center space-y-1">
-                    <span className="text-[10px] font-extrabold text-purple-600 uppercase block tracking-widest">Amount Paid</span>
-                    <h2 className="text-3xl font-black text-slate-900 dark:text-white font-mono">
+                  <div className="space-y-1 rounded-3xl bg-purple-50/60 p-5 text-center dark:bg-purple-950/30">
+                    <span className="block text-[10px] font-extrabold tracking-widest text-purple-600 uppercase">
+                      Amount Paid
+                    </span>
+                    <h2 className="font-mono text-3xl font-black text-slate-900 dark:text-white">
                       PKR {selectedPayment.amount_pkr.toLocaleString()}
                     </h2>
-                    <div className="pt-2 flex items-center justify-center gap-2">
+                    <div className="flex items-center justify-center gap-2 pt-2">
                       {getGatewayBadge(selectedPayment.gateway)}
                       {getStatusBadge(selectedPayment.status)}
                     </div>
                   </div>
 
                   {/* Metadata Fields */}
-                  <div className="space-y-3 rounded-2xl bg-slate-50 p-4 dark:bg-slate-800/50 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                    <div className="flex justify-between py-1.5 border-b border-slate-200/60 dark:border-slate-700/60">
+                  <div className="space-y-3 rounded-2xl bg-slate-50 p-4 text-xs font-semibold text-slate-600 dark:bg-slate-800/50 dark:text-slate-300">
+                    <div className="flex justify-between border-b border-slate-200/60 py-1.5 dark:border-slate-700/60">
                       <span>Customer Name:</span>
-                      <span className="font-bold text-slate-900 dark:text-white">{selectedPayment.customer_name}</span>
+                      <span className="font-bold text-slate-900 dark:text-white">
+                        {selectedPayment.customer_name}
+                      </span>
                     </div>
 
-                    <div className="flex justify-between py-1.5 border-b border-slate-200/60 dark:border-slate-700/60">
+                    <div className="flex justify-between border-b border-slate-200/60 py-1.5 dark:border-slate-700/60">
                       <span>Customer Email:</span>
-                      <span className="font-mono text-slate-900 dark:text-white">{selectedPayment.customer_email}</span>
+                      <span className="font-mono text-slate-900 dark:text-white">
+                        {selectedPayment.customer_email}
+                      </span>
                     </div>
 
-                    <div className="flex justify-between py-1.5 border-b border-slate-200/60 dark:border-slate-700/60">
+                    <div className="flex justify-between border-b border-slate-200/60 py-1.5 dark:border-slate-700/60">
                       <span>Subscription Plan:</span>
-                      <span className="font-bold text-purple-600 dark:text-purple-400">{selectedPayment.plan_name}</span>
+                      <span className="font-bold text-purple-600 dark:text-purple-400">
+                        {selectedPayment.plan_name}
+                      </span>
                     </div>
 
-                    <div className="flex justify-between py-1.5 border-b border-slate-200/60 dark:border-slate-700/60">
+                    <div className="flex justify-between border-b border-slate-200/60 py-1.5 dark:border-slate-700/60">
                       <span>Transaction Date:</span>
-                      <span className="font-mono">{new Date(selectedPayment.created_at).toLocaleString()}</span>
+                      <span className="font-mono">
+                        {new Date(selectedPayment.created_at).toLocaleString()}
+                      </span>
                     </div>
 
                     <div className="flex justify-between py-1.5">
                       <span>Billing Address:</span>
-                      <span className="font-medium text-slate-900 dark:text-white">{selectedPayment.billing_address || 'Lahore, Pakistan'}</span>
+                      <span className="font-medium text-slate-900 dark:text-white">
+                        {selectedPayment.billing_address || 'Lahore, Pakistan'}
+                      </span>
                     </div>
                   </div>
 
@@ -831,8 +938,10 @@ export const AdminPaymentsPage: React.FC = () => {
                   <div className="space-y-2 pt-2">
                     <button
                       type="button"
-                      onClick={() => showSuccess(`Downloaded invoice PDF for ${selectedPayment.transaction_id}`)}
-                      className="w-full flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-3 text-xs font-extrabold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-200"
+                      onClick={() =>
+                        showSuccess(`Downloaded invoice PDF for ${selectedPayment.transaction_id}`)
+                      }
+                      className="flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-3 text-xs font-extrabold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-200"
                     >
                       <FileText className="h-4 w-4 text-purple-600" />
                       <span>Download Tax Invoice (.pdf)</span>
@@ -840,8 +949,12 @@ export const AdminPaymentsPage: React.FC = () => {
 
                     <button
                       type="button"
-                      onClick={() => showSuccess(`Downloaded payment receipt for ${selectedPayment.transaction_id}`)}
-                      className="w-full flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-3 text-xs font-extrabold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-200"
+                      onClick={() =>
+                        showSuccess(
+                          `Downloaded payment receipt for ${selectedPayment.transaction_id}`
+                        )
+                      }
+                      className="flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-3 text-xs font-extrabold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-200"
                     >
                       <Download className="h-4 w-4 text-emerald-600" />
                       <span>Download Payment Receipt</span>
@@ -849,11 +962,11 @@ export const AdminPaymentsPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                <div className="border-t border-slate-100 pt-4 dark:border-slate-800">
                   <button
                     type="button"
                     onClick={() => setSelectedPayment(null)}
-                    className="w-full rounded-2xl bg-purple-600 py-3 text-xs font-black text-white hover:bg-purple-700 shadow-md"
+                    className="w-full rounded-2xl bg-purple-600 py-3 text-xs font-black text-white shadow-md hover:bg-purple-700"
                   >
                     Close Transaction Details
                   </button>
@@ -876,20 +989,24 @@ export const AdminPaymentsPage: React.FC = () => {
               className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs"
             />
 
-            <div className="fixed inset-y-0 right-0 flex max-w-full pl-10 z-50">
+            <div className="fixed inset-y-0 right-0 z-50 flex max-w-full pl-10">
               <motion.div
                 initial={{ x: '100%' }}
                 animate={{ x: 0 }}
                 exit={{ x: '100%' }}
                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                className="w-screen max-w-md bg-white p-6 shadow-2xl dark:bg-slate-900 flex flex-col justify-between text-left"
+                className="flex w-screen max-w-md flex-col justify-between bg-white p-6 text-left shadow-2xl dark:bg-slate-900"
               >
                 <div className="space-y-6 overflow-y-auto pr-1">
                   {/* Drawer Header */}
                   <div className="flex items-center justify-between border-b border-slate-100 pb-4 dark:border-slate-800">
                     <div>
-                      <h3 className="font-sans text-lg font-black text-slate-900 dark:text-white">Verify Payment Request</h3>
-                      <p className="text-xs font-mono text-purple-600 dark:text-purple-400">Request: {selectedRequest.transaction_id}</p>
+                      <h3 className="font-sans text-lg font-black text-slate-900 dark:text-white">
+                        Verify Payment Request
+                      </h3>
+                      <p className="font-mono text-xs text-purple-600 dark:text-purple-400">
+                        Request: {selectedRequest.transaction_id}
+                      </p>
                     </div>
 
                     <button
@@ -902,12 +1019,14 @@ export const AdminPaymentsPage: React.FC = () => {
                   </div>
 
                   {/* Summary Box */}
-                  <div className="rounded-3xl bg-purple-50/60 p-5 dark:bg-purple-950/30 text-center space-y-1">
-                    <span className="text-[10px] font-extrabold text-purple-600 uppercase block tracking-widest">Amount Transferred</span>
-                    <h2 className="text-3xl font-black text-slate-900 dark:text-white font-mono">
+                  <div className="space-y-1 rounded-3xl bg-purple-50/60 p-5 text-center dark:bg-purple-950/30">
+                    <span className="block text-[10px] font-extrabold tracking-widest text-purple-600 uppercase">
+                      Amount Transferred
+                    </span>
+                    <h2 className="font-mono text-3xl font-black text-slate-900 dark:text-white">
                       PKR {selectedRequest.amount.toLocaleString()}
                     </h2>
-                    <div className="pt-2 flex items-center justify-center gap-2">
+                    <div className="flex items-center justify-center gap-2 pt-2">
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-200 px-2.5 py-0.5 text-[10px] font-extrabold text-slate-700">
                         {selectedRequest.payment_method}
                       </span>
@@ -916,36 +1035,46 @@ export const AdminPaymentsPage: React.FC = () => {
                   </div>
 
                   {/* Metadata Fields */}
-                  <div className="space-y-3 rounded-2xl bg-slate-50 p-4 dark:bg-slate-850 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                    <div className="flex justify-between py-1.5 border-b border-slate-200/60 dark:border-slate-700/60">
+                  <div className="dark:bg-slate-850 space-y-3 rounded-2xl bg-slate-50 p-4 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    <div className="flex justify-between border-b border-slate-200/60 py-1.5 dark:border-slate-700/60">
                       <span>User Name:</span>
-                      <span className="font-bold text-slate-900 dark:text-white">{selectedRequest.user?.display_name || 'Anonymous'}</span>
+                      <span className="font-bold text-slate-900 dark:text-white">
+                        {selectedRequest.user?.display_name || 'Anonymous'}
+                      </span>
                     </div>
 
-                    <div className="flex justify-between py-1.5 border-b border-slate-200/60 dark:border-slate-700/60">
+                    <div className="flex justify-between border-b border-slate-200/60 py-1.5 dark:border-slate-700/60">
                       <span>User Email:</span>
-                      <span className="font-mono text-slate-900 dark:text-white">{selectedRequest.user?.email || 'N/A'}</span>
+                      <span className="font-mono text-slate-900 dark:text-white">
+                        {selectedRequest.user?.email || 'N/A'}
+                      </span>
                     </div>
 
-                    <div className="flex justify-between py-1.5 border-b border-slate-200/60 dark:border-slate-700/60">
+                    <div className="flex justify-between border-b border-slate-200/60 py-1.5 dark:border-slate-700/60">
                       <span>Requested Subscription Plan:</span>
-                      <span className="font-bold text-purple-600 dark:text-purple-400 uppercase">{selectedRequest.plan_id}</span>
+                      <span className="font-bold text-purple-600 uppercase dark:text-purple-400">
+                        {selectedRequest.plan_id}
+                      </span>
                     </div>
 
-                    <div className="flex justify-between py-1.5 border-b border-slate-200/60 dark:border-slate-700/60">
+                    <div className="flex justify-between border-b border-slate-200/60 py-1.5 dark:border-slate-700/60">
                       <span>Transaction ID:</span>
-                      <span className="font-mono font-bold text-slate-900 dark:text-white">{selectedRequest.transaction_id}</span>
+                      <span className="font-mono font-bold text-slate-900 dark:text-white">
+                        {selectedRequest.transaction_id}
+                      </span>
                     </div>
 
-                    <div className="flex justify-between py-1.5 border-b border-slate-200/60 dark:border-slate-700/60">
+                    <div className="flex justify-between border-b border-slate-200/60 py-1.5 dark:border-slate-700/60">
                       <span>Submitted Date:</span>
-                      <span className="font-mono">{new Date(selectedRequest.created_at).toLocaleString()}</span>
+                      <span className="font-mono">
+                        {new Date(selectedRequest.created_at).toLocaleString()}
+                      </span>
                     </div>
 
                     {selectedRequest.note && (
                       <div className="py-1">
-                        <span className="text-slate-400 block mb-1">User Note:</span>
-                        <div className="bg-white p-2.5 rounded-xl border border-slate-100 dark:bg-slate-800 dark:border-slate-700 text-slate-700 dark:text-slate-300 leading-relaxed italic">
+                        <span className="mb-1 block text-slate-400">User Note:</span>
+                        <div className="rounded-xl border border-slate-100 bg-white p-2.5 leading-relaxed text-slate-700 italic dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                           "{selectedRequest.note}"
                         </div>
                       </div>
@@ -953,10 +1082,10 @@ export const AdminPaymentsPage: React.FC = () => {
 
                     {selectedRequest.rejection_reason && (
                       <div className="py-1">
-                        <span className="text-rose-500 font-bold block mb-1 flex items-center gap-1">
+                        <span className="mb-1 block flex items-center gap-1 font-bold text-rose-500">
                           <ShieldAlert className="h-4 w-4" /> Rejection Reason:
                         </span>
-                        <div className="bg-rose-50/50 p-2.5 rounded-xl border border-rose-100 dark:bg-rose-950/20 dark:border-rose-900/30 text-rose-700 dark:text-rose-300 leading-relaxed">
+                        <div className="rounded-xl border border-rose-100 bg-rose-50/50 p-2.5 leading-relaxed text-rose-700 dark:border-rose-900/30 dark:bg-rose-950/20 dark:text-rose-300">
                           "{selectedRequest.rejection_reason}"
                         </div>
                       </div>
@@ -965,26 +1094,28 @@ export const AdminPaymentsPage: React.FC = () => {
 
                   {/* Screenshot Receipt Preview */}
                   <div className="space-y-2">
-                    <span className="text-xs font-bold text-slate-500 uppercase block">Proof of Payment Screenshot:</span>
+                    <span className="block text-xs font-bold text-slate-500 uppercase">
+                      Proof of Payment Screenshot:
+                    </span>
                     {signedScreenshotUrl ? (
                       <a
                         href={signedScreenshotUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block relative rounded-2xl overflow-hidden border border-slate-200 group bg-slate-50 hover:opacity-90 dark:border-slate-800"
+                        className="group relative block overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 hover:opacity-90 dark:border-slate-800"
                       >
                         <img
                           src={signedScreenshotUrl}
                           alt="Manual payment screenshot receipt proof"
-                          className="w-full h-auto max-h-56 object-cover"
+                          className="h-auto max-h-56 w-full object-cover"
                         />
-                        <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold">
+                        <div className="absolute inset-0 flex items-center justify-center bg-slate-950/40 text-xs font-bold text-white opacity-0 transition-opacity group-hover:opacity-100">
                           Open Full Image in New Tab
                         </div>
                       </a>
                     ) : (
-                      <div className="h-32 flex items-center justify-center bg-slate-100 rounded-2xl dark:bg-slate-800/40 text-slate-400">
-                        <Clock className="h-5 w-5 animate-spin mr-2" />
+                      <div className="flex h-32 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 dark:bg-slate-800/40">
+                        <Clock className="mr-2 h-5 w-5 animate-spin" />
                         <span>Loading receipt preview...</span>
                       </div>
                     )}
@@ -992,14 +1123,14 @@ export const AdminPaymentsPage: React.FC = () => {
                 </div>
 
                 {/* Approve / Reject Controls */}
-                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
+                <div className="space-y-2.5 border-t border-slate-100 pt-4 dark:border-slate-800">
                   {selectedRequest.status === 'Pending Verification' && (
                     <div className="flex gap-3">
                       <button
                         type="button"
                         onClick={() => setShowRejectModal(true)}
                         disabled={actionProcessing}
-                        className="flex-1 rounded-2xl border border-rose-200 py-3 text-xs font-bold text-rose-600 hover:bg-rose-50 dark:border-rose-900/40 dark:text-rose-400 dark:hover:bg-rose-950/20 transition-all duration-200"
+                        className="flex-1 rounded-2xl border border-rose-200 py-3 text-xs font-bold text-rose-600 transition-all duration-200 hover:bg-rose-50 dark:border-rose-900/40 dark:text-rose-400 dark:hover:bg-rose-950/20"
                       >
                         Decline Payment
                       </button>
@@ -1008,7 +1139,7 @@ export const AdminPaymentsPage: React.FC = () => {
                         type="button"
                         onClick={() => handleApproveRequest(selectedRequest.id)}
                         disabled={actionProcessing}
-                        className="flex-1 flex items-center justify-center gap-1.5 rounded-2xl bg-emerald-600 py-3 text-xs font-black text-white hover:bg-emerald-700 shadow-md shadow-emerald-600/10 active:scale-98 transition-all"
+                        className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-emerald-600 py-3 text-xs font-black text-white shadow-md shadow-emerald-600/10 transition-all hover:bg-emerald-700 active:scale-98"
                       >
                         <Check className="h-4 w-4" />
                         <span>Approve Payment</span>
@@ -1046,13 +1177,15 @@ export const AdminPaymentsPage: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="relative z-55 w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900 text-left"
+              className="relative z-55 w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 text-left shadow-2xl dark:border-slate-800 dark:bg-slate-900"
             >
-              <h3 className="text-base font-black text-slate-900 dark:text-white mb-2">
+              <h3 className="mb-2 text-base font-black text-slate-900 dark:text-white">
                 Decline Payment Request
               </h3>
-              <p className="text-xs text-slate-500 font-semibold mb-4">
-                Please provide the reason why this payment request is being declined. This reason will be shown to the user in their billing requests tab and sent via notification alert.
+              <p className="mb-4 text-xs font-semibold text-slate-500">
+                Please provide the reason why this payment request is being declined. This reason
+                will be shown to the user in their billing requests tab and sent via notification
+                alert.
               </p>
 
               <textarea
@@ -1061,7 +1194,7 @@ export const AdminPaymentsPage: React.FC = () => {
                 placeholder="e.g. Transaction ID does not match our bank statement, or Amount paid is incorrect."
                 rows={4}
                 required
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs font-semibold text-slate-900 focus:outline-none focus:border-purple-650 dark:border-slate-800 dark:bg-slate-800 dark:text-white mb-4"
+                className="focus:border-purple-650 mb-4 w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs font-semibold text-slate-900 focus:outline-none dark:border-slate-800 dark:bg-slate-800 dark:text-white"
               />
 
               <div className="flex gap-3">
@@ -1076,7 +1209,7 @@ export const AdminPaymentsPage: React.FC = () => {
                   type="button"
                   onClick={handleRejectRequest}
                   disabled={actionProcessing}
-                  className="flex-1 rounded-2xl bg-rose-600 py-3 text-xs font-black text-white hover:bg-rose-700 shadow-md shadow-rose-600/20"
+                  className="flex-1 rounded-2xl bg-rose-600 py-3 text-xs font-black text-white shadow-md shadow-rose-600/20 hover:bg-rose-700"
                 >
                   {actionProcessing ? 'Declining...' : 'Decline & Notify'}
                 </button>

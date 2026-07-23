@@ -78,7 +78,7 @@ export const AppRoutes: React.FC = () => {
           <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
           <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />
           <Route path={ROUTES.STORAGE} element={<StoragePage />} />
-           <Route path={ROUTES.SUBSCRIPTION} element={<SubscriptionPage />} />
+          <Route path={ROUTES.SUBSCRIPTION} element={<SubscriptionPage />} />
           <Route path={ROUTES.SHARED_LIBRARY} element={<SharedLibraryPage />} />
         </Route>
 

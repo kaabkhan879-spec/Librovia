@@ -217,7 +217,9 @@ export const UploadBookPage: React.FC = () => {
       setUploadProgress(100)
       setStatus('success')
       showSuccess(`"${title.trim()}" uploaded successfully! 📚`)
-      await refreshSubscription().catch((e) => console.error('Failed to update subscription storage:', e))
+      await refreshSubscription().catch((e) =>
+        console.error('Failed to update subscription storage:', e)
+      )
       notificationsService
         .addNotification(
           'upload',
@@ -788,26 +790,27 @@ export const UploadBookPage: React.FC = () => {
       {/* Premium Upgrade Modal */}
       <AnimatePresence>
         {showUpgradeModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-bg-card border border-border-base relative max-w-md w-full rounded-2xl p-6 shadow-2xl space-y-6"
+              className="bg-bg-card border-border-base relative w-full max-w-md space-y-6 rounded-2xl border p-6 shadow-2xl"
             >
               <button
                 onClick={() => setShowUpgradeModal(false)}
-                className="absolute right-4 top-4 text-text-muted hover:text-text-main transition-colors"
+                className="text-text-muted hover:text-text-main absolute top-4 right-4 transition-colors"
               >
                 <X size={20} />
               </button>
-              <div className="flex flex-col items-center text-center space-y-3">
-                <div className="p-3 bg-accent-amber/10 text-accent-amber rounded-full">
+              <div className="flex flex-col items-center space-y-3 text-center">
+                <div className="bg-accent-amber/10 text-accent-amber rounded-full p-3">
                   <Lock size={32} />
                 </div>
-                <h3 className="text-xl font-extrabold text-text-main">Storage Limit Reached</h3>
-                <p className="text-sm text-text-muted leading-relaxed">
-                  Uploading this book will exceed your plan's storage limit. Upgrade to a Pro or Family plan to unlock up to 1 TB of cloud library storage!
+                <h3 className="text-text-main text-xl font-extrabold">Storage Limit Reached</h3>
+                <p className="text-text-muted text-sm leading-relaxed">
+                  Uploading this book will exceed your plan's storage limit. Upgrade to a Pro or
+                  Family plan to unlock up to 1 TB of cloud library storage!
                 </p>
               </div>
               <div className="flex gap-3">

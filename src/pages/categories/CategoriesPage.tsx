@@ -322,7 +322,7 @@ export const CategoriesPage: React.FC = () => {
             placeholder="Search collections by name or contained books..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-2xl border border-slate-200/90 bg-white py-2.5 pr-10 pl-10 text-xs font-semibold text-slate-900 placeholder:text-slate-400 shadow-xs transition-all focus:border-purple-600 focus:outline-none focus:ring-2 focus:ring-purple-600/10 dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:focus:border-purple-500 dark:focus:ring-purple-500/10"
+            className="w-full rounded-2xl border border-slate-200/90 bg-white py-2.5 pr-10 pl-10 text-xs font-semibold text-slate-900 shadow-xs transition-all placeholder:text-slate-400 focus:border-purple-600 focus:ring-2 focus:ring-purple-600/10 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:focus:border-purple-500 dark:focus:ring-purple-500/10"
           />
           {searchQuery && (
             <button
@@ -691,9 +691,7 @@ export const CategoriesPage: React.FC = () => {
                         <h3 className="line-clamp-1 font-sans text-base font-extrabold text-slate-900 transition-colors group-hover:text-purple-600 dark:text-white dark:group-hover:text-purple-400">
                           {cat.name}
                         </h3>
-                        <p className="text-[11px] font-semibold text-slate-400">
-                          {lastUpdatedStr}
-                        </p>
+                        <p className="text-[11px] font-semibold text-slate-400">{lastUpdatedStr}</p>
                       </div>
 
                       {/* Footer Stats Row: Total Books & Total Authors */}
@@ -761,9 +759,7 @@ export const CategoriesPage: React.FC = () => {
                     placeholder="e.g. Computer Science, Research"
                     className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:border-purple-600 focus:bg-white focus:outline-none dark:border-slate-800 dark:bg-slate-800/40 dark:text-white"
                   />
-                  {nameError && (
-                    <p className="text-[11px] font-bold text-rose-500">{nameError}</p>
-                  )}
+                  {nameError && <p className="text-[11px] font-bold text-rose-500">{nameError}</p>}
                 </div>
 
                 <div className="flex justify-end gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
@@ -820,8 +816,9 @@ export const CategoriesPage: React.FC = () => {
                 </div>
               </div>
 
-              <p className="text-xs font-semibold leading-relaxed text-slate-500 dark:text-slate-400">
-                Books will <strong className="text-slate-700 dark:text-slate-200">NOT</strong> be deleted. Only the collection will be removed.
+              <p className="text-xs leading-relaxed font-semibold text-slate-500 dark:text-slate-400">
+                Books will <strong className="text-slate-700 dark:text-slate-200">NOT</strong> be
+                deleted. Only the collection will be removed.
               </p>
 
               <div className="flex justify-end gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">

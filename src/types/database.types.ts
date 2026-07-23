@@ -651,17 +651,17 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: "payment_requests_user_id_fkey"
-            columns: ["user_id"]
-            referencedRelation: "users"
-            referencedColumns: ["id"]
+            foreignKeyName: 'payment_requests_user_id_fkey'
+            columns: ['user_id']
+            referencedRelation: 'users'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "payment_requests_reviewed_by_fkey"
-            columns: ["reviewed_by"]
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          }
+            foreignKeyName: 'payment_requests_reviewed_by_fkey'
+            columns: ['reviewed_by']
+            referencedRelation: 'users'
+            referencedColumns: ['id']
+          },
         ]
       }
     }

@@ -289,7 +289,7 @@ export const AdminSystemSettingsPage: React.FC = () => {
                 onChange={(e) => setPaymentInstructions(e.target.value)}
                 placeholder="Provide detailed instructions to users showing how to pay and submit confirmation details..."
                 rows={4}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 dark:border-slate-800 dark:bg-slate-800 dark:text-white focus:outline-none focus:border-purple-650"
+                className="focus:border-purple-650 w-full rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 focus:outline-none dark:border-slate-800 dark:bg-slate-800 dark:text-white"
               />
             </div>
           </div>

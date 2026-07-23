@@ -52,8 +52,7 @@ const FAQS = [
   },
   {
     question: 'Are there any hidden payment processing fees?',
-    answer:
-      'No. The prices displayed (PKR) are all-inclusive with zero extra transaction fees.',
+    answer: 'No. The prices displayed (PKR) are all-inclusive with zero extra transaction fees.',
   },
 ]
 
@@ -99,9 +98,11 @@ export const SubscriptionPage: React.FC = () => {
   const [selectedUpgradePlan, setSelectedUpgradePlan] = useState<SubscriptionPlan | null>(null)
   const [upgradeStep, setUpgradeStep] = useState<'summary' | 'payment' | 'success'>('summary')
   const [paymentRequests, setPaymentRequests] = useState<any[]>([])
-  
+
   // Form fields
-  const [paymentMethod, setPaymentMethod] = useState<'EasyPaisa' | 'JazzCash' | 'Bank Transfer'>('EasyPaisa')
+  const [paymentMethod, setPaymentMethod] = useState<'EasyPaisa' | 'JazzCash' | 'Bank Transfer'>(
+    'EasyPaisa'
+  )
   const [transactionId, setTransactionId] = useState('')
   const [paidAmount, setPaidAmount] = useState<number>(0)
   const [screenshotFile, setScreenshotFile] = useState<File | null>(null)
@@ -148,10 +149,7 @@ export const SubscriptionPage: React.FC = () => {
     Math.max(0, storageLimitBytes - storageUsedBytes) /
     (1024 * 1024 * 1024)
   ).toFixed(1)
-  const storagePercentage = Math.min(
-    100,
-    Math.round((storageUsedBytes / storageLimitBytes) * 100)
-  )
+  const storagePercentage = Math.min(100, Math.round((storageUsedBytes / storageLimitBytes) * 100))
 
   // Handlers
   const handleUpgradeClick = (plan: SubscriptionPlan) => {
@@ -165,7 +163,10 @@ export const SubscriptionPage: React.FC = () => {
 
   const handleContinueToPayment = () => {
     if (!selectedUpgradePlan) return
-    const price = billingCycle === 'yearly' ? selectedUpgradePlan.price_yearly : selectedUpgradePlan.price_monthly
+    const price =
+      billingCycle === 'yearly'
+        ? selectedUpgradePlan.price_yearly
+        : selectedUpgradePlan.price_monthly
     setPaidAmount(price)
     setUpgradeStep('payment')
   }
@@ -246,15 +247,19 @@ export const SubscriptionPage: React.FC = () => {
           </div>
 
           <h1 className="font-sans text-3xl font-black tracking-tight text-slate-900 sm:text-5xl dark:text-white">
-            Unlock the Full Power of <span className="bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-500 bg-clip-text text-transparent">Librovia</span>
+            Unlock the Full Power of{' '}
+            <span className="bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-500 bg-clip-text text-transparent">
+              Librovia
+            </span>
           </h1>
 
-          <p className="mx-auto max-w-xl text-sm font-medium leading-relaxed text-slate-600 dark:text-slate-300">
-            Choose the perfect plan for your reading journey. Enjoy expanded cloud storage, unlimited AI search, offline access, and collaborative family tools.
+          <p className="mx-auto max-w-xl text-sm leading-relaxed font-medium text-slate-600 dark:text-slate-300">
+            Choose the perfect plan for your reading journey. Enjoy expanded cloud storage,
+            unlimited AI search, offline access, and collaborative family tools.
           </p>
 
           {/* Billing Cycle Toggle */}
-          <div className="pt-4 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <div className="flex flex-col items-center justify-center gap-3 pt-4 sm:flex-row">
             <div className="relative flex items-center rounded-2xl border border-slate-200 bg-slate-100/80 p-1.5 shadow-inner dark:border-slate-800 dark:bg-slate-800/80">
               <button
                 type="button"
@@ -306,7 +311,7 @@ export const SubscriptionPage: React.FC = () => {
       {/* ==================================================================== */}
       <div className="rounded-3xl border border-purple-200/80 bg-white p-6 shadow-xs transition-all duration-300 dark:border-purple-900/40 dark:bg-slate-900">
         <div className="space-y-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-5 dark:border-slate-800">
+          <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
             <div className="flex items-center gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-600/20">
                 <Crown className="h-6 w-6" />
@@ -371,7 +376,10 @@ export const SubscriptionPage: React.FC = () => {
                 Storage Used
               </span>
               <p className="mt-1 text-sm font-black text-slate-900 dark:text-white">
-                {storageUsedGB} GB <span className="text-xs font-semibold text-slate-400">({storagePercentage}% used)</span>
+                {storageUsedGB} GB{' '}
+                <span className="text-xs font-semibold text-slate-400">
+                  ({storagePercentage}% used)
+                </span>
               </p>
             </div>
 
@@ -424,15 +432,10 @@ export const SubscriptionPage: React.FC = () => {
           {plans.map((plan) => {
             const isCurrent = currentPlanId === plan.id
             const isPro = plan.id === 'pro'
-            const numericPrice =
-              billingCycle === 'yearly' ? plan.price_yearly : plan.price_monthly
+            const numericPrice = billingCycle === 'yearly' ? plan.price_yearly : plan.price_monthly
             const displayPrice = `PKR ${numericPrice.toLocaleString()}`
             const billingSuffix =
-              plan.id === 'free'
-                ? '/ forever'
-                : billingCycle === 'yearly'
-                ? '/ year'
-                : '/ month'
+              plan.id === 'free' ? '/ forever' : billingCycle === 'yearly' ? '/ year' : '/ month'
             const Icon = getPlanIcon(plan.id)
 
             // Badge formatting
@@ -440,15 +443,15 @@ export const SubscriptionPage: React.FC = () => {
               plan.id === 'free'
                 ? 'Free Forever'
                 : plan.id === 'pro'
-                ? '⭐ Most Popular'
-                : '👨‍👩‍👧 Best Value'
+                  ? '⭐ Most Popular'
+                  : '👨‍👩‍👧 Best Value'
 
             return (
               <div
                 key={plan.id}
                 className={`premium-card relative flex h-full flex-col justify-between rounded-3xl p-8 transition-all duration-300 ${
                   isPro
-                    ? 'border-2 border-purple-600 bg-white shadow-xl shadow-purple-500/10 ring-4 ring-purple-600/10 lg:-translate-y-2 dark:border-purple-500 dark:bg-slate-900 dark:shadow-purple-950/30'
+                    ? 'border-2 border-purple-600 bg-white shadow-xl ring-4 shadow-purple-500/10 ring-purple-600/10 lg:-translate-y-2 dark:border-purple-500 dark:bg-slate-900 dark:shadow-purple-950/30'
                     : 'border border-slate-200/90 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900'
                 }`}
               >
@@ -458,15 +461,15 @@ export const SubscriptionPage: React.FC = () => {
                     isPro
                       ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white'
                       : plan.id === 'family'
-                      ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white'
-                      : 'bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+                        ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white'
+                        : 'border border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
                   }`}
                 >
                   {badgeText}
                 </div>
 
                 {/* Card Header */}
-                <div className="space-y-6 flex-1 flex flex-col justify-between">
+                <div className="flex flex-1 flex-col justify-between space-y-6">
                   <div className="space-y-6">
                     <div className="flex items-center justify-between">
                       <div
@@ -519,7 +522,10 @@ export const SubscriptionPage: React.FC = () => {
                       </span>
                       <ul className="space-y-2.5">
                         {plan.features.map((feat, idx) => (
-                          <li key={idx} className="flex items-center gap-3 text-xs font-medium text-slate-700 dark:text-slate-300">
+                          <li
+                            key={idx}
+                            className="flex items-center gap-3 text-xs font-medium text-slate-700 dark:text-slate-300"
+                          >
                             <div
                               className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
                                 feat.highlight || isPro
@@ -529,7 +535,11 @@ export const SubscriptionPage: React.FC = () => {
                             >
                               <Check className="h-3 w-3 stroke-[3]" />
                             </div>
-                            <span className={feat.highlight ? 'font-bold text-slate-900 dark:text-white' : ''}>
+                            <span
+                              className={
+                                feat.highlight ? 'font-bold text-slate-900 dark:text-white' : ''
+                              }
+                            >
                               {feat.text}
                             </span>
                           </li>
@@ -552,9 +562,9 @@ export const SubscriptionPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => handleUpgradeClick(plan)}
-                      className={`premium-button w-full cursor-pointer rounded-2xl py-3.5 text-xs font-black transition-all shadow-md ${
+                      className={`premium-button w-full cursor-pointer rounded-2xl py-3.5 text-xs font-black shadow-md transition-all ${
                         isPro
-                          ? 'bg-purple-600 text-white hover:bg-purple-700 shadow-purple-600/20'
+                          ? 'bg-purple-600 text-white shadow-purple-600/20 hover:bg-purple-700'
                           : 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100'
                       }`}
                     >
@@ -572,7 +582,7 @@ export const SubscriptionPage: React.FC = () => {
       {/* 4. DYNAMIC PLAN COMPARISON TABLE */}
       {/* ==================================================================== */}
       <div className="space-y-6 pt-6">
-        <div className="text-center space-y-1">
+        <div className="space-y-1 text-center">
           <h2 className="font-sans text-2xl font-black text-slate-900 dark:text-white">
             Detailed Feature Comparison
           </h2>
@@ -582,7 +592,7 @@ export const SubscriptionPage: React.FC = () => {
         </div>
 
         <div className="overflow-x-auto rounded-3xl border border-slate-200/80 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
-          <table className="w-full min-w-[640px] text-left border-collapse">
+          <table className="w-full min-w-[640px] border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/80 text-xs font-extrabold text-slate-900 dark:border-slate-800 dark:bg-slate-800/50 dark:text-white">
                 <th className="p-4 sm:p-5">Features</th>
@@ -615,9 +625,7 @@ export const SubscriptionPage: React.FC = () => {
                 ))}
               </tr>
               <tr>
-                <td className="p-4 font-bold text-slate-900 sm:p-5 dark:text-white">
-                  AI Requests
-                </td>
+                <td className="p-4 font-bold text-slate-900 sm:p-5 dark:text-white">AI Requests</td>
                 {plans.map((p) => (
                   <td
                     key={p.id}
@@ -675,7 +683,11 @@ export const SubscriptionPage: React.FC = () => {
                 <td className="p-4 font-bold text-slate-900 sm:p-5 dark:text-white">Support</td>
                 {plans.map((p) => (
                   <td key={p.id} className="p-4 text-center sm:p-5">
-                    {p.id === 'family' ? '24/7 Dedicated' : p.id === 'pro' ? 'Priority Support' : 'Community'}
+                    {p.id === 'family'
+                      ? '24/7 Dedicated'
+                      : p.id === 'pro'
+                        ? 'Priority Support'
+                        : 'Community'}
                   </td>
                 ))}
               </tr>
@@ -699,7 +711,7 @@ export const SubscriptionPage: React.FC = () => {
 
         <div className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900">
           {/* Tab buttons */}
-          <div className="flex border-b border-slate-100 pb-4 dark:border-slate-800 gap-2">
+          <div className="flex gap-2 border-b border-slate-100 pb-4 dark:border-slate-800">
             <button
               type="button"
               onClick={() => setActivePlaceholderTab('invoices')}
@@ -760,7 +772,7 @@ export const SubscriptionPage: React.FC = () => {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
                     <thead>
-                      <tr className="border-b border-slate-100 text-slate-400 uppercase tracking-wider font-extrabold text-[10px] dark:border-slate-800">
+                      <tr className="border-b border-slate-100 text-[10px] font-extrabold tracking-wider text-slate-400 uppercase dark:border-slate-800">
                         <th className="pb-3">Invoice Number</th>
                         <th className="pb-3">Date</th>
                         <th className="pb-3">Plan</th>
@@ -769,7 +781,7 @@ export const SubscriptionPage: React.FC = () => {
                         <th className="pb-3 text-right">Receipt</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium text-slate-700 dark:text-slate-300">
+                    <tbody className="divide-y divide-slate-100 font-medium text-slate-700 dark:divide-slate-800 dark:text-slate-300">
                       {invoices.map((inv) => (
                         <tr key={inv.id}>
                           <td className="py-3.5 font-mono font-bold text-slate-900 dark:text-white">
@@ -834,7 +846,9 @@ export const SubscriptionPage: React.FC = () => {
                 <div className="pt-2">
                   <button
                     type="button"
-                    onClick={() => showInfo('Payment gateway integration is currently under development.')}
+                    onClick={() =>
+                      showInfo('Payment gateway integration is currently under development.')
+                    }
                     className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-dashed border-purple-300 bg-purple-50/50 px-4 py-3 text-xs font-bold text-purple-700 transition-colors hover:bg-purple-100/60 dark:border-purple-800 dark:bg-purple-950/30 dark:text-purple-300"
                   >
                     <CreditCard className="h-4 w-4" />
@@ -881,7 +895,7 @@ export const SubscriptionPage: React.FC = () => {
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs">
                       <thead>
-                        <tr className="border-b border-slate-100 text-slate-400 uppercase tracking-wider font-extrabold text-[10px] dark:border-slate-800">
+                        <tr className="border-b border-slate-100 text-[10px] font-extrabold tracking-wider text-slate-400 uppercase dark:border-slate-800">
                           <th className="pb-3">Submitted Date</th>
                           <th className="pb-3">Plan</th>
                           <th className="pb-3">Method</th>
@@ -897,11 +911,11 @@ export const SubscriptionPage: React.FC = () => {
                             <td className="py-3.5 font-mono text-slate-400">
                               {new Date(req.created_at).toLocaleDateString()}
                             </td>
-                            <td className="py-3.5 font-bold text-purple-600 dark:text-purple-400 uppercase">
+                            <td className="py-3.5 font-bold text-purple-600 uppercase dark:text-purple-400">
                               {req.plan_id}
                             </td>
                             <td className="py-3.5">{req.payment_method}</td>
-                            <td className="py-3.5 text-slate-900 dark:text-white font-bold">
+                            <td className="py-3.5 font-bold text-slate-900 dark:text-white">
                               PKR {req.amount.toLocaleString()}
                             </td>
                             <td className="py-3.5 font-mono font-bold text-slate-900 dark:text-white">
@@ -926,7 +940,7 @@ export const SubscriptionPage: React.FC = () => {
                             </td>
                             <td className="py-3.5 text-right">
                               {req.status === 'Rejected' && req.rejection_reason && (
-                                <span className="text-[10.5px] text-rose-500 font-medium block">
+                                <span className="block text-[10.5px] font-medium text-rose-500">
                                   Reason: {req.rejection_reason}
                                 </span>
                               )}
@@ -937,7 +951,7 @@ export const SubscriptionPage: React.FC = () => {
                     </table>
                   </div>
                 ) : (
-                  <div className="text-center py-6 text-slate-400 dark:text-slate-500">
+                  <div className="py-6 text-center text-slate-400 dark:text-slate-500">
                     No payment requests submitted.
                   </div>
                 )}
@@ -951,7 +965,7 @@ export const SubscriptionPage: React.FC = () => {
       {/* 6. FREQUENTLY ASKED QUESTIONS */}
       {/* ==================================================================== */}
       <div className="space-y-6 pt-6">
-        <div className="text-center space-y-1">
+        <div className="space-y-1 text-center">
           <h2 className="font-sans text-2xl font-black text-slate-900 dark:text-white">
             Frequently Asked Questions
           </h2>
@@ -991,7 +1005,7 @@ export const SubscriptionPage: React.FC = () => {
                       animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }}
                       transition={{ duration: 0.2 }}
-                      className="border-t border-slate-100 bg-slate-50/50 px-4 py-3 text-xs font-medium leading-relaxed text-slate-600 dark:border-slate-800 dark:bg-slate-800/30 dark:text-slate-300"
+                      className="border-t border-slate-100 bg-slate-50/50 px-4 py-3 text-xs leading-relaxed font-medium text-slate-600 dark:border-slate-800 dark:bg-slate-800/30 dark:text-slate-300"
                     >
                       {faq.answer}
                     </motion.div>
@@ -1030,7 +1044,7 @@ export const SubscriptionPage: React.FC = () => {
                 type="button"
                 onClick={handleCloseUpgradeModal}
                 disabled={submittingRequest}
-                className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 disabled:opacity-40"
+                className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 disabled:opacity-40 dark:hover:text-slate-200"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -1047,7 +1061,9 @@ export const SubscriptionPage: React.FC = () => {
                         Upgrade to {selectedUpgradePlan.plan_name} Plan
                       </h3>
                       <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                        {billingCycle === 'yearly' ? 'Annual Billing (Save 17%)' : 'Monthly Billing'}
+                        {billingCycle === 'yearly'
+                          ? 'Annual Billing (Save 17%)'
+                          : 'Monthly Billing'}
                       </p>
                     </div>
                   </div>
@@ -1069,7 +1085,7 @@ export const SubscriptionPage: React.FC = () => {
                       </span>
                     </div>
 
-                    <div className="border-t border-slate-200 pt-2 flex justify-between text-sm font-black text-slate-900 dark:border-slate-700 dark:text-white">
+                    <div className="flex justify-between border-t border-slate-200 pt-2 text-sm font-black text-slate-900 dark:border-slate-700 dark:text-white">
                       <span>Total Due Today</span>
                       <span className="text-purple-600 dark:text-purple-400">
                         PKR{' '}
@@ -1101,11 +1117,14 @@ export const SubscriptionPage: React.FC = () => {
 
                   {/* Manual Verification Note */}
                   <div className="flex items-start gap-2.5 rounded-2xl border border-purple-200/80 bg-purple-50/80 p-3.5 text-xs text-purple-900 dark:border-purple-900/40 dark:bg-purple-950/30 dark:text-purple-200">
-                    <Lock className="h-4 w-4 shrink-0 text-purple-600 dark:text-purple-400 mt-0.5" />
-                    <div className="space-y-0.5 text-[11px] leading-relaxed text-left">
-                      <span className="font-bold block text-purple-900 dark:text-purple-300">Manual Verification</span>
+                    <Lock className="mt-0.5 h-4 w-4 shrink-0 text-purple-600 dark:text-purple-400" />
+                    <div className="space-y-0.5 text-left text-[11px] leading-relaxed">
+                      <span className="block font-bold text-purple-900 dark:text-purple-300">
+                        Manual Verification
+                      </span>
                       <p className="text-slate-600 dark:text-slate-300">
-                        We support local wallets (JazzCash, EasyPaisa, Bank Transfer). The plan activates immediately upon admin transaction approval.
+                        We support local wallets (JazzCash, EasyPaisa, Bank Transfer). The plan
+                        activates immediately upon admin transaction approval.
                       </p>
                     </div>
                   </div>
@@ -1115,7 +1134,7 @@ export const SubscriptionPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={handleCloseUpgradeModal}
-                      className="flex-1 rounded-2xl border border-slate-200 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-all duration-200"
+                      className="flex-1 rounded-2xl border border-slate-200 py-3 text-xs font-bold text-slate-700 transition-all duration-200 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
                     >
                       Cancel
                     </button>
@@ -1123,7 +1142,7 @@ export const SubscriptionPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={handleContinueToPayment}
-                      className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-purple-600 py-3 text-xs font-black text-white hover:bg-purple-700 shadow-md shadow-purple-600/20 active:scale-98 transition-all duration-200"
+                      className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-purple-600 py-3 text-xs font-black text-white shadow-md shadow-purple-600/20 transition-all duration-200 hover:bg-purple-700 active:scale-98"
                     >
                       <Crown className="h-4 w-4" />
                       <span>Continue to Payment</span>
@@ -1132,7 +1151,10 @@ export const SubscriptionPage: React.FC = () => {
                 </div>
               ) : upgradeStep === 'payment' ? (
                 // Step 2: Payment Gateway & Submission form
-                <form onSubmit={handleSubmitPayment} className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
+                <form
+                  onSubmit={handleSubmitPayment}
+                  className="max-h-[80vh] space-y-4 overflow-y-auto pr-1"
+                >
                   <div className="flex items-center gap-3 border-b border-slate-100 pb-3 dark:border-slate-800">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100 text-purple-600 dark:bg-purple-950">
                       <CreditCard className="h-5 w-5" />
@@ -1141,97 +1163,129 @@ export const SubscriptionPage: React.FC = () => {
                       <h3 className="text-base font-black text-slate-900 dark:text-white">
                         Make a Manual Payment
                       </h3>
-                      <p className="text-[11px] text-slate-500 font-semibold">
-                        Pay exactly <span className="text-purple-600 dark:text-purple-400 font-bold font-mono">PKR {paidAmount.toLocaleString()}</span> to upgrade
+                      <p className="text-[11px] font-semibold text-slate-500">
+                        Pay exactly{' '}
+                        <span className="font-mono font-bold text-purple-600 dark:text-purple-400">
+                          PKR {paidAmount.toLocaleString()}
+                        </span>{' '}
+                        to upgrade
                       </p>
                     </div>
                   </div>
 
                   {/* Dynamic Instructions */}
                   <div className="rounded-2xl bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                    <p className="font-semibold text-slate-900 dark:text-white mb-1">Instructions:</p>
-                    <p>{systemSettings?.payment_instructions || 'Please transfer the select package price to any details below and upload screenshot.'}</p>
+                    <p className="mb-1 font-semibold text-slate-900 dark:text-white">
+                      Instructions:
+                    </p>
+                    <p>
+                      {systemSettings?.payment_instructions ||
+                        'Please transfer the select package price to any details below and upload screenshot.'}
+                    </p>
                   </div>
 
                   {/* Payment Details channels */}
                   <div className="space-y-2 rounded-2xl border border-slate-200/65 bg-slate-50/50 p-3.5 text-[11px] font-semibold text-slate-600 dark:border-slate-800 dark:bg-slate-900/30 dark:text-slate-300">
-                    {paymentMethod === 'EasyPaisa' && (
-                      systemSettings?.easypaisa_number && systemSettings?.easypaisa_name ? (
+                    {paymentMethod === 'EasyPaisa' &&
+                      (systemSettings?.easypaisa_number && systemSettings?.easypaisa_name ? (
                         <div className="space-y-1.5">
-                          <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                          <div className="flex justify-between border-b border-slate-100 py-1 dark:border-slate-800">
                             <span className="text-slate-500">Account Holder:</span>
-                            <span className="font-bold text-slate-900 dark:text-white">{systemSettings.easypaisa_name}</span>
+                            <span className="font-bold text-slate-900 dark:text-white">
+                              {systemSettings.easypaisa_name}
+                            </span>
                           </div>
                           <div className="flex justify-between py-1">
                             <span className="text-slate-500">Mobile Number:</span>
-                            <span className="font-bold text-slate-900 dark:text-white font-mono">{systemSettings.easypaisa_number}</span>
+                            <span className="font-mono font-bold text-slate-900 dark:text-white">
+                              {systemSettings.easypaisa_number}
+                            </span>
                           </div>
                         </div>
                       ) : (
-                        <div className="text-center py-2 text-rose-500 font-bold flex items-center justify-center gap-1.5">
-                          <AlertCircle className="h-4 w-4 text-rose-500 shrink-0" />
-                          <span>Payment details are not configured. Please contact the administrator.</span>
+                        <div className="flex items-center justify-center gap-1.5 py-2 text-center font-bold text-rose-500">
+                          <AlertCircle className="h-4 w-4 shrink-0 text-rose-500" />
+                          <span>
+                            Payment details are not configured. Please contact the administrator.
+                          </span>
                         </div>
-                      )
-                    )}
+                      ))}
 
-                    {paymentMethod === 'JazzCash' && (
-                      systemSettings?.jazzcash_number && systemSettings?.jazzcash_name ? (
+                    {paymentMethod === 'JazzCash' &&
+                      (systemSettings?.jazzcash_number && systemSettings?.jazzcash_name ? (
                         <div className="space-y-1.5">
-                          <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                          <div className="flex justify-between border-b border-slate-100 py-1 dark:border-slate-800">
                             <span className="text-slate-500">Account Holder:</span>
-                            <span className="font-bold text-slate-900 dark:text-white">{systemSettings.jazzcash_name}</span>
+                            <span className="font-bold text-slate-900 dark:text-white">
+                              {systemSettings.jazzcash_name}
+                            </span>
                           </div>
                           <div className="flex justify-between py-1">
                             <span className="text-slate-500">Mobile Number:</span>
-                            <span className="font-bold text-slate-900 dark:text-white font-mono">{systemSettings.jazzcash_number}</span>
+                            <span className="font-mono font-bold text-slate-900 dark:text-white">
+                              {systemSettings.jazzcash_number}
+                            </span>
                           </div>
                         </div>
                       ) : (
-                        <div className="text-center py-2 text-rose-500 font-bold flex items-center justify-center gap-1.5">
-                          <AlertCircle className="h-4 w-4 text-rose-500 shrink-0" />
-                          <span>Payment details are not configured. Please contact the administrator.</span>
+                        <div className="flex items-center justify-center gap-1.5 py-2 text-center font-bold text-rose-500">
+                          <AlertCircle className="h-4 w-4 shrink-0 text-rose-500" />
+                          <span>
+                            Payment details are not configured. Please contact the administrator.
+                          </span>
                         </div>
-                      )
-                    )}
+                      ))}
 
-                    {paymentMethod === 'Bank Transfer' && (
-                      systemSettings?.bank_name && systemSettings?.bank_account_number && systemSettings?.bank_account_name ? (
+                    {paymentMethod === 'Bank Transfer' &&
+                      (systemSettings?.bank_name &&
+                      systemSettings?.bank_account_number &&
+                      systemSettings?.bank_account_name ? (
                         <div className="space-y-1.5">
-                          <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                          <div className="flex justify-between border-b border-slate-100 py-1 dark:border-slate-800">
                             <span className="text-slate-500">Bank Name:</span>
-                            <span className="font-bold text-slate-900 dark:text-white">{systemSettings.bank_name}</span>
+                            <span className="font-bold text-slate-900 dark:text-white">
+                              {systemSettings.bank_name}
+                            </span>
                           </div>
-                          <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                          <div className="flex justify-between border-b border-slate-100 py-1 dark:border-slate-800">
                             <span className="text-slate-500">Account Holder:</span>
-                            <span className="font-bold text-slate-900 dark:text-white">{systemSettings.bank_account_name}</span>
+                            <span className="font-bold text-slate-900 dark:text-white">
+                              {systemSettings.bank_account_name}
+                            </span>
                           </div>
-                          <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                          <div className="flex justify-between border-b border-slate-100 py-1 dark:border-slate-800">
                             <span className="text-slate-500">Account Number:</span>
-                            <span className="font-bold text-slate-900 dark:text-white font-mono">{systemSettings.bank_account_number}</span>
+                            <span className="font-mono font-bold text-slate-900 dark:text-white">
+                              {systemSettings.bank_account_number}
+                            </span>
                           </div>
                           <div className="flex justify-between py-1">
                             <span className="text-slate-500">IBAN:</span>
-                            <span className="font-bold text-slate-900 dark:text-white font-mono">{systemSettings.bank_account_number}</span>
+                            <span className="font-mono font-bold text-slate-900 dark:text-white">
+                              {systemSettings.bank_account_number}
+                            </span>
                           </div>
                         </div>
                       ) : (
-                        <div className="text-center py-2 text-rose-500 font-bold flex items-center justify-center gap-1.5">
-                          <AlertCircle className="h-4 w-4 text-rose-500 shrink-0" />
-                          <span>Payment details are not configured. Please contact the administrator.</span>
+                        <div className="flex items-center justify-center gap-1.5 py-2 text-center font-bold text-rose-500">
+                          <AlertCircle className="h-4 w-4 shrink-0 text-rose-500" />
+                          <span>
+                            Payment details are not configured. Please contact the administrator.
+                          </span>
                         </div>
-                      )
-                    )}
+                      ))}
                   </div>
 
                   {/* Form inputs */}
-                  <div className="space-y-3 font-semibold text-xs text-slate-700 dark:text-slate-300">
+                  <div className="space-y-3 text-xs font-semibold text-slate-700 dark:text-slate-300">
                     <div>
-                      <label className="block mb-1 text-[11px] font-extrabold text-slate-500 uppercase">Select Payment Wallet/Method</label>
+                      <label className="mb-1 block text-[11px] font-extrabold text-slate-500 uppercase">
+                        Select Payment Wallet/Method
+                      </label>
                       <select
                         value={paymentMethod}
                         onChange={(e: any) => setPaymentMethod(e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-bold text-slate-900 focus:outline-none focus:border-purple-650 dark:border-slate-800 dark:bg-slate-800 dark:text-white"
+                        className="focus:border-purple-650 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-bold text-slate-900 focus:outline-none dark:border-slate-800 dark:bg-slate-800 dark:text-white"
                       >
                         <option value="EasyPaisa">EasyPaisa</option>
                         <option value="JazzCash">JazzCash</option>
@@ -1241,30 +1295,36 @@ export const SubscriptionPage: React.FC = () => {
 
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block mb-1 text-[11px] font-extrabold text-slate-500 uppercase">Amount Paid (PKR)</label>
+                        <label className="mb-1 block text-[11px] font-extrabold text-slate-500 uppercase">
+                          Amount Paid (PKR)
+                        </label>
                         <input
                           type="number"
                           value={paidAmount}
                           onChange={(e) => setPaidAmount(Number(e.target.value))}
                           required
-                          className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 focus:outline-none focus:border-purple-650 dark:border-slate-800 dark:bg-slate-800 dark:text-white"
+                          className="focus:border-purple-650 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 focus:outline-none dark:border-slate-800 dark:bg-slate-800 dark:text-white"
                         />
                       </div>
                       <div>
-                        <label className="block mb-1 text-[11px] font-extrabold text-slate-500 uppercase">Transaction ID / Ref ID</label>
+                        <label className="mb-1 block text-[11px] font-extrabold text-slate-500 uppercase">
+                          Transaction ID / Ref ID
+                        </label>
                         <input
                           type="text"
                           value={transactionId}
                           onChange={(e) => setTransactionId(e.target.value)}
                           required
                           placeholder="e.g. 1029384756"
-                          className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 focus:outline-none focus:border-purple-650 dark:border-slate-800 dark:bg-slate-800 dark:text-white"
+                          className="focus:border-purple-650 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 focus:outline-none dark:border-slate-800 dark:bg-slate-800 dark:text-white"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="block mb-1 text-[11px] font-extrabold text-slate-500 uppercase">Upload Receipt Screenshot</label>
+                      <label className="mb-1 block text-[11px] font-extrabold text-slate-500 uppercase">
+                        Upload Receipt Screenshot
+                      </label>
                       <div className="relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-4 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900/40">
                         <input
                           type="file"
@@ -1274,23 +1334,23 @@ export const SubscriptionPage: React.FC = () => {
                           className="absolute inset-0 cursor-pointer opacity-0"
                         />
                         {screenshotPreviewUrl ? (
-                          <div className="relative w-full max-h-32 overflow-hidden rounded-xl border border-slate-100">
+                          <div className="relative max-h-32 w-full overflow-hidden rounded-xl border border-slate-100">
                             <img
                               src={screenshotPreviewUrl}
                               alt="Receipt Preview"
-                              className="w-full h-full object-cover"
+                              className="h-full w-full object-cover"
                             />
-                            <div className="absolute inset-0 bg-slate-900/50 flex items-center justify-center text-white text-[10px] font-extrabold tracking-wider uppercase">
+                            <div className="absolute inset-0 flex items-center justify-center bg-slate-900/50 text-[10px] font-extrabold tracking-wider text-white uppercase">
                               Change Screenshot
                             </div>
                           </div>
                         ) : (
-                          <div className="text-center py-2">
-                            <Upload className="mx-auto h-6 w-6 text-slate-400 mb-1" />
-                            <span className="text-[10px] text-slate-500 font-bold block">
+                          <div className="py-2 text-center">
+                            <Upload className="mx-auto mb-1 h-6 w-6 text-slate-400" />
+                            <span className="block text-[10px] font-bold text-slate-500">
                               Click or drag screenshot here
                             </span>
-                            <span className="text-[9px] text-slate-400 font-medium">
+                            <span className="text-[9px] font-medium text-slate-400">
                               JPEG, PNG, WEBP (Max 5MB)
                             </span>
                           </div>
@@ -1299,13 +1359,15 @@ export const SubscriptionPage: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block mb-1 text-[11px] font-extrabold text-slate-500 uppercase">Optional Note</label>
+                      <label className="mb-1 block text-[11px] font-extrabold text-slate-500 uppercase">
+                        Optional Note
+                      </label>
                       <textarea
                         value={userNote}
                         onChange={(e) => setUserNote(e.target.value)}
                         placeholder="Add any details for payment verification..."
                         rows={2}
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 focus:outline-none focus:border-purple-650 dark:border-slate-800 dark:bg-slate-800 dark:text-white"
+                        className="focus:border-purple-650 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 focus:outline-none dark:border-slate-800 dark:bg-slate-800 dark:text-white"
                       />
                     </div>
                   </div>
@@ -1316,14 +1378,14 @@ export const SubscriptionPage: React.FC = () => {
                       type="button"
                       disabled={submittingRequest}
                       onClick={() => setUpgradeStep('summary')}
-                      className="flex-1 rounded-2xl border border-slate-200 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 disabled:opacity-50"
+                      className="flex-1 rounded-2xl border border-slate-200 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
                     >
                       Back
                     </button>
                     <button
                       type="submit"
                       disabled={submittingRequest}
-                      className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-purple-600 py-3 text-xs font-black text-white hover:bg-purple-700 disabled:opacity-50 shadow-md shadow-purple-600/20 active:scale-98 transition-all"
+                      className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-purple-600 py-3 text-xs font-black text-white shadow-md shadow-purple-600/20 transition-all hover:bg-purple-700 active:scale-98 disabled:opacity-50"
                     >
                       {submittingRequest ? 'Submitting...' : 'Submit Payment'}
                     </button>
@@ -1331,23 +1393,28 @@ export const SubscriptionPage: React.FC = () => {
                 </form>
               ) : (
                 // Step 3: Success screen with WhatsApp support trigger
-                <div className="space-y-6 text-center py-4 select-none">
-                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-950/70 dark:text-emerald-400 shadow-inner">
+                <div className="space-y-6 py-4 text-center select-none">
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shadow-inner dark:bg-emerald-950/70 dark:text-emerald-400">
                     <CheckCircle2 className="h-8 w-8 animate-bounce" />
                   </div>
-                  
+
                   <div className="space-y-2">
                     <h3 className="font-sans text-xl font-black text-slate-900 dark:text-white">
                       Payment Submitted Successfully! ⏳
                     </h3>
-                    <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 max-w-sm mx-auto leading-relaxed">
-                      Your payment request for the <span className="text-purple-600 dark:text-purple-400 font-bold uppercase">{selectedUpgradePlan?.plan_name}</span> plan has been received. Our team will verify and activate your subscription shortly.
+                    <p className="mx-auto max-w-sm text-xs leading-relaxed font-semibold text-slate-500 dark:text-slate-400">
+                      Your payment request for the{' '}
+                      <span className="font-bold text-purple-600 uppercase dark:text-purple-400">
+                        {selectedUpgradePlan?.plan_name}
+                      </span>{' '}
+                      plan has been received. Our team will verify and activate your subscription
+                      shortly.
                     </p>
                   </div>
 
                   {systemSettings?.whatsapp_number && (
-                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4 dark:border-emerald-900/30 dark:bg-emerald-950/20 text-xs font-semibold text-slate-600 dark:text-slate-300 space-y-3">
-                      <p className="text-[11px] font-bold text-slate-800 dark:text-white leading-normal">
+                    <div className="space-y-3 rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4 text-xs font-semibold text-slate-600 dark:border-emerald-900/30 dark:bg-emerald-950/20 dark:text-slate-300">
+                      <p className="text-[11px] leading-normal font-bold text-slate-800 dark:text-white">
                         Need quick activation? Message us on WhatsApp for fast verification!
                       </p>
                       <a
@@ -1356,10 +1423,10 @@ export const SubscriptionPage: React.FC = () => {
                         )}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center justify-center gap-2 w-full rounded-2xl bg-emerald-600 py-3 text-xs font-black text-white hover:bg-emerald-700 shadow-md shadow-emerald-600/20 transition-all duration-200 active:scale-98"
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 py-3 text-xs font-black text-white shadow-md shadow-emerald-600/20 transition-all duration-200 hover:bg-emerald-700 active:scale-98"
                       >
                         <svg className="h-4.5 w-4.5 fill-current" viewBox="0 0 24 24">
-                          <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.625 1.451 5.437 0 9.862-4.414 9.866-9.84.002-2.628-1.02-5.1-2.878-6.958C16.398 1.95 13.933 1.929 12 1.929c-5.436 0-9.86 4.415-9.864 9.843-.001 1.848.493 3.654 1.432 5.228l-.995 3.635 3.73-.977-.256-.489zm13.125-9.351c-.321-.16-1.9-.938-2.193-1.047-.293-.108-.507-.162-.72.16-.213.32-.825 1.047-1.012 1.261-.187.213-.373.24-.693.08-.32-.16-1.353-.499-2.577-1.591-.951-.849-1.593-1.898-1.78-2.218-.187-.32-.02-.493.14-.653.144-.144.32-.373.48-.56.16-.187.213-.32.32-.533.107-.213.053-.4-.027-.56-.08-.16-.72-1.734-.987-2.373-.259-.626-.523-.538-.72-.547-.187-.008-.4-.01-.613-.01-.213 0-.56.08-.853.4-.293.32-1.12 1.093-1.12 2.667 0 1.573 1.147 3.093 1.307 3.293.16.2 2.257 3.447 5.467 4.833.764.331 1.36.528 1.823.675.77.244 1.472.21 2.027.128.618-.092 1.9-.777 2.167-1.493.267-.717.267-1.33.187-1.46-.08-.13-.293-.21-.613-.37z"/>
+                          <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.625 1.451 5.437 0 9.862-4.414 9.866-9.84.002-2.628-1.02-5.1-2.878-6.958C16.398 1.95 13.933 1.929 12 1.929c-5.436 0-9.86 4.415-9.864 9.843-.001 1.848.493 3.654 1.432 5.228l-.995 3.635 3.73-.977-.256-.489zm13.125-9.351c-.321-.16-1.9-.938-2.193-1.047-.293-.108-.507-.162-.72.16-.213.32-.825 1.047-1.012 1.261-.187.213-.373.24-.693.08-.32-.16-1.353-.499-2.577-1.591-.951-.849-1.593-1.898-1.78-2.218-.187-.32-.02-.493.14-.653.144-.144.32-.373.48-.56.16-.187.213-.32.32-.533.107-.213.053-.4-.027-.56-.08-.16-.72-1.734-.987-2.373-.259-.626-.523-.538-.72-.547-.187-.008-.4-.01-.613-.01-.213 0-.56.08-.853.4-.293.32-1.12 1.093-1.12 2.667 0 1.573 1.147 3.093 1.307 3.293.16.2 2.257 3.447 5.467 4.833.764.331 1.36.528 1.823.675.77.244 1.472.21 2.027.128.618-.092 1.9-.777 2.167-1.493.267-.717.267-1.33.187-1.46-.08-.13-.293-.21-.613-.37z" />
                         </svg>
                         <span>Contact Support on WhatsApp</span>
                       </a>
@@ -1370,7 +1437,7 @@ export const SubscriptionPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={handleCloseUpgradeModal}
-                      className="w-full cursor-pointer rounded-2xl bg-purple-600 py-3 text-xs font-black text-white hover:bg-purple-700 shadow-md shadow-purple-600/20 transition-all duration-200 active:scale-98"
+                      className="w-full cursor-pointer rounded-2xl bg-purple-600 py-3 text-xs font-black text-white shadow-md shadow-purple-600/20 transition-all duration-200 hover:bg-purple-700 active:scale-98"
                     >
                       Close & Go to Dashboard
                     </button>
@@ -1381,8 +1448,6 @@ export const SubscriptionPage: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
-
-
     </PageWrapper>
   )
 }

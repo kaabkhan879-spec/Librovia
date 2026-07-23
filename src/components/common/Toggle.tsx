@@ -59,7 +59,7 @@ export const Toggle: React.FC<ToggleProps> = ({
         disabled={disabled}
         onClick={() => onChange(!checked)}
         onKeyDown={handleKeyDown}
-        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent select-none transition-colors duration-200 ease-in-out focus:ring-2 focus:ring-purple-600/40 focus:ring-offset-2 focus:outline-none active:scale-95 disabled:pointer-events-none disabled:opacity-50 dark:focus:ring-offset-slate-900 ${
+        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out select-none focus:ring-2 focus:ring-purple-600/40 focus:ring-offset-2 focus:outline-none active:scale-95 disabled:pointer-events-none disabled:opacity-50 dark:focus:ring-offset-slate-900 ${
           checked ? 'bg-purple-600 dark:bg-purple-500' : 'bg-slate-200 dark:bg-slate-700'
         }`}
       >

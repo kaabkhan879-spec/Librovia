@@ -28,3 +28,6 @@ USING (auth.uid() = user_id);
 CREATE POLICY "Users can delete their own notifications" 
 ON public.notifications FOR DELETE 
 USING (auth.uid() = user_id);
+
+-- Enable Realtime replication for the notifications table
+alter publication supabase_realtime add table public.notifications;

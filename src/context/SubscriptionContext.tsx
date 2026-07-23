@@ -54,8 +54,6 @@ interface SubscriptionContextType {
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined)
 
-
-
 export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth()
 
@@ -123,7 +121,8 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
             }),
             amount: `PKR ${p.amount_pkr}`,
             planName: p.plan_name,
-            status: p.status === 'Completed' ? 'Paid' : p.status === 'Pending' ? 'Pending' : 'Failed',
+            status:
+              p.status === 'Completed' ? 'Paid' : p.status === 'Pending' ? 'Pending' : 'Failed',
           }))
           setInvoices(mapped as Invoice[])
         }
@@ -203,7 +202,11 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     if (!user?.id) return
     const prevPlanId = currentPlanId
     try {
-      const updated = await subscriptionsService.updateUserSubscription(user.id, newPlanId, billingCycle)
+      const updated = await subscriptionsService.updateUserSubscription(
+        user.id,
+        newPlanId,
+        billingCycle
+      )
       if (updated) {
         setUserSub(updated)
         setCurrentPlanId(newPlanId)
@@ -221,7 +224,11 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     if (!user?.id || !currentPlanId) return
     const prevCycle = billingCycle
     try {
-      const updated = await subscriptionsService.updateUserSubscription(user.id, currentPlanId, cycle)
+      const updated = await subscriptionsService.updateUserSubscription(
+        user.id,
+        currentPlanId,
+        cycle
+      )
       if (updated) {
         setUserSub(updated)
         setBillingCycleState(cycle)
@@ -273,7 +280,10 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     if (userSub?.custom_limit_bytes !== undefined && userSub?.custom_limit_bytes !== null) {
       return Number(userSub.custom_limit_bytes)
     }
-    if (userSub?.custom_storage_limit_bytes !== undefined && userSub?.custom_storage_limit_bytes !== null) {
+    if (
+      userSub?.custom_storage_limit_bytes !== undefined &&
+      userSub?.custom_storage_limit_bytes !== null
+    ) {
       return Number(userSub.custom_storage_limit_bytes)
     }
     return currentPlan.storage_limit_bytes

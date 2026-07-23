@@ -270,7 +270,8 @@ export const AnalyticsPage: React.FC = () => {
               Reading Analytics 📊
             </h1>
             <p className="max-w-xl text-xs font-medium text-purple-100/90">
-              Track your reading habits, speed velocity, goal milestones, and achievements over time.
+              Track your reading habits, speed velocity, goal milestones, and achievements over
+              time.
             </p>
           </div>
 
@@ -397,7 +398,11 @@ export const AnalyticsPage: React.FC = () => {
                 </div>
 
                 <div className="text-[10.5px] font-bold text-slate-500 dark:text-slate-400">
-                  <span>{completedBooks > 0 ? `${completedBooks} completed this month` : '0 completed this month'}</span>
+                  <span>
+                    {completedBooks > 0
+                      ? `${completedBooks} completed this month`
+                      : '0 completed this month'}
+                  </span>
                 </div>
               </motion.div>
 
@@ -458,14 +463,16 @@ export const AnalyticsPage: React.FC = () => {
               {/* Weekly Activity Chart */}
               <motion.div
                 variants={itemVariants}
-                className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900 lg:col-span-1"
+                className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xs lg:col-span-1 dark:border-slate-800 dark:bg-slate-900"
               >
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
                   <div>
                     <h3 className="text-xs font-extrabold tracking-wider text-slate-900 uppercase dark:text-white">
                       Weekly Activity
                     </h3>
-                    <span className="text-[10px] font-semibold text-slate-400">Page logs by day</span>
+                    <span className="text-[10px] font-semibold text-slate-400">
+                      Page logs by day
+                    </span>
                   </div>
                   <span className="flex items-center gap-1 font-mono text-[10px] font-bold text-purple-600 dark:text-purple-400">
                     <TrendingUp className="h-3.5 w-3.5" /> High
@@ -502,14 +509,16 @@ export const AnalyticsPage: React.FC = () => {
               {/* Monthly Activity Chart */}
               <motion.div
                 variants={itemVariants}
-                className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900 lg:col-span-1"
+                className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xs lg:col-span-1 dark:border-slate-800 dark:bg-slate-900"
               >
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
                   <div>
                     <h3 className="text-xs font-extrabold tracking-wider text-slate-900 uppercase dark:text-white">
                       Monthly History
                     </h3>
-                    <span className="text-[10px] font-semibold text-slate-400">Weekly breakdown</span>
+                    <span className="text-[10px] font-semibold text-slate-400">
+                      Weekly breakdown
+                    </span>
                   </div>
                   <span className="rounded-md bg-blue-50 px-2 py-0.5 text-[9px] font-bold text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
                     This Month
@@ -545,14 +554,16 @@ export const AnalyticsPage: React.FC = () => {
               {/* 3. GOALS SECTION WITH ACTIONABLE INSIGHTS */}
               <motion.div
                 variants={itemVariants}
-                className="flex flex-col justify-between rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900 lg:col-span-1"
+                className="flex flex-col justify-between rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xs lg:col-span-1 dark:border-slate-800 dark:bg-slate-900"
               >
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
                   <div>
                     <h3 className="text-xs font-extrabold tracking-wider text-slate-900 uppercase dark:text-white">
                       Reading Goals
                     </h3>
-                    <span className="text-[10px] font-semibold text-slate-400">Motivational targets</span>
+                    <span className="text-[10px] font-semibold text-slate-400">
+                      Motivational targets
+                    </span>
                   </div>
                   <Target className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                 </div>
@@ -562,7 +573,9 @@ export const AnalyticsPage: React.FC = () => {
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-[10px] font-bold">
                       <span className="text-slate-700 dark:text-slate-300">Daily Goal</span>
-                      <span className="text-emerald-600 dark:text-emerald-400">{dailyGoalPercent}%</span>
+                      <span className="text-emerald-600 dark:text-emerald-400">
+                        {dailyGoalPercent}%
+                      </span>
                     </div>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                       <div
@@ -581,7 +594,9 @@ export const AnalyticsPage: React.FC = () => {
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-[10px] font-bold">
                       <span className="text-slate-700 dark:text-slate-300">Weekly Goal</span>
-                      <span className="text-purple-600 dark:text-purple-400">{weeklyGoalPercent}%</span>
+                      <span className="text-purple-600 dark:text-purple-400">
+                        {weeklyGoalPercent}%
+                      </span>
                     </div>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                       <div
@@ -600,7 +615,9 @@ export const AnalyticsPage: React.FC = () => {
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-[10px] font-bold">
                       <span className="text-slate-700 dark:text-slate-300">Monthly Goal</span>
-                      <span className="text-blue-600 dark:text-blue-400">{monthlyGoalPercent}%</span>
+                      <span className="text-blue-600 dark:text-blue-400">
+                        {monthlyGoalPercent}%
+                      </span>
                     </div>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                       <div
@@ -635,7 +652,7 @@ export const AnalyticsPage: React.FC = () => {
                     key={ach.id}
                     className={`group relative flex cursor-pointer flex-col justify-between rounded-3xl border p-4 shadow-xs transition-all duration-200 hover:-translate-y-1 ${
                       ach.earned
-                        ? 'border-slate-200/80 bg-white dark:border-slate-800 dark:bg-slate-900 hover:shadow-md'
+                        ? 'border-slate-200/80 bg-white hover:shadow-md dark:border-slate-800 dark:bg-slate-900'
                         : 'border-dashed border-slate-200 bg-slate-50/50 opacity-60 dark:border-slate-800 dark:bg-slate-900/30'
                     }`}
                   >
@@ -660,7 +677,7 @@ export const AnalyticsPage: React.FC = () => {
                       <h4 className="text-xs font-black text-slate-900 dark:text-white">
                         {ach.title}
                       </h4>
-                      <p className="text-[10px] font-semibold text-slate-400 leading-snug">
+                      <p className="text-[10px] leading-snug font-semibold text-slate-400">
                         {ach.desc}
                       </p>
                     </div>

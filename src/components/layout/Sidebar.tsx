@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { NavLink, Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { ROUTES } from '../../constants/routes'
@@ -17,8 +17,6 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  Sun,
-  Moon,
   Crown,
   ShieldCheck,
   Users,
@@ -41,22 +39,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { currentPlanId } = useSubscription()
   const navigate = useNavigate()
 
-  // Track dark theme state locally to update UI toggle icon
-  const [isDark, setIsDark] = useState(() => {
-    return window.document.documentElement.classList.contains('dark')
-  })
-
-  const toggleTheme = () => {
-    const root = window.document.documentElement
-    if (isDark) {
-      root.classList.remove('dark')
-      setIsDark(false)
-    } else {
-      root.classList.add('dark')
-      setIsDark(true)
-    }
-  }
-
   const handleLogout = async () => {
     await logout()
     navigate(ROUTES.LANDING)
@@ -65,7 +47,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navigation = [
     { name: 'Dashboard', to: ROUTES.DASHBOARD, icon: LayoutDashboard },
     { name: 'My Library', to: ROUTES.LIBRARY, icon: Library },
-    ...((currentPlanId === 'pro' || currentPlanId === 'family')
+    ...(currentPlanId === 'pro' || currentPlanId === 'family'
       ? [{ name: 'Shared Library', to: ROUTES.SHARED_LIBRARY, icon: Users }]
       : []),
     { name: 'Collections', to: ROUTES.COLLECTIONS, icon: Folder },
@@ -180,21 +162,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           )}
 
-          {/* Action row (Theme toggle and sign out) */}
+          {/* Action row (Sign out only) */}
           <div
             className={`flex gap-1.5 ${isCollapsed ? 'flex-col items-center' : 'justify-between'}`}
           >
             <button
-              onClick={toggleTheme}
-              className="border-border-base bg-bg-surface text-text-sub hover:bg-bg-app hover:text-text-main flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border"
-              title={isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
-            >
-              {isDark ? <Sun className="h-4.5 w-4.5" /> : <Moon className="h-4.5 w-4.5" />}
-            </button>
-
-            <button
               onClick={handleLogout}
-              className={`border-border-base bg-bg-surface text-text-sub flex h-9 cursor-pointer items-center justify-center rounded-lg border transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 ${isCollapsed ? 'w-9' : 'flex-1 gap-2 text-xs font-bold uppercase'} `}
+              className={`border-border-base bg-bg-surface text-text-sub flex h-9 cursor-pointer items-center justify-center rounded-lg border transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 ${isCollapsed ? 'w-9' : 'w-full gap-2 text-xs font-bold uppercase'} `}
               title="Sign Out"
             >
               <LogOut className="h-4.5 w-4.5" />

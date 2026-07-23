@@ -111,10 +111,7 @@ export const offlineStorageService = {
   },
 
   // Download PDF Blob for offline reading with progress callback
-  async downloadBookForOffline(
-    book: Book,
-    onProgress?: (progress: number) => void
-  ): Promise<Blob> {
+  async downloadBookForOffline(book: Book, onProgress?: (progress: number) => void): Promise<Blob> {
     const meta: DownloadedBookMeta = {
       bookId: book.id,
       title: book.title,

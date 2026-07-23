@@ -1,15 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import {
-  HardDrive,
-  Trash2,
-  X,
-  BookOpen,
-  CheckCircle2,
-  AlertCircle,
-  RefreshCw,
-} from 'lucide-react'
+import { HardDrive, Trash2, X, BookOpen, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react'
 import { offlineStorageService, type DownloadedBookMeta } from '../../services/offlineStorage'
 import { ROUTES } from '../../constants/routes'
 import { Button } from './Button'
@@ -56,7 +48,9 @@ export const DownloadsManagerModal: React.FC<DownloadsManagerModalProps> = ({
 
   const handleClearAll = async () => {
     if (
-      confirm('Are you sure you want to remove ALL offline downloaded books? (Cloud versions will remain safe)')
+      confirm(
+        'Are you sure you want to remove ALL offline downloaded books? (Cloud versions will remain safe)'
+      )
     ) {
       await offlineStorageService.clearAllDownloads()
       await loadStorageData()
@@ -109,7 +103,7 @@ export const DownloadsManagerModal: React.FC<DownloadsManagerModalProps> = ({
             <div className="border-b border-slate-100 bg-purple-50/40 p-4 dark:border-slate-800 dark:bg-purple-950/20">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-700 dark:text-purple-300">
+                  <span className="text-[10px] font-extrabold tracking-wider text-purple-700 uppercase dark:text-purple-300">
                     Device Storage Used
                   </span>
                   <p className="text-xl font-black text-slate-900 dark:text-white">
@@ -137,7 +131,7 @@ export const DownloadsManagerModal: React.FC<DownloadsManagerModalProps> = ({
                   <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Loading offline books...
                 </div>
               ) : downloads.length === 0 ? (
-                <div className="flex flex-col items-center justify-center p-8 text-center text-slate-400 space-y-3">
+                <div className="flex flex-col items-center justify-center space-y-3 p-8 text-center text-slate-400">
                   <AlertCircle className="h-8 w-8 text-slate-300 dark:text-slate-700" />
                   <div className="space-y-1">
                     <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
@@ -153,9 +147,9 @@ export const DownloadsManagerModal: React.FC<DownloadsManagerModalProps> = ({
                   {downloads.map((item) => (
                     <div
                       key={item.bookId}
-                      className="flex items-center justify-between rounded-2xl border border-slate-100 bg-white p-3.5 shadow-2xs dark:border-slate-800 dark:bg-slate-850"
+                      className="dark:bg-slate-850 flex items-center justify-between rounded-2xl border border-slate-100 bg-white p-3.5 shadow-2xs dark:border-slate-800"
                     >
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
                         {item.coverPath ? (
                           <img
                             src={item.coverPath}

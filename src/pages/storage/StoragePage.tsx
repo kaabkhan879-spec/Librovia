@@ -133,19 +133,19 @@ export const StoragePage: React.FC = () => {
             exit={{ opacity: 0 }}
             className="space-y-6"
           >
-            <div className="rounded-3xl border border-slate-100 bg-white p-6 h-28 flex flex-col justify-between dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex h-28 flex-col justify-between rounded-3xl border border-slate-100 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
               <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-2xl shimmer-placeholder shrink-0" />
+                  <div className="shimmer-placeholder h-12 w-12 shrink-0 rounded-2xl" />
                   <div className="space-y-2">
-                    <div className="h-3 w-20 rounded shimmer-placeholder" />
-                    <div className="h-6 w-48 rounded shimmer-placeholder" />
+                    <div className="shimmer-placeholder h-3 w-20 rounded" />
+                    <div className="shimmer-placeholder h-6 w-48 rounded" />
                   </div>
                 </div>
                 <div className="w-full max-w-md flex-1 space-y-2.5">
                   <div className="flex justify-between">
-                    <div className="h-3 w-16 rounded shimmer-placeholder" />
-                    <div className="h-3 w-8 rounded shimmer-placeholder" />
+                    <div className="shimmer-placeholder h-3 w-16 rounded" />
+                    <div className="shimmer-placeholder h-3 w-8 rounded" />
                   </div>
                   <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800" />
                 </div>
@@ -164,10 +164,13 @@ export const StoragePage: React.FC = () => {
             {storagePercent >= 85 && (
               <motion.div
                 variants={itemVariants}
-                className="flex items-center gap-3 rounded-2xl border border-amber-250 bg-amber-50 p-4 text-xs font-semibold text-amber-800 dark:border-amber-950/30 dark:bg-amber-950/15 dark:text-amber-300"
+                className="border-amber-250 flex items-center gap-3 rounded-2xl border bg-amber-50 p-4 text-xs font-semibold text-amber-800 dark:border-amber-950/30 dark:bg-amber-950/15 dark:text-amber-300"
               >
                 <ShieldAlert className="h-5 w-5 shrink-0" />
-                <p>Warning: You are approaching your storage limit. Consider upgrading your plan to prevent upload failures.</p>
+                <p>
+                  Warning: You are approaching your storage limit. Consider upgrading your plan to
+                  prevent upload failures.
+                </p>
               </motion.div>
             )}
 
@@ -176,7 +179,7 @@ export const StoragePage: React.FC = () => {
               variants={itemVariants}
               className="rounded-3xl border border-purple-200/80 bg-white p-6 shadow-xs dark:border-purple-900/40 dark:bg-slate-900"
             >
-              <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between border-b border-slate-100 pb-5 dark:border-slate-800">
+              <div className="flex flex-col gap-6 border-b border-slate-100 pb-5 lg:flex-row lg:items-center lg:justify-between dark:border-slate-800">
                 <div className="flex items-center gap-4">
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-600/20">
                     <Crown className="h-6 w-6" />
@@ -319,7 +322,7 @@ export const StoragePage: React.FC = () => {
                   <span className="text-[9px] font-extrabold tracking-wider text-slate-400 uppercase">
                     Remaining Space
                   </span>
-                  <div className="flex h-7 w-7 items-center justify-center rounded-lg text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/20">
                     <HardDrive className="h-4 w-4" />
                   </div>
                 </div>
@@ -339,7 +342,7 @@ export const StoragePage: React.FC = () => {
                   <span className="text-[9px] font-extrabold tracking-wider text-slate-400 uppercase">
                     Available Limit ({currentPlan.plan_name})
                   </span>
-                  <div className="flex h-7 w-7 items-center justify-center rounded-lg text-blue-600 bg-blue-50 dark:bg-blue-950/20">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/20">
                     <Database className="h-4 w-4" />
                   </div>
                 </div>
@@ -359,7 +362,7 @@ export const StoragePage: React.FC = () => {
                   <span className="text-[9px] font-extrabold tracking-wider text-slate-400 uppercase">
                     Total Uploaded Files
                   </span>
-                  <div className="flex h-7 w-7 items-center justify-center rounded-lg text-purple-650 bg-purple-50 dark:bg-purple-950/20">
+                  <div className="text-purple-650 flex h-7 w-7 items-center justify-center rounded-lg bg-purple-50 dark:bg-purple-950/20">
                     <Cloud className="h-4 w-4" />
                   </div>
                 </div>
@@ -376,13 +379,13 @@ export const StoragePage: React.FC = () => {
               variants={itemVariants}
               className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900"
             >
-              <div className="border-b border-slate-50 p-5 text-left dark:border-slate-800/40 flex items-center justify-between">
+              <div className="flex items-center justify-between border-b border-slate-50 p-5 text-left dark:border-slate-800/40">
                 <h3 className="text-sm font-bold tracking-wider text-slate-800 uppercase dark:text-white">
                   Library Space Allocation Breakdown
                 </h3>
 
                 {/* Cache Deletion Action Button with Clear Tooltip/Explanation */}
-                <div className="relative group">
+                <div className="group relative">
                   <button
                     type="button"
                     onClick={handleClearCache}
@@ -391,11 +394,12 @@ export const StoragePage: React.FC = () => {
                     <Trash2 className="h-3.5 w-3.5" />
                     <span>Clear Local Cache</span>
                   </button>
-                  <div className="absolute right-0 top-full mt-2 hidden w-64 rounded-xl border border-slate-200 bg-slate-900 p-2.5 text-[11px] font-medium leading-normal text-slate-200 shadow-xl group-hover:block z-20 dark:border-slate-700 dark:bg-slate-800">
+                  <div className="absolute top-full right-0 z-20 mt-2 hidden w-64 rounded-xl border border-slate-200 bg-slate-900 p-2.5 text-[11px] leading-normal font-medium text-slate-200 shadow-xl group-hover:block dark:border-slate-700 dark:bg-slate-800">
                     <div className="flex items-start gap-1.5">
-                      <Info className="h-3.5 w-3.5 text-purple-400 shrink-0 mt-0.5" />
+                      <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-purple-400" />
                       <p>
-                        Clears offline PDF cache from local browser storage. Your cloud library books and notes stay 100% safe.
+                        Clears offline PDF cache from local browser storage. Your cloud library
+                        books and notes stay 100% safe.
                       </p>
                     </div>
                   </div>
@@ -448,18 +452,21 @@ export const StoragePage: React.FC = () => {
             {/* Premium Upgrade Banner */}
             <motion.div
               variants={itemVariants}
-              className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-purple-700 via-indigo-850 to-slate-900 p-6 text-white shadow-lg text-left"
+              className="via-indigo-850 relative overflow-hidden rounded-3xl bg-gradient-to-r from-purple-700 to-slate-900 p-6 text-left text-white shadow-lg"
             >
               <div className="absolute -top-16 -right-16 h-48 w-48 rounded-full bg-purple-500/20 blur-2xl" />
               <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="space-y-1.5 max-w-xl">
+                <div className="max-w-xl space-y-1.5">
                   <span className="flex items-center gap-1 text-[9px] font-extrabold tracking-widest text-purple-300 uppercase">
                     <Sparkles className="h-3 w-3 shrink-0" />
                     Subscription Upgrade
                   </span>
-                  <h3 className="text-lg font-black tracking-tight">Need more digital storage space?</h3>
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    Upgrade your plan to unlock up to 1 TB cloud storage, unlimited AI search, unlimited offline downloads, and family sharing.
+                  <h3 className="text-lg font-black tracking-tight">
+                    Need more digital storage space?
+                  </h3>
+                  <p className="text-xs leading-relaxed text-slate-300">
+                    Upgrade your plan to unlock up to 1 TB cloud storage, unlimited AI search,
+                    unlimited offline downloads, and family sharing.
                   </p>
                 </div>
                 <div className="shrink-0 pt-2 sm:pt-0">

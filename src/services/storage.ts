@@ -37,7 +37,11 @@ export class StorageError extends Error {
 // Helper to validate files before sending to network
 function validateFile(
   file: File,
-  config: { maxSize: number; allowedTypes: readonly string[]; allowedExtensions: readonly string[] },
+  config: {
+    maxSize: number
+    allowedTypes: readonly string[]
+    allowedExtensions: readonly string[]
+  },
   label: string
 ) {
   if (file.size > config.maxSize) {

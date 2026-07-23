@@ -155,10 +155,19 @@ export const BookDetailsPage: React.FC = () => {
   const [collections, setCollections] = useState<Collection[]>([])
 
   // Sharing states
+  interface ResolvedRecipient {
+    userId: string
+    email: string
+    name: string
+    plan: string
+    joined: string
+    avatar: string
+  }
+
   const [isShareModalOpen, setIsShareModalOpen] = useState(false)
   const [shareEmail, setShareEmail] = useState('')
   const [searchingUser, setSearchingUser] = useState(false)
-  const [resolvedRecipient, setResolvedRecipient] = useState<any | null>(null)
+  const [resolvedRecipient, setResolvedRecipient] = useState<ResolvedRecipient | null>(null)
   const [searchError, setSearchError] = useState<string | null>(null)
 
   // Layout states
@@ -1215,10 +1224,8 @@ export const BookDetailsPage: React.FC = () => {
               {/* Header */}
               <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
                 <div>
-                  <h3 className="text-sm font-black text-slate-900 dark:text-white">
-                    Share Book
-                  </h3>
-                  <p className="text-[10px] text-slate-400 font-medium">
+                  <h3 className="text-sm font-black text-slate-900 dark:text-white">Share Book</h3>
+                  <p className="text-[10px] font-medium text-slate-400">
                     Invite another premium Librovia user to read this book.
                   </p>
                 </div>
@@ -1248,13 +1255,13 @@ export const BookDetailsPage: React.FC = () => {
                       value={shareEmail}
                       onChange={(e) => setShareEmail(e.target.value)}
                       placeholder="e.g. ahmad@gmail.com"
-                      className="flex-1 rounded-2xl border border-slate-200 bg-slate-50/50 px-3.5 py-2 text-xs font-semibold text-slate-900 placeholder-slate-400 outline-hidden focus:border-purple-650 focus:bg-white dark:border-slate-850 dark:bg-slate-800/40 dark:text-white"
+                      className="focus:border-purple-650 dark:border-slate-850 flex-1 rounded-2xl border border-slate-200 bg-slate-50/50 px-3.5 py-2 text-xs font-semibold text-slate-900 placeholder-slate-400 outline-hidden focus:bg-white dark:bg-slate-800/40 dark:text-white"
                     />
                     <button
                       type="button"
                       disabled={searchingUser}
                       onClick={handleSearchUser}
-                      className="cursor-pointer rounded-2xl bg-purple-600 px-4 py-2 text-xs font-bold tracking-wider text-white uppercase hover:bg-purple-700 disabled:opacity-55 flex items-center gap-1.5"
+                      className="flex cursor-pointer items-center gap-1.5 rounded-2xl bg-purple-600 px-4 py-2 text-xs font-bold tracking-wider text-white uppercase hover:bg-purple-700 disabled:opacity-55"
                     >
                       {searchingUser ? 'Searching...' : 'Search'}
                     </button>
@@ -1269,7 +1276,7 @@ export const BookDetailsPage: React.FC = () => {
                 )}
 
                 {resolvedRecipient && (
-                  <div className="rounded-2xl border border-slate-100 bg-slate-50/40 p-4 space-y-4 text-left dark:border-slate-850 dark:bg-slate-800/20">
+                  <div className="dark:border-slate-850 space-y-4 rounded-2xl border border-slate-100 bg-slate-50/40 p-4 text-left dark:bg-slate-800/20">
                     <div className="flex items-center gap-3">
                       <img
                         src={resolvedRecipient.avatar}
@@ -1277,41 +1284,47 @@ export const BookDetailsPage: React.FC = () => {
                         className="h-11 w-11 rounded-2xl border border-slate-100 shadow-sm"
                       />
                       <div className="space-y-0.5">
-                        <p className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1">
+                        <p className="flex items-center gap-1 text-xs font-extrabold text-slate-900 dark:text-white">
                           <span>{resolvedRecipient.name}</span>
-                          <span className="inline-flex items-center gap-0.5 rounded bg-emerald-50 px-1.5 py-0.2 text-[8px] font-black text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+                          <span className="py-0.2 inline-flex items-center gap-0.5 rounded bg-emerald-50 px-1.5 text-[8px] font-black text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
                             Verified
                           </span>
                         </p>
-                        <p className="text-[10px] text-slate-400 font-semibold">{resolvedRecipient.email}</p>
-                        <p className="text-[9px] text-slate-400 font-semibold">Joined {resolvedRecipient.joined}</p>
+                        <p className="text-[10px] font-semibold text-slate-400">
+                          {resolvedRecipient.email}
+                        </p>
+                        <p className="text-[9px] font-semibold text-slate-400">
+                          Joined {resolvedRecipient.joined}
+                        </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between border-t border-slate-100 pt-3 dark:border-slate-850">
+                    <div className="dark:border-slate-850 flex items-center justify-between border-t border-slate-100 pt-3">
                       <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase">
                         Subscription Badge
                       </span>
-                      <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[8.5px] font-black tracking-wider ${
-                        resolvedRecipient.plan === 'FREE'
-                          ? 'bg-slate-100 text-slate-500'
-                          : resolvedRecipient.plan === 'PRO'
-                            ? 'bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-300'
-                            : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400'
-                      }`}>
+                      <span
+                        className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[8.5px] font-black tracking-wider ${
+                          resolvedRecipient.plan === 'FREE'
+                            ? 'bg-slate-100 text-slate-500'
+                            : resolvedRecipient.plan === 'PRO'
+                              ? 'bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-300'
+                              : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400'
+                        }`}
+                      >
                         <Crown className="h-2.5 w-2.5" />
                         {resolvedRecipient.plan} MEMBER
                       </span>
                     </div>
 
                     {/* Permissions Locking checks */}
-                    <div className="border-t border-slate-100 pt-3 space-y-2 dark:border-slate-850">
+                    <div className="dark:border-slate-850 space-y-2 border-t border-slate-100 pt-3">
                       <span className="block text-[8px] font-bold tracking-widest text-slate-400 uppercase">
                         Permissions Options
                       </span>
                       <div className="flex flex-col gap-2">
                         <div className="flex items-center justify-between">
-                          <label className="text-[10.5px] font-bold text-slate-600 dark:text-slate-350 flex items-center gap-2">
+                          <label className="dark:text-slate-350 flex items-center gap-2 text-[10.5px] font-bold text-slate-600">
                             <input
                               type="checkbox"
                               checked={true}
@@ -1320,10 +1333,12 @@ export const BookDetailsPage: React.FC = () => {
                             />
                             <span>Read Only</span>
                           </label>
-                          <span className="text-[9px] font-bold text-emerald-500 uppercase">Enabled</span>
+                          <span className="text-[9px] font-bold text-emerald-500 uppercase">
+                            Enabled
+                          </span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <label className="text-[10.5px] font-bold text-slate-400 dark:text-slate-500 flex items-center gap-2">
+                          <label className="flex items-center gap-2 text-[10.5px] font-bold text-slate-400 dark:text-slate-500">
                             <input
                               type="checkbox"
                               checked={false}
@@ -1332,10 +1347,12 @@ export const BookDetailsPage: React.FC = () => {
                             />
                             <span>Allow Download</span>
                           </label>
-                          <span className="text-[9px] font-bold text-rose-500 uppercase">Locked</span>
+                          <span className="text-[9px] font-bold text-rose-500 uppercase">
+                            Locked
+                          </span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <label className="text-[10.5px] font-bold text-slate-400 dark:text-slate-500 flex items-center gap-2">
+                          <label className="flex items-center gap-2 text-[10.5px] font-bold text-slate-400 dark:text-slate-500">
                             <input
                               type="checkbox"
                               checked={false}
@@ -1344,7 +1361,9 @@ export const BookDetailsPage: React.FC = () => {
                             />
                             <span>Allow Re-share</span>
                           </label>
-                          <span className="text-[9px] font-bold text-rose-500 uppercase">Locked</span>
+                          <span className="text-[9px] font-bold text-rose-500 uppercase">
+                            Locked
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -1354,7 +1373,7 @@ export const BookDetailsPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={handleShareBook}
-                        className="w-full cursor-pointer justify-center rounded-2xl bg-purple-600 py-2.5 text-xs font-black tracking-wider text-white uppercase hover:bg-purple-700 shadow-sm"
+                        className="w-full cursor-pointer justify-center rounded-2xl bg-purple-600 py-2.5 text-xs font-black tracking-wider text-white uppercase shadow-sm hover:bg-purple-700"
                       >
                         Share Book
                       </button>

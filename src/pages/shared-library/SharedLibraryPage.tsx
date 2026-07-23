@@ -35,6 +35,16 @@ interface SharedBook {
   owner_email?: string
 }
 
+interface SharedUser {
+  id: string
+  recipient_id: string
+  name: string
+  email: string
+  plan_id: string
+  status: string
+  joined_date: string
+}
+
 export const SharedLibraryPage: React.FC = () => {
   const { user } = useAuth()
   const { currentPlanId } = useSubscription()
@@ -48,7 +58,7 @@ export const SharedLibraryPage: React.FC = () => {
 
   // Manage Access Modal States
   const [selectedBook, setSelectedBook] = useState<{ id: string; title: string } | null>(null)
-  const [sharedUsers, setSharedUsers] = useState<any[]>([])
+  const [sharedUsers, setSharedUsers] = useState<SharedUser[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
 
   // Load shared list
@@ -74,7 +84,9 @@ export const SharedLibraryPage: React.FC = () => {
       navigate(ROUTES.DASHBOARD)
       return
     }
-    loadSharedBooks()
+    Promise.resolve().then(() => {
+      loadSharedBooks()
+    })
   }, [currentPlanId, navigate, loadSharedBooks, showError])
 
   // Open manage users modal
@@ -210,7 +222,7 @@ export const SharedLibraryPage: React.FC = () => {
                   {sharedByMe.map((share) => (
                     <div
                       key={share.id}
-                      className="group flex gap-4 rounded-3xl border border-slate-100 bg-white p-4 shadow-2xs hover:border-purple-500/10 dark:border-slate-850 dark:bg-slate-900"
+                      className="group dark:border-slate-850 flex gap-4 rounded-3xl border border-slate-100 bg-white p-4 shadow-2xs hover:border-purple-500/10 dark:bg-slate-900"
                     >
                       {/* Cover Thumbnail */}
                       <Link
@@ -235,11 +247,12 @@ export const SharedLibraryPage: React.FC = () => {
                             {share.book_title}
                           </h4>
                           <p className="truncate text-[10px] font-bold text-slate-400">
-                            Shared with: <span className="text-purple-500">{share.recipient_email}</span>
+                            Shared with:{' '}
+                            <span className="text-purple-500">{share.recipient_email}</span>
                           </p>
                           <div className="flex flex-wrap gap-1.5 pt-1">
                             <span
-                              className={`rounded px-1.5 py-0.5 text-[8.5px] font-black uppercase tracking-wider ${
+                              className={`rounded px-1.5 py-0.5 text-[8.5px] font-black tracking-wider uppercase ${
                                 share.status === 'accepted'
                                   ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/20 dark:text-emerald-400'
                                   : share.status === 'declined'
@@ -255,9 +268,7 @@ export const SharedLibraryPage: React.FC = () => {
                         {/* Actions block */}
                         <div className="flex gap-1.5 pt-2">
                           <button
-                            onClick={() =>
-                              handleOpenManageAccess(share.book_id, share.book_title)
-                            }
+                            onClick={() => handleOpenManageAccess(share.book_id, share.book_title)}
                             className="cursor-pointer rounded-xl bg-purple-50 px-3 py-1.5 text-[10px] font-bold tracking-wider text-purple-700 uppercase transition-colors hover:bg-purple-100 dark:bg-purple-950/30 dark:text-purple-300"
                           >
                             Manage Access
@@ -302,7 +313,7 @@ export const SharedLibraryPage: React.FC = () => {
                   {sharedWithMe.map((share) => (
                     <div
                       key={share.id}
-                      className="group flex gap-4 rounded-3xl border border-slate-100 bg-white p-4 shadow-2xs hover:border-purple-500/10 dark:border-slate-850 dark:bg-slate-900"
+                      className="group dark:border-slate-850 flex gap-4 rounded-3xl border border-slate-100 bg-white p-4 shadow-2xs hover:border-purple-500/10 dark:bg-slate-900"
                     >
                       {/* Cover Thumbnail */}
                       <Link
@@ -337,11 +348,8 @@ export const SharedLibraryPage: React.FC = () => {
 
                         {/* Actions block */}
                         <div className="flex gap-1.5 pt-2">
-                          <Link
-                            to={ROUTES.READER.replace(':id', share.book_id)}
-                            className="flex-1"
-                          >
-                            <button className="w-full cursor-pointer justify-center gap-1.5 rounded-xl bg-purple-600 px-3 py-1.5 text-[10px] font-black text-white hover:bg-purple-700 transition-colors flex items-center">
+                          <Link to={ROUTES.READER.replace(':id', share.book_id)} className="flex-1">
+                            <button className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-purple-600 px-3 py-1.5 text-[10px] font-black text-white transition-colors hover:bg-purple-700">
                               <Play className="h-3 w-3 fill-white" />
                               <span>Read</span>
                             </button>
@@ -402,13 +410,13 @@ export const SharedLibraryPage: React.FC = () => {
                 </div>
 
                 {/* Users List */}
-                <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+                <div className="max-h-60 space-y-3 overflow-y-auto pr-1">
                   {loadingUsers ? (
-                    <div className="flex py-8 items-center justify-center">
+                    <div className="flex items-center justify-center py-8">
                       <div className="h-6 w-6 animate-spin rounded-full border-2 border-purple-600 border-t-transparent" />
                     </div>
                   ) : sharedUsers.length === 0 ? (
-                    <p className="text-center text-xs text-slate-400 py-6">
+                    <p className="py-6 text-center text-xs text-slate-400">
                       No active shares for this book.
                     </p>
                   ) : (
@@ -421,15 +429,13 @@ export const SharedLibraryPage: React.FC = () => {
                           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-400">
                             <User className="h-4.5 w-4.5" />
                           </div>
-                          <div className="text-left space-y-0.5">
-                            <p className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1">
+                          <div className="space-y-0.5 text-left">
+                            <p className="flex items-center gap-1 text-xs font-extrabold text-slate-900 dark:text-white">
                               <span>{u.name}</span>
                               <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
                             </p>
-                            <p className="text-[10px] text-slate-400 font-medium">
-                              {u.email}
-                            </p>
-                            <span className="inline-flex items-center gap-1 rounded bg-purple-50 px-1 py-0.2 text-[8px] font-black text-purple-600 dark:bg-purple-950/40 dark:text-purple-300">
+                            <p className="text-[10px] font-medium text-slate-400">{u.email}</p>
+                            <span className="py-0.2 inline-flex items-center gap-1 rounded bg-purple-50 px-1 text-[8px] font-black text-purple-600 dark:bg-purple-950/40 dark:text-purple-300">
                               <Crown className="h-2.5 w-2.5" />
                               {u.plan_id.toUpperCase()} MEMBER
                             </span>

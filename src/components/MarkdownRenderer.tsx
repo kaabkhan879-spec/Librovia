@@ -11,7 +11,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ text }) => {
   const blocks = text.split(/\n\n+/)
 
   return (
-    <div className="space-y-4 font-sans text-[11px] leading-relaxed text-slate-850 dark:text-slate-150">
+    <div className="text-slate-850 dark:text-slate-150 space-y-4 font-sans text-[11px] leading-relaxed">
       {blocks.map((block, idx) => {
         const trimmed = block.trim()
         if (!trimmed) return null
@@ -26,10 +26,10 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ text }) => {
           return (
             <pre
               key={idx}
-              className="overflow-x-auto rounded-2xl bg-slate-950 p-4 font-mono text-[9.5px] text-slate-100 dark:bg-slate-900 border border-slate-800/80 my-2"
+              className="my-2 overflow-x-auto rounded-2xl border border-slate-800/80 bg-slate-950 p-4 font-mono text-[9.5px] text-slate-100 dark:bg-slate-900"
             >
               {language && (
-                <div className="text-[7.5px] font-black uppercase text-slate-500 mb-2 tracking-widest">
+                <div className="mb-2 text-[7.5px] font-black tracking-widest text-slate-500 uppercase">
                   {language}
                 </div>
               )}
@@ -58,10 +58,10 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ text }) => {
             return (
               <div
                 key={idx}
-                className="overflow-x-auto my-3 border border-slate-100 dark:border-slate-800/60 rounded-2xl shadow-xs"
+                className="my-3 overflow-x-auto rounded-2xl border border-slate-100 shadow-xs dark:border-slate-800/60"
               >
-                <table className="min-w-full divide-y divide-slate-150 dark:divide-slate-800 text-left border-collapse">
-                  <thead className="bg-slate-50 dark:bg-slate-950/45 text-[8.5px] font-extrabold text-slate-400 uppercase tracking-widest">
+                <table className="divide-slate-150 min-w-full border-collapse divide-y text-left dark:divide-slate-800">
+                  <thead className="bg-slate-50 text-[8.5px] font-extrabold tracking-widest text-slate-400 uppercase dark:bg-slate-950/45">
                     <tr>
                       {headers.map((h, i) => (
                         <th key={i} className="px-3.5 py-2.5 font-black">
@@ -70,9 +70,9 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ text }) => {
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 bg-white dark:bg-slate-900 text-[10px] font-medium text-slate-700 dark:text-slate-300">
+                  <tbody className="divide-y divide-slate-100 bg-white text-[10px] font-medium text-slate-700 dark:divide-slate-800/60 dark:bg-slate-900 dark:text-slate-300">
                     {bodyRows.map((row, rIdx) => (
-                      <tr key={rIdx} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/40">
+                      <tr key={rIdx} className="dark:hover:bg-slate-850/40 hover:bg-slate-50/50">
                         {row.map((cell, cIdx) => (
                           <td key={cIdx} className="px-3.5 py-2.5 whitespace-pre-wrap">
                             {parseInline(cell)}
@@ -98,19 +98,22 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ text }) => {
               return (
                 <h1
                   key={idx}
-                  className="text-sm font-black text-slate-900 dark:text-white pt-2.5 border-b border-slate-100 dark:border-slate-800 pb-1"
+                  className="border-b border-slate-100 pt-2.5 pb-1 text-sm font-black text-slate-900 dark:border-slate-800 dark:text-white"
                 >
                   {parsed}
                 </h1>
               )
             if (level === 2)
               return (
-                <h2 key={idx} className="text-xs font-black text-slate-900 dark:text-white pt-2">
+                <h2 key={idx} className="pt-2 text-xs font-black text-slate-900 dark:text-white">
                   {parsed}
                 </h2>
               )
             return (
-              <h3 key={idx} className="text-[11px] font-extrabold text-slate-900 dark:text-white pt-1">
+              <h3
+                key={idx}
+                className="pt-1 text-[11px] font-extrabold text-slate-900 dark:text-white"
+              >
                 {parsed}
               </h3>
             )
@@ -123,7 +126,10 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ text }) => {
             return item.replace(/^[\*\-•]\s+/, '')
           })
           return (
-            <ul key={idx} className="list-disc pl-5 space-y-1 my-1 text-slate-755 dark:text-slate-200">
+            <ul
+              key={idx}
+              className="text-slate-755 my-1 list-disc space-y-1 pl-5 dark:text-slate-200"
+            >
               {items.map((item, i) => (
                 <li key={i}>{parseInline(item)}</li>
               ))}
@@ -139,7 +145,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ text }) => {
           return (
             <ol
               key={idx}
-              className="list-decimal pl-5 space-y-1 my-1 text-slate-755 dark:text-slate-200"
+              className="text-slate-755 my-1 list-decimal space-y-1 pl-5 dark:text-slate-200"
             >
               {items.map((item, i) => (
                 <li key={i}>{parseInline(item)}</li>
@@ -213,7 +219,7 @@ function parseInline(text: string): React.ReactNode[] {
       parts.push(
         <code
           key={index++}
-          className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] font-mono text-purple-650 dark:text-purple-400"
+          className="text-purple-650 rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] dark:bg-slate-800 dark:text-purple-400"
         >
           {content}
         </code>
