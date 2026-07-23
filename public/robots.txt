@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /reader/
+Disallow: /settings/
+Disallow: /profile/
+
+Sitemap: https://librovia.app/sitemap.xml
