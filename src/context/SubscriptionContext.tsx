@@ -333,7 +333,29 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 export const useSubscription = () => {
   const context = useContext(SubscriptionContext)
   if (!context) {
-    throw new Error('useSubscription must be used within a SubscriptionProvider')
+    console.warn('[PWA] useSubscription called outside of SubscriptionProvider. Returning safe fallback values.')
+    return {
+      plans: DEFAULT_PLANS,
+      loadingPlans: false,
+      currentPlan: DEFAULT_PLANS[0],
+      currentPlanId: 'free',
+      billingCycle: 'monthly' as BillingCycle,
+      subscriptionStatus: 'Active' as const,
+      renewalDate: 'N/A',
+      daysRemaining: 365,
+      isExpired: false,
+      storageUsedBytes: 0,
+      storageLimitBytes: DEFAULT_PLANS[0].storage_limit_bytes,
+      invoices: [],
+      paymentMethods: [],
+      setPlan: async () => {},
+      setBillingCycle: async () => {},
+      cancelSubscription: async () => {},
+      reactivateSubscription: async () => {},
+      canUploadFile: () => true,
+      hasReachedAILimit: () => false,
+      refreshSubscription: async () => {},
+    }
   }
   return context
 }
