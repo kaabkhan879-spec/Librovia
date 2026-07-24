@@ -185,9 +185,9 @@ export const offlineStorageService = {
       await this.saveDownloadMeta(meta)
 
       return blob
-    } catch (err: any) {
+    } catch (err) {
       meta.status = 'failed'
-      meta.error = err.message || 'Download failed'
+      meta.error = err instanceof Error ? err.message : 'Download failed'
       await this.saveDownloadMeta(meta)
       throw err
     }

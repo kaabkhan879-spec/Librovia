@@ -11,16 +11,13 @@ if (!import.meta.env.VITE_SUPABASE_ANON_KEY) {
 }
 
 // PKCE flow requires a secure context (HTTPS or localhost) due to window.crypto.subtle
-const isSecureContext =
-  typeof window !== 'undefined' &&
-  !!window.crypto &&
-  !!window.crypto.subtle
+const isSecureContext = typeof window !== 'undefined' && !!window.crypto && !!window.crypto.subtle
 
-export const supabase = createClient<any>(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    flowType: isSecureContext ? 'pkce' : 'implicit'
-  }
+    flowType: isSecureContext ? 'pkce' : 'implicit',
+  },
 })

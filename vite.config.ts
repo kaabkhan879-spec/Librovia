@@ -24,32 +24,32 @@ export default defineConfig({
         theme_color: '#8B5CF6',
         orientation: 'portrait',
         description: 'Store, organize, read, and sync your books securely across all your devices.',
-        categories: ["books", "education", "utilities"],
+        categories: ['books', 'education', 'utilities'],
         icons: [
           {
             src: '/assets/icon-192.png',
             sizes: '192x192',
             type: 'image/png',
-            purpose: 'any'
+            purpose: 'any',
           },
           {
             src: '/assets/icon-192-maskable.png',
             sizes: '192x192',
             type: 'image/png',
-            purpose: 'maskable'
+            purpose: 'maskable',
           },
           {
             src: '/assets/icon-512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any'
+            purpose: 'any',
           },
           {
             src: '/assets/icon-512-maskable.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'maskable'
-          }
+            purpose: 'maskable',
+          },
         ],
         shortcuts: [
           {
@@ -57,29 +57,29 @@ export default defineConfig({
             short_name: 'Library',
             description: 'Open your books list',
             url: '/library',
-            icons: [{ src: '/assets/icon-192.png', sizes: '192x192' }]
+            icons: [{ src: '/assets/icon-192.png', sizes: '192x192' }],
           },
           {
             name: 'Shared Library',
             short_name: 'Shared',
             description: 'View shared books',
             url: '/shared-library',
-            icons: [{ src: '/assets/icon-192.png', sizes: '192x192' }]
+            icons: [{ src: '/assets/icon-192.png', sizes: '192x192' }],
           },
           {
             name: 'Analytics',
             short_name: 'Analytics',
             description: 'View reading statistics',
             url: '/analytics',
-            icons: [{ src: '/assets/icon-192.png', sizes: '192x192' }]
+            icons: [{ src: '/assets/icon-192.png', sizes: '192x192' }],
           },
           {
             name: 'Settings',
             short_name: 'Settings',
             description: 'Change reading settings',
             url: '/settings',
-            icons: [{ src: '/assets/icon-192.png', sizes: '192x192' }]
-          }
+            icons: [{ src: '/assets/icon-192.png', sizes: '192x192' }],
+          },
         ],
         screenshots: [
           {
@@ -87,16 +87,16 @@ export default defineConfig({
             sizes: '1920x1080',
             type: 'image/png',
             form_factor: 'wide',
-            label: 'Librovia Premium Cinematic Canvas & Shelf View'
+            label: 'Librovia Premium Cinematic Canvas & Shelf View',
           },
           {
             src: '/assets/cozy_library_reading.png',
             sizes: '1920x1080',
             type: 'image/png',
             form_factor: 'narrow',
-            label: 'Librovia Reading Canvas Mobile View'
-          }
-        ]
+            label: 'Librovia Reading Canvas Mobile View',
+          },
+        ],
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,json}'],
@@ -111,7 +111,7 @@ export default defineConfig({
                 url.pathname.startsWith('/auth/')
               )
             },
-            handler: 'NetworkOnly'
+            handler: 'NetworkOnly',
           },
           {
             urlPattern: /\.(?:js|css|html|svg|png|jpg|jpeg|gif|woff2)$/,
@@ -120,13 +120,13 @@ export default defineConfig({
               cacheName: 'librovia-assets-cache',
               expiration: {
                 maxEntries: 150,
-                maxAgeSeconds: 30 * 24 * 60 * 60
-              }
-            }
-          }
-        ]
-      }
-    })
+                maxAgeSeconds: 30 * 24 * 60 * 60,
+              },
+            },
+          },
+        ],
+      },
+    }),
   ],
   build: {
     rollupOptions: {
@@ -139,7 +139,12 @@ export default defineConfig({
             if (id.includes('supabase') || id.includes('postgrest')) {
               return 'vendor-supabase'
             }
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom') || id.includes('react-router')) {
+            if (
+              id.includes('react') ||
+              id.includes('react-dom') ||
+              id.includes('react-router-dom') ||
+              id.includes('react-router')
+            ) {
               return 'vendor-react'
             }
             if (id.includes('framer-motion')) {

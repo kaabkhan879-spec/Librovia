@@ -72,20 +72,29 @@ export const LoginForm: React.FC = () => {
     <AuthCard>
       <div className="space-y-7 text-left">
         <div>
-          <h2 className="text-[#FFFFFF] text-3xl font-bold tracking-tight">Welcome Back 👋</h2>
-          <p className="text-[#CBD5E1] mt-2 text-xs font-semibold">
+          <h2 className="text-3xl font-bold tracking-tight text-[#FFFFFF]">Welcome Back 👋</h2>
+          <p className="mt-2 text-xs font-semibold text-[#CBD5E1]">
             Sign in to continue your reading journey.
           </p>
         </div>
 
         {!isSupabaseConfigured && (
-          <div className="bg-amber-950/40 border border-amber-500/30 rounded-2xl p-4 text-xs text-amber-200 space-y-1.5 backdrop-blur-sm">
-            <div className="font-bold flex items-center gap-1.5 text-amber-400">
-              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500 animate-pulse" />
+          <div className="space-y-1.5 rounded-2xl border border-amber-500/30 bg-amber-950/40 p-4 text-xs text-amber-200 backdrop-blur-sm">
+            <div className="flex items-center gap-1.5 font-bold text-amber-400">
+              <AlertTriangle className="h-4 w-4 shrink-0 animate-pulse text-amber-500" />
               <span>Configuration Required</span>
             </div>
             <p className="leading-relaxed text-amber-200/80">
-              Supabase connection keys are missing from the build environment. If this is deployed on Vercel, please add <code className="bg-black/35 px-1 py-0.5 rounded text-amber-300 font-mono text-[10px]">VITE_SUPABASE_URL</code> and <code className="bg-black/35 px-1 py-0.5 rounded text-amber-300 font-mono text-[10px]">VITE_SUPABASE_ANON_KEY</code> to your Vercel Project Settings, then redeploy the project.
+              Supabase connection keys are missing from the build environment. If this is deployed
+              on Vercel, please add{' '}
+              <code className="rounded bg-black/35 px-1 py-0.5 font-mono text-[10px] text-amber-300">
+                VITE_SUPABASE_URL
+              </code>{' '}
+              and{' '}
+              <code className="rounded bg-black/35 px-1 py-0.5 font-mono text-[10px] text-amber-300">
+                VITE_SUPABASE_ANON_KEY
+              </code>{' '}
+              to your Vercel Project Settings, then redeploy the project.
             </p>
           </div>
         )}
@@ -102,7 +111,7 @@ export const LoginForm: React.FC = () => {
             error={errors.email}
             disabled={isLoading}
             labelClassName="text-[#E2E8F0] font-semibold text-xs tracking-wider uppercase block mb-2"
-            className="!rounded-2xl !py-3.5 !pl-11 !bg-[#1E293B] !border-[#334155] !text-[#FFFFFF] placeholder:!text-[#94A3B8] focus:!border-[#8B5CF6] focus:!ring-[#8B5CF6]/20 focus:!ring-4"
+            className="!rounded-2xl !border-[#334155] !bg-[#1E293B] !py-3.5 !pl-11 !text-[#FFFFFF] placeholder:!text-[#94A3B8] focus:!border-[#8B5CF6] focus:!ring-4 focus:!ring-[#8B5CF6]/20"
           />
 
           <PasswordInput
@@ -113,23 +122,23 @@ export const LoginForm: React.FC = () => {
             error={errors.password}
             disabled={isLoading}
             labelClassName="text-[#E2E8F0] font-semibold text-xs tracking-wider uppercase block mb-2"
-            className="!rounded-2xl !py-3.5 !bg-[#1E293B] !border-[#334155] !text-[#FFFFFF] placeholder:!text-[#94A3B8] focus:!border-[#8B5CF6] focus:!ring-[#8B5CF6]/20 focus:!ring-4"
+            className="!rounded-2xl !border-[#334155] !bg-[#1E293B] !py-3.5 !text-[#FFFFFF] placeholder:!text-[#94A3B8] focus:!border-[#8B5CF6] focus:!ring-4 focus:!ring-[#8B5CF6]/20"
           />
 
-          <div className="flex items-center justify-between text-xs font-semibold select-none py-1">
-            <label className="text-[#E2E8F0] flex cursor-pointer items-center gap-2.5">
+          <div className="flex items-center justify-between py-1 text-xs font-semibold select-none">
+            <label className="flex cursor-pointer items-center gap-2.5 text-[#E2E8F0]">
               <input
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="border-slate-700 bg-slate-800 text-[#8B5CF6] focus:ring-[#8B5CF6]/20 h-4 w-4 cursor-pointer rounded accent-[#8B5CF6] focus:ring-offset-[#0B0F19]"
+                className="h-4 w-4 cursor-pointer rounded border-slate-700 bg-slate-800 text-[#8B5CF6] accent-[#8B5CF6] focus:ring-[#8B5CF6]/20 focus:ring-offset-[#0B0F19]"
                 disabled={isLoading}
               />
               <span>Remember me</span>
             </label>
             <Link
               to="/forgot-password"
-              className="text-[#8B5CF6] hover:text-[#A855F7] transition-colors duration-200 hover:underline"
+              className="text-[#8B5CF6] transition-colors duration-200 hover:text-[#A855F7] hover:underline"
             >
               Forgot password?
             </Link>
@@ -138,7 +147,7 @@ export const LoginForm: React.FC = () => {
           <Button
             type="submit"
             variant="primary"
-            className="mt-3 w-full justify-center !py-3.5 text-center font-bold !rounded-2xl !bg-gradient-to-r !from-[#7C3AED] !to-[#9333EA] hover:!from-[#8B5CF6] hover:!to-[#A855F7] !shadow-[0_12px_40px_rgba(124,58,237,0.35)] hover:scale-[1.01] active:scale-[0.99] transition-all duration-200"
+            className="mt-3 w-full justify-center !rounded-2xl !bg-gradient-to-r !from-[#7C3AED] !to-[#9333EA] !py-3.5 text-center font-bold !shadow-[0_12px_40px_rgba(124,58,237,0.35)] transition-all duration-200 hover:scale-[1.01] hover:!from-[#8B5CF6] hover:!to-[#A855F7] active:scale-[0.99]"
             loading={isLoading}
             disabled={isLoading}
             rightIcon={!isLoading ? <ArrowRight className="h-4.5 w-4.5" /> : undefined}
@@ -148,8 +157,8 @@ export const LoginForm: React.FC = () => {
         </form>
 
         <div className="relative my-6 flex items-center justify-center select-none">
-          <div className="bg-[#334155]/60 absolute inset-x-0 h-px" />
-          <span className="bg-[#0F172A] text-[#94A3B8] relative z-10 px-4 text-[10px] font-bold tracking-widest uppercase">
+          <div className="absolute inset-x-0 h-px bg-[#334155]/60" />
+          <span className="relative z-10 bg-[#0F172A] px-4 text-[10px] font-bold tracking-widest text-[#94A3B8] uppercase">
             Or continue with
           </span>
         </div>
@@ -178,7 +187,7 @@ export const LoginForm: React.FC = () => {
           Don't have an account?{' '}
           <Link
             to={ROUTES.REGISTER}
-            className="text-[#8B5CF6] hover:text-[#A855F7] font-bold hover:underline transition-colors duration-200"
+            className="font-bold text-[#8B5CF6] transition-colors duration-200 hover:text-[#A855F7] hover:underline"
           >
             Create Account
           </Link>

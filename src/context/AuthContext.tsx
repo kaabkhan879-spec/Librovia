@@ -62,7 +62,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
-      setLoading(false)
+      setTimeout(() => setLoading(false), 0)
       return
     }
 
@@ -227,10 +227,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.user) {
         const userEmail = data.user.email || email
         const role = await fetchUserRole(data.user.id)
-        
+
         // Cache role on successful login
         localStorage.setItem(`librovia_role_${data.user.id}`, role)
-        
+
         const loggedUser: User = {
           id: data.user.id,
           email: userEmail,
@@ -243,14 +243,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(loggedUser)
         setLoading(false)
 
-        auditService.insertLog({
-          event: 'User Login',
-          category: 'Authentication',
-          severity: 'Info',
-          actor_email: userEmail,
-          actor_role: role,
-          metadata: { userId: data.user.id },
-        }).catch(err => console.error('Failed to log login audit event:', err))
+        auditService
+          .insertLog({
+            event: 'User Login',
+            category: 'Authentication',
+            severity: 'Info',
+            actor_email: userEmail,
+            actor_role: role,
+            metadata: { userId: data.user.id },
+          })
+          .catch((err) => console.error('Failed to log login audit event:', err))
 
         return loggedUser
       }

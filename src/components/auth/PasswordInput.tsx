@@ -17,14 +17,18 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
     return (
       <div className="w-full space-y-1.5 text-left">
         {label && (
-          <label className={labelClassName || "text-text-sub font-sans text-xs font-bold tracking-wider uppercase"}>
+          <label
+            className={
+              labelClassName || 'text-text-sub font-sans text-xs font-bold tracking-wider uppercase'
+            }
+          >
             {label}
           </label>
         )}
 
         <div className="relative rounded-lg shadow-sm">
           {/* Left Icon */}
-          <div className="text-[#A78BFA] pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-[#A78BFA]">
             <Lock className="h-4 w-4" />
           </div>
 
@@ -39,7 +43,7 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="text-[#A78BFA]/70 hover:text-[#A78BFA] absolute inset-y-0 right-0 flex cursor-pointer items-center pr-3 focus:outline-none"
+            className="absolute inset-y-0 right-0 flex cursor-pointer items-center pr-3 text-[#A78BFA]/70 hover:text-[#A78BFA] focus:outline-none"
             aria-label={showPassword ? 'Hide password' : 'Show password'}
           >
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}

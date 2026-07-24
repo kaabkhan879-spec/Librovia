@@ -7,12 +7,9 @@ export const PublicLayout: React.FC = () => {
   const location = useLocation()
 
   // Define paths that correspond to self-contained auth layouts
-  const isAuthRoute = [
-    '/login',
-    '/register',
-    '/forgot-password',
-    '/reset-password',
-  ].includes(location.pathname)
+  const isAuthRoute = ['/login', '/register', '/forgot-password', '/reset-password'].includes(
+    location.pathname
+  )
 
   if (isAuthRoute) {
     return <Outlet />

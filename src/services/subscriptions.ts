@@ -167,17 +167,19 @@ export const subscriptionsService = {
   async getUserSubscription(userId: string): Promise<UserSubscription | null> {
     if (!userId) return null
     try {
-      let { data, error } = await supabase
+      const { data: initialData, error } = await supabase
         .from('user_subscriptions')
         .select('*, plan:subscription_plans(*)')
         .eq('user_id', userId)
         .maybeSingle()
 
+      let activeSub = initialData
+
       if (error) {
         console.error('Failed to query user subscription:', error.message)
       }
 
-      if (!data) {
+      if (!activeSub) {
         // Fetch database plans to get free tier features dynamically
         const plans = await this.getSubscriptionPlans()
         const freePlan = plans.find((p) => p.id === 'free') || DEFAULT_PLANS[0]
@@ -202,7 +204,7 @@ export const subscriptionsService = {
           .single()
 
         if (!insertError && inserted) {
-          data = inserted
+          activeSub = inserted
         } else {
           return {
             user_id: userId,
@@ -216,7 +218,7 @@ export const subscriptionsService = {
         }
       }
 
-      return data as unknown as UserSubscription
+      return activeSub as unknown as UserSubscription
     } catch (err) {
       console.warn('Failed to load user subscription from DB:', err)
       return null
@@ -402,10 +404,17 @@ export const subscriptionsService = {
       supabase.from('user_roles').select('user_id, email'),
     ])
 
-    const profilesMap = new Map(profilesRes.data?.map((p: any) => [p.id, p.display_name]) || [])
-    const rolesMap = new Map(rolesRes.data?.map((r: any) => [r.user_id, r.email]) || [])
+    const profilesMap = new Map<string, string | null>(
+      profilesRes.data?.map((p: { id: string; display_name: string | null }) => [
+        p.id,
+        p.display_name,
+      ]) || []
+    )
+    const rolesMap = new Map<string, string>(
+      rolesRes.data?.map((r: { user_id: string; email: string }) => [r.user_id, r.email]) || []
+    )
 
-    return (requests || []).map((row: any) => ({
+    return (requests || []).map((row: Record<string, unknown> & { user_id: string }) => ({
       ...row,
       user: {
         email: rolesMap.get(row.user_id) || 'Unknown',
@@ -441,7 +450,7 @@ export const subscriptionsService = {
     const userEmail = roleData?.email || 'Unknown'
     req.user = { email: userEmail }
 
-    const updates: any = {
+    const updates: Record<string, unknown> = {
       status,
       reviewed_by: user.id,
       reviewed_at: new Date().toISOString(),

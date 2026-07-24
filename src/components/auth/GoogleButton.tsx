@@ -11,7 +11,7 @@ export const GoogleButton: React.FC<GoogleButtonProps> = ({
   return (
     <button
       type="button"
-      className="border border-slate-200 bg-white text-[#0F172A] hover:bg-slate-50 hover:scale-[1.01] active:scale-[0.99] flex w-full cursor-pointer items-center justify-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold shadow-sm transition-all focus:ring-2 focus:outline-none"
+      className="flex w-full cursor-pointer items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-[#0F172A] shadow-sm transition-all hover:scale-[1.01] hover:bg-slate-50 focus:ring-2 focus:outline-none active:scale-[0.99]"
       {...props}
     >
       <svg className="h-4.5 w-4.5 shrink-0" viewBox="0 0 24 24">

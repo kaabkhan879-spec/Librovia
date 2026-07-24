@@ -98,13 +98,22 @@ export const RegisterForm: React.FC = () => {
         </div>
 
         {!isSupabaseConfigured && (
-          <div className="bg-amber-950/40 border border-amber-500/30 rounded-2xl p-4 text-xs text-amber-200 space-y-1.5 backdrop-blur-sm">
-            <div className="font-bold flex items-center gap-1.5 text-amber-400">
-              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500 animate-pulse" />
+          <div className="space-y-1.5 rounded-2xl border border-amber-500/30 bg-amber-950/40 p-4 text-xs text-amber-200 backdrop-blur-sm">
+            <div className="flex items-center gap-1.5 font-bold text-amber-400">
+              <AlertTriangle className="h-4 w-4 shrink-0 animate-pulse text-amber-500" />
               <span>Configuration Required</span>
             </div>
             <p className="leading-relaxed text-amber-200/80">
-              Supabase connection keys are missing from the build environment. If this is deployed on Vercel, please add <code className="bg-black/35 px-1 py-0.5 rounded text-amber-300 font-mono text-[10px]">VITE_SUPABASE_URL</code> and <code className="bg-black/35 px-1 py-0.5 rounded text-amber-300 font-mono text-[10px]">VITE_SUPABASE_ANON_KEY</code> to your Vercel Project Settings, then redeploy the project.
+              Supabase connection keys are missing from the build environment. If this is deployed
+              on Vercel, please add{' '}
+              <code className="rounded bg-black/35 px-1 py-0.5 font-mono text-[10px] text-amber-300">
+                VITE_SUPABASE_URL
+              </code>{' '}
+              and{' '}
+              <code className="rounded bg-black/35 px-1 py-0.5 font-mono text-[10px] text-amber-300">
+                VITE_SUPABASE_ANON_KEY
+              </code>{' '}
+              to your Vercel Project Settings, then redeploy the project.
             </p>
           </div>
         )}
