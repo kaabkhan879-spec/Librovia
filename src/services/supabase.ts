@@ -10,4 +10,11 @@ if (!import.meta.env.VITE_SUPABASE_ANON_KEY) {
   console.error('Supabase Anon Key is undefined at runtime!')
 }
 
-export const supabase = createClient<any>(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient<any>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    flowType: 'pkce'
+  }
+})

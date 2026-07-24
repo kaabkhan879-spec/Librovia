@@ -286,6 +286,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       actor_role: 'user',
       metadata: { email, displayName },
     })
+    setLoading(false)
   }
 
   const logout = async () => {
