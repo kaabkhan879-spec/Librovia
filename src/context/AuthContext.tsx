@@ -59,25 +59,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return
     }
 
-    // 1. Recover session on load
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        const email = session.user.email || ''
-        const role = await fetchUserRole(session.user.id)
-        setUser({
-          id: session.user.id,
-          email,
-          displayName: session.user.user_metadata?.display_name || email.split('@')[0],
-          avatarUrl:
-            session.user.user_metadata?.avatar_url ||
-            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&h=100&q=80',
-          role,
-        })
-      }
-      setLoading(false)
-    })
-
-    // 2. Setup auth state change listener
+    // 1. Setup auth state change listener (automatically fires with initial session state)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -89,20 +71,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (session?.user) {
         const email = session.user.email || ''
-        const role = await fetchUserRole(session.user.id)
-        setUser({
-          id: session.user.id,
-          email,
-          displayName: session.user.user_metadata?.display_name || email.split('@')[0],
-          avatarUrl:
-            session.user.user_metadata?.avatar_url ||
-            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&h=100&q=80',
-          role,
-        })
+        const cacheKey = `librovia_role_${session.user.id}`
+        const cachedRole = localStorage.getItem(cacheKey) as 'user' | 'super_admin' | null
+
+        // Optimistically set state and stop loading spinner if role is cached
+        if (cachedRole) {
+          setUser({
+            id: session.user.id,
+            email,
+            displayName: session.user.user_metadata?.display_name || email.split('@')[0],
+            avatarUrl:
+              session.user.user_metadata?.avatar_url ||
+              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&h=100&q=80',
+            role: cachedRole,
+          })
+          setLoading(false)
+        }
+
+        // Fetch / verify the role in the background (stale-while-revalidate pattern)
+        fetchUserRole(session.user.id)
+          .then((role) => {
+            localStorage.setItem(cacheKey, role)
+            setUser((prev) => {
+              if (prev && prev.id === session.user.id) {
+                return { ...prev, role }
+              }
+              return prev
+            })
+            setLoading(false)
+          })
+          .catch(() => {
+            if (!cachedRole) {
+              setUser({
+                id: session.user.id,
+                email,
+                displayName: session.user.user_metadata?.display_name || email.split('@')[0],
+                avatarUrl:
+                  session.user.user_metadata?.avatar_url ||
+                  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&h=100&q=80',
+                role: 'user',
+              })
+              setLoading(false)
+            }
+          })
       } else {
         setUser(null)
+        setLoading(false)
       }
-      setLoading(false)
     })
 
     return () => {
@@ -123,6 +138,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (data.user) {
       const userEmail = data.user.email || email
       const role = await fetchUserRole(data.user.id)
+      
+      // Cache role on successful login
+      localStorage.setItem(`librovia_role_${data.user.id}`, role)
+      
       const loggedUser: User = {
         id: data.user.id,
         email: userEmail,

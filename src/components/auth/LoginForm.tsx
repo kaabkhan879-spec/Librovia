@@ -70,10 +70,10 @@ export const LoginForm: React.FC = () => {
 
   return (
     <AuthCard>
-      <div className="space-y-6 text-left">
+      <div className="space-y-7 text-left">
         <div>
-          <h2 className="text-text-main text-3xl font-extrabold tracking-tight">Welcome Back 👋</h2>
-          <p className="text-text-muted mt-1.5 text-xs font-semibold">
+          <h2 className="text-[#FFFFFF] text-3xl font-bold tracking-tight">Welcome Back 👋</h2>
+          <p className="text-[#CBD5E1] mt-2 text-xs font-semibold">
             Sign in to continue your reading journey.
           </p>
         </div>
@@ -91,16 +91,18 @@ export const LoginForm: React.FC = () => {
         )}
 
         {/* Auth form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-6">
           <Input
             label="Email Address"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="name@example.com"
-            leftIcon={<Mail className="h-4 w-4" />}
+            leftIcon={<Mail className="h-4.5 w-4.5 text-[#A78BFA]" />}
             error={errors.email}
             disabled={isLoading}
+            labelClassName="text-[#E2E8F0] font-semibold text-xs tracking-wider uppercase block mb-2"
+            className="!rounded-2xl !py-3.5 !pl-11 !bg-[#1E293B] !border-[#334155] !text-[#FFFFFF] placeholder:!text-[#94A3B8] focus:!border-[#8B5CF6] focus:!ring-[#8B5CF6]/20 focus:!ring-4"
           />
 
           <PasswordInput
@@ -110,22 +112,24 @@ export const LoginForm: React.FC = () => {
             placeholder="••••••••"
             error={errors.password}
             disabled={isLoading}
+            labelClassName="text-[#E2E8F0] font-semibold text-xs tracking-wider uppercase block mb-2"
+            className="!rounded-2xl !py-3.5 !bg-[#1E293B] !border-[#334155] !text-[#FFFFFF] placeholder:!text-[#94A3B8] focus:!border-[#8B5CF6] focus:!ring-[#8B5CF6]/20 focus:!ring-4"
           />
 
-          <div className="flex items-center justify-between text-xs font-semibold select-none">
-            <label className="text-text-sub flex cursor-pointer items-center gap-2">
+          <div className="flex items-center justify-between text-xs font-semibold select-none py-1">
+            <label className="text-[#E2E8F0] flex cursor-pointer items-center gap-2.5">
               <input
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="border-border-base text-primary-600 focus:ring-primary-500/10 h-4 w-4 cursor-pointer rounded"
+                className="border-slate-700 bg-slate-800 text-[#8B5CF6] focus:ring-[#8B5CF6]/20 h-4 w-4 cursor-pointer rounded accent-[#8B5CF6] focus:ring-offset-[#0B0F19]"
                 disabled={isLoading}
               />
               <span>Remember me</span>
             </label>
             <Link
               to="/forgot-password"
-              className="text-primary-600 hover:text-primary-700 hover:underline"
+              className="text-[#8B5CF6] hover:text-[#A855F7] transition-colors duration-200 hover:underline"
             >
               Forgot password?
             </Link>
@@ -134,18 +138,18 @@ export const LoginForm: React.FC = () => {
           <Button
             type="submit"
             variant="primary"
-            className="mt-2 w-full justify-center py-2.5 text-center font-bold"
+            className="mt-3 w-full justify-center !py-3.5 text-center font-bold !rounded-2xl !bg-gradient-to-r !from-[#7C3AED] !to-[#9333EA] hover:!from-[#8B5CF6] hover:!to-[#A855F7] !shadow-[0_12px_40px_rgba(124,58,237,0.35)] hover:scale-[1.01] active:scale-[0.99] transition-all duration-200"
             loading={isLoading}
             disabled={isLoading}
-            rightIcon={!isLoading ? <ArrowRight className="h-4 w-4" /> : undefined}
+            rightIcon={!isLoading ? <ArrowRight className="h-4.5 w-4.5" /> : undefined}
           >
             {isLoading ? 'Signing In...' : 'Login to Librovia'}
           </Button>
         </form>
 
-        <div className="relative my-4 flex items-center justify-center select-none">
-          <div className="bg-border-base absolute inset-x-0 h-px" />
-          <span className="bg-bg-surface text-text-muted relative z-10 px-3 text-[10px] font-bold tracking-widest uppercase">
+        <div className="relative my-6 flex items-center justify-center select-none">
+          <div className="bg-[#334155]/60 absolute inset-x-0 h-px" />
+          <span className="bg-[#0F172A] text-[#94A3B8] relative z-10 px-4 text-[10px] font-bold tracking-widest uppercase">
             Or continue with
           </span>
         </div>
@@ -170,11 +174,11 @@ export const LoginForm: React.FC = () => {
           label={isLoading ? 'Connecting Google...' : 'Continue with Google'}
         />
 
-        <p className="text-text-sub pt-2 text-center text-xs font-semibold select-none">
+        <p className="text-text-sub pt-3 text-center text-xs font-semibold select-none">
           Don't have an account?{' '}
           <Link
             to={ROUTES.REGISTER}
-            className="text-primary-600 hover:text-primary-700 font-bold hover:underline"
+            className="text-[#8B5CF6] hover:text-[#A855F7] font-bold hover:underline transition-colors duration-200"
           >
             Create Account
           </Link>

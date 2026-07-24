@@ -1,12 +1,16 @@
 {
   "name": "Librovia",
   "short_name": "Librovia",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "window-controls-overlay"],
   "background_color": "#0B0F19",
   "theme_color": "#8B5CF6",
   "orientation": "portrait",
   "description": "Store, organize, read, and sync your books securely across all your devices.",
+  "categories": ["books", "education", "utilities"],
   "icons": [
     {
       "src": "/assets/icon-192.png",
@@ -61,6 +65,22 @@
       "description": "Change reading settings",
       "url": "/settings",
       "icons": [{ "src": "/assets/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/assets/cozy_library_reading.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Librovia Premium Cinematic Canvas & Shelf View"
+    },
+    {
+      "src": "/assets/cozy_library_reading.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Librovia Reading Canvas Mobile View"
     }
   ]
 }

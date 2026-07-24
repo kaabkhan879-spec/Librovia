@@ -23,9 +23,9 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
         <div className="pointer-events-none absolute top-1/2 left-1/2 h-[400px] w-[400px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-purple-600/5 blur-3xl select-none" />
 
         <motion.div
-          initial={{ opacity: 0, y: 15 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: 'easeOut' }}
+          transition={{ duration: 0.25, ease: 'easeOut' }}
           className="relative z-10 w-full max-w-md"
         >
           {children}

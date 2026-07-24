@@ -23,8 +23,8 @@ export const PWAHandler: React.FC = () => {
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
 
-    // 2. Register Service Worker and listen for updates
-    if ('serviceWorker' in navigator) {
+    // 2. Register Service Worker and listen for updates (Only in Production)
+    if ('serviceWorker' in navigator && import.meta.env.PROD) {
       navigator.serviceWorker
         .register('/sw.js')
         .then((reg) => {
