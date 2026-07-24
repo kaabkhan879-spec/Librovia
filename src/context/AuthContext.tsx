@@ -243,14 +243,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(loggedUser)
         setLoading(false)
 
-        await auditService.insertLog({
+        auditService.insertLog({
           event: 'User Login',
           category: 'Authentication',
           severity: 'Info',
           actor_email: userEmail,
           actor_role: role,
           metadata: { userId: data.user.id },
-        })
+        }).catch(err => console.error('Failed to log login audit event:', err))
 
         return loggedUser
       }

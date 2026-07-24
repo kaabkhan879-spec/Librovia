@@ -10,11 +10,17 @@ if (!import.meta.env.VITE_SUPABASE_ANON_KEY) {
   console.error('Supabase Anon Key is undefined at runtime!')
 }
 
+// PKCE flow requires a secure context (HTTPS or localhost) due to window.crypto.subtle
+const isSecureContext =
+  typeof window !== 'undefined' &&
+  !!window.crypto &&
+  !!window.crypto.subtle
+
 export const supabase = createClient<any>(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    flowType: 'pkce'
+    flowType: isSecureContext ? 'pkce' : 'implicit'
   }
 })
